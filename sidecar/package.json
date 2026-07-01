@@ -1,0 +1,10 @@
+{
+  "name": "mold-management-sidecar",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "exceljs": "^4.4.0",
+    "hono": "^4.0.0",
+    "@hono/node-server": "^1.0.0"
+  }
+}
