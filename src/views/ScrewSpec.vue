@@ -3,6 +3,7 @@
     <el-card>
       <template #header>
         <div class="card-header">
+          <el-icon><Document /></el-icon>
           <span>螺丝规格管理</span>
           <el-button type="primary" @click="handleAdd">
             <el-icon><Plus /></el-icon>
@@ -332,16 +333,5 @@ async function handleSubmit() {
 <style scoped>
 .page-container {
   height: 100%;
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.dialog-footer {
-  display: flex;
-  justify-content: flex-end;
 }
 </style>

@@ -2,98 +2,30 @@
   <div class="page-container">
     <el-card>
       <template #header>
-        <span>库存汇总</span>
+        <div class="card-header">
+          <el-icon><DataAnalysis /></el-icon>
+          <span>库存汇总</span>
+        </div>
       </template>
 
-      <el-tabs v-model="activeTab">
+      <el-tabs v-model="activeTab" class="inventory-tabs">
         <el-tab-pane label="冲头库存" name="punch">
-          <el-table :data="punchStock" border style="width: 100%" v-loading="loading">
-            <el-table-column prop="name" label="冲头名称" width="120" />
-            <el-table-column prop="currentStock" label="当前库存" width="100" />
-            <el-table-column prop="safetyStock" label="安全库存" width="100" />
-            <el-table-column prop="status" label="库存状态" width="100">
-              <template #default="{ row }">
-                <el-tag :type="row.status === '需订购' ? 'danger' : 'success'">
-                  {{ row.status }}
-                </el-tag>
-              </template>
-            </el-table-column>
-          </el-table>
+          <StockTable :data="punchStock" name-label="冲头名称" :loading="loading" />
         </el-tab-pane>
-
         <el-tab-pane label="牙板库存" name="die">
-          <el-table :data="dieStock" border style="width: 100%">
-            <el-table-column prop="name" label="牙板名称" width="120" />
-            <el-table-column prop="currentStock" label="当前库存" width="100" />
-            <el-table-column prop="safetyStock" label="安全库存" width="100" />
-            <el-table-column prop="status" label="库存状态" width="100">
-              <template #default="{ row }">
-                <el-tag :type="row.status === '需订购' ? 'danger' : 'success'">
-                  {{ row.status }}
-                </el-tag>
-              </template>
-            </el-table-column>
-          </el-table>
+          <StockTable :data="dieStock" name-label="牙板名称" :loading="loading" />
         </el-tab-pane>
-
         <el-tab-pane label="皮带库存" name="belt">
-          <el-table :data="beltStock" border style="width: 100%">
-            <el-table-column prop="name" label="皮带名称" width="120" />
-            <el-table-column prop="currentStock" label="当前库存" width="100" />
-            <el-table-column prop="safetyStock" label="安全库存" width="100" />
-            <el-table-column prop="status" label="库存状态" width="100">
-              <template #default="{ row }">
-                <el-tag :type="row.status === '需订购' ? 'danger' : 'success'">
-                  {{ row.status }}
-                </el-tag>
-              </template>
-            </el-table-column>
-          </el-table>
+          <StockTable :data="beltStock" name-label="皮带名称" :loading="loading" />
         </el-tab-pane>
-
         <el-tab-pane label="主模具库存" name="mainMold">
-          <el-table :data="mainMoldStock" border style="width: 100%">
-            <el-table-column prop="name" label="主模具名称" width="120" />
-            <el-table-column prop="currentStock" label="当前库存" width="100" />
-            <el-table-column prop="safetyStock" label="安全库存" width="100" />
-            <el-table-column prop="status" label="库存状态" width="100">
-              <template #default="{ row }">
-                <el-tag :type="row.status === '需订购' ? 'danger' : 'success'">
-                  {{ row.status }}
-                </el-tag>
-              </template>
-            </el-table-column>
-          </el-table>
+          <StockTable :data="mainMoldStock" name-label="主模具名称" :loading="loading" />
         </el-tab-pane>
-
         <el-tab-pane label="剪刀库存" name="scissor">
-          <el-table :data="scissorStock" border style="width: 100%">
-            <el-table-column prop="name" label="剪刀名称" width="120" />
-            <el-table-column prop="currentStock" label="当前库存" width="100" />
-            <el-table-column prop="safetyStock" label="安全库存" width="100" />
-            <el-table-column prop="status" label="库存状态" width="100">
-              <template #default="{ row }">
-                <el-tag :type="row.status === '需订购' ? 'danger' : 'success'">
-                  {{ row.status }}
-                </el-tag>
-              </template>
-            </el-table-column>
-          </el-table>
+          <StockTable :data="scissorStock" name-label="剪刀名称" :loading="loading" />
         </el-tab-pane>
-
         <el-tab-pane label="上冲库存" name="upperPunch">
-          <el-table :data="upperPunchStock" border style="width: 100%">
-            <el-table-column prop="name" label="上冲名称" width="120" />
-            <el-table-column prop="currentStock" label="当前库存" width="100" />
-            <el-table-column prop="safetyStock" label="安全库存" width="100" />
-            <el-table-column prop="status" label="库存状态" width="100">
-              <template #default="{ row }">
-                <el-tag :type="row.status === '需订购' ? 'danger' : 'success'">
-                  {{ row.status }}
-                </el-tag>
-              </template>
-            </el-table-column>
-          </el-table>
+          <StockTable :data="upperPunchStock" name-label="上冲名称" :loading="loading" />
         </el-tab-pane>
       </el-tabs>
     </el-card>
@@ -104,6 +36,7 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { stockCalcApi } from '../api'
+import StockTable from '../components/StockTable.vue'
 
 const activeTab = ref('punch')
 const punchStock = ref<any[]>([])
@@ -134,7 +67,7 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.page-container {
-  height: 100%;
+.inventory-tabs {
+  margin-top: 8px;
 }
 </style>

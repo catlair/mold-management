@@ -3,6 +3,7 @@
     <el-card>
       <template #header>
         <div class="card-header">
+          <el-icon><Top /></el-icon>
           <span>上冲管理</span>
           <el-button type="primary" @click="handleAdd">
             <el-icon><Plus /></el-icon>
@@ -414,15 +415,5 @@ async function handleDeleteLink(row: any) {
 <style scoped>
 .page-container {
   height: 100%;
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.tab-header {
-  margin-bottom: 16px;
 }
 </style>
