@@ -14,7 +14,8 @@
       {
         "title": "模具管理系统",
         "width": 1200,
-        "height": 800
+        "height": 800,
+        "backgroundColor": "#667eea"
       }
     ],
     "security": {
