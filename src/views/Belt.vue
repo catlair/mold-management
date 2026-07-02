@@ -15,11 +15,12 @@
       <el-tabs v-model="activeTab">
         <el-tab-pane label="皮带信息" name="info">
           <el-table :data="beltList" border style="width: 100%" v-loading="loading">
-            <el-table-column prop="name" label="名称" width="200" sortable />
-            <el-table-column prop="spec" label="规格" width="120" sortable />
-            <el-table-column prop="machine" label="适用机器" width="120" sortable :filters="machineFilters" :filter-method="filterHandler" />
-            <el-table-column prop="safetyStock" label="安全库存" width="100" sortable />
-            <el-table-column label="操作" width="150">
+            <el-table-column prop="name" label="名称" width="180" sortable />
+            <el-table-column prop="spec" label="规格" width="140" sortable />
+            <el-table-column prop="machine" label="适用机器" width="140" sortable :filters="machineFilters" :filter-method="filterHandler" />
+            <el-table-column prop="safetyStock" label="安全库存" width="120" sortable />
+            <el-table-column prop="remark" label="备注" min-width="150" />
+            <el-table-column label="操作" width="150" fixed="right">
               <template #default="{ row }">
                 <el-button size="small" @click="handleEdit(row)">编辑</el-button>
                 <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
@@ -93,6 +94,9 @@
         </el-form-item>
         <el-form-item label="安全库存">
           <el-input-number v-model="form.safetyStock" :min="0" />
+        </el-form-item>
+        <el-form-item label="备注">
+          <el-input v-model="form.remark" type="textarea" :rows="2" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -207,7 +211,7 @@ function getBeltName(beltId: string) {
 
 const dialogVisible = ref(false)
 const isEdit = ref(false)
-const form = ref({ id: '', name: '', spec: '', machine: '', safetyStock: 0 })
+const form = ref({ id: '', name: '', spec: '', machine: '', safetyStock: 0, remark: '' })
 
 const showOrderDialog = ref(false)
 const orderForm = ref({ beltId: '', quantity: 1, orderDate: getCurrentDateTime(), status: '未到货', remark: '' })
@@ -257,7 +261,7 @@ async function loadData() {
 
 function handleAdd() {
   isEdit.value = false
-  form.value = { id: '', name: '', spec: '', machine: '', safetyStock: 0 }
+  form.value = { id: '', name: '', spec: '', machine: '', safetyStock: 0, remark: '' }
   dialogVisible.value = true
 }
 
