@@ -62,12 +62,21 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 
 const route = useRoute()
 const activeMenu = computed(() => route.path)
 const isCollapse = ref(false)
+
+onMounted(() => {
+  const loading = document.getElementById('app-loading')
+  if (loading) {
+    loading.style.opacity = '0'
+    loading.style.transition = 'opacity 0.3s ease'
+    setTimeout(() => loading.remove(), 300)
+  }
+})
 </script>
 
 <style>
@@ -91,11 +100,12 @@ html, body {
 
 .app-aside {
   background: #304156;
-  overflow: visible;
-  transition: width 0.3s;
+  overflow: hidden;
+  transition: width 0.3s ease-in-out;
   position: relative;
   display: flex;
   flex-direction: column;
+  will-change: width;
 }
 
 .logo {
@@ -117,6 +127,7 @@ html, body {
   background: #304156;
   flex: 1;
   overflow-y: auto;
+  will-change: transform;
 }
 
 .el-menu-vertical:not(.el-menu--collapse) {
