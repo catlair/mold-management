@@ -34,15 +34,15 @@
             <el-button type="primary" size="small" @click="showOrderDialog = true">新增订购</el-button>
           </div>
           <el-table :data="orderList" border style="width: 100%">
-            <el-table-column label="剪刀" width="120" sortable>
+            <el-table-column label="剪刀" width="140" sortable>
               <template #default="{ row }">
                 {{ getScissorName(row.scissorId) }}
               </template>
             </el-table-column>
-            <el-table-column prop="quantity" label="订购数量" width="100" sortable />
-            <el-table-column prop="orderDate" label="订购时间" width="120" sortable />
-            <el-table-column prop="status" label="到货状态" width="100" sortable :filters="statusFilters" :filter-method="filterHandler" />
-            <el-table-column prop="remark" label="备注" />
+            <el-table-column prop="quantity" label="订购数量" width="120" sortable />
+            <el-table-column prop="orderDate" label="订购时间" width="180" sortable />
+            <el-table-column prop="status" label="到货状态" width="120" sortable :filters="statusFilters" :filter-method="filterHandler" />
+            <el-table-column prop="remark" label="备注" min-width="150" />
           </el-table>
         </el-tab-pane>
 
@@ -51,15 +51,15 @@
             <el-button type="primary" size="small" @click="showUseDialog = true">新增使用</el-button>
           </div>
           <el-table :data="useList" border style="width: 100%">
-            <el-table-column label="剪刀" width="120" sortable>
+            <el-table-column label="剪刀" width="140" sortable>
               <template #default="{ row }">
                 {{ getScissorName(row.scissorId) }}
               </template>
             </el-table-column>
-            <el-table-column prop="user" label="使用人" width="100" sortable />
-            <el-table-column prop="quantity" label="使用数量" width="100" sortable />
-            <el-table-column prop="useDate" label="使用时间" width="120" sortable />
-            <el-table-column prop="remark" label="备注" />
+            <el-table-column prop="user" label="使用人" width="120" sortable />
+            <el-table-column prop="quantity" label="使用数量" width="120" sortable />
+            <el-table-column prop="useDate" label="使用时间" width="180" sortable />
+            <el-table-column prop="remark" label="备注" min-width="150" />
           </el-table>
         </el-tab-pane>
 
