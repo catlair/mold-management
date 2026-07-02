@@ -72,8 +72,8 @@ const isCollapse = ref(false)
 onMounted(() => {
   const loading = document.getElementById('app-loading')
   if (loading) {
-    loading.style.opacity = '0'
     loading.style.transition = 'opacity 0.3s ease'
+    loading.style.opacity = '0'
     setTimeout(() => loading.remove(), 300)
   }
 })
