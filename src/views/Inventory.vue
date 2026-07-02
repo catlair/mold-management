@@ -7,7 +7,7 @@
 
       <el-tabs v-model="activeTab">
         <el-tab-pane label="冲头库存" name="punch">
-          <el-table :data="punchStock" border style="width: 100%">
+          <el-table :data="punchStock" border style="width: 100%" v-loading="loading">
             <el-table-column prop="name" label="冲头名称" width="120" />
             <el-table-column prop="currentStock" label="当前库存" width="100" />
             <el-table-column prop="safetyStock" label="安全库存" width="100" />
@@ -112,8 +112,10 @@ const beltStock = ref<any[]>([])
 const mainMoldStock = ref<any[]>([])
 const scissorStock = ref<any[]>([])
 const upperPunchStock = ref<any[]>([])
+const loading = ref(true)
 
 onMounted(async () => {
+  loading.value = true
   try {
     const result = await stockCalcApi.calculateAll()
     punchStock.value = result.punch || []
@@ -125,6 +127,8 @@ onMounted(async () => {
   } catch (error) {
     ElMessage.error('加载库存数据失败')
     console.error(error)
+  } finally {
+    loading.value = false
   }
 })
 </script>

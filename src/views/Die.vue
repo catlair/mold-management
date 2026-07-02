@@ -13,7 +13,7 @@
 
       <el-tabs v-model="activeTab">
         <el-tab-pane label="牙板信息" name="info">
-          <el-table :data="dieList" border style="width: 100%">
+          <el-table :data="dieList" border style="width: 100%" v-loading="loading">
             <el-table-column prop="name" label="名称" width="200" sortable />
             <el-table-column prop="machineType" label="机型" width="120" sortable :filters="machineTypeFilters" :filter-method="filterHandler" />
             <el-table-column prop="wireDiameter" label="线径" width="100" sortable />
@@ -105,13 +105,13 @@
     <!-- 添加/编辑对话框 -->
     <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑牙板' : '添加牙板'" width="500px">
       <el-form ref="formRef" :model="form" :rules="formRules" label-width="80px">
-        <el-form-item label="名称">
+        <el-form-item label="名称" prop="name">
           <el-input v-model="form.name" />
         </el-form-item>
-        <el-form-item label="机型">
+        <el-form-item label="机型" prop="machineType">
           <el-input v-model="form.machineType" />
         </el-form-item>
-        <el-form-item label="线径">
+        <el-form-item label="线径" prop="wireDiameter">
           <el-input v-model="form.wireDiameter" />
         </el-form-item>
         <el-form-item label="安全库存">
@@ -136,7 +136,7 @@
           <el-input-number v-model="orderForm.quantity" :min="1" />
         </el-form-item>
         <el-form-item label="订购时间">
-          <el-date-picker v-model="orderForm.orderDate" type="date" value-format="YYYY-MM-DD" />
+          <el-date-picker v-model="orderForm.orderDate" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" />
         </el-form-item>
         <el-form-item label="到货状态">
           <el-select v-model="orderForm.status">
@@ -222,6 +222,11 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance } from 'element-plus'
 import { dieApi, dieOrderApi, dieUseApi, dieLinkApi, screwSpecApi, stockCalcApi } from '../api'
 
+function getCurrentDateTime() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`
+}
+
 const activeTab = ref('info')
 const dieList = ref<any[]>([])
 const orderList = ref<any[]>([])
@@ -229,6 +234,7 @@ const useList = ref<any[]>([])
 const stockList = ref<any[]>([])
 const linkList = ref<any[]>([])
 const screwSpecList = ref<any[]>([])
+const loading = ref(true)
 
 // 筛选选项
 const machineTypeFilters = computed(() => {
@@ -268,10 +274,10 @@ const isEdit = ref(false)
 const form = ref({ id: '', name: '', machineType: '', wireDiameter: '', safetyStock: 0 })
 
 const showOrderDialog = ref(false)
-const orderForm = ref({ dieId: '', quantity: 1, orderDate: '', status: '未到货', remark: '' })
+const orderForm = ref({ dieId: '', quantity: 1, orderDate: getCurrentDateTime(), status: '未到货', remark: '' })
 
 const showUseDialog = ref(false)
-const useForm = ref({ dieId: '', user: '', quantity: 1, useDate: '', remark: '' })
+const useForm = ref({ dieId: '', user: '', quantity: 1, useDate: getCurrentDateTime(), remark: '' })
 
 const showLinkDialog = ref(false)
 const linkForm = ref({ dieId: '', screwSpecId: '', remark: '' })
@@ -307,6 +313,7 @@ onMounted(() => {
 })
 
 async function loadData() {
+  loading.value = true
   try {
     const [dies, orders, uses, links, screwSpecs] = await Promise.all([
       dieApi.getAll(),
@@ -320,11 +327,12 @@ async function loadData() {
     useList.value = uses
     linkList.value = links
     screwSpecList.value = screwSpecs
-    // 自动计算库存
     stockList.value = await stockCalcApi.calculate('die')
   } catch (error) {
     ElMessage.error('加载数据失败')
     console.error(error)
+  } finally {
+    loading.value = false
   }
 }
 

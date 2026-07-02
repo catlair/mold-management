@@ -11,7 +11,7 @@
         </div>
       </template>
 
-      <el-table :data="tableData" border style="width: 100%" max-height="600">
+      <el-table :data="tableData" border style="width: 100%" max-height="600" v-loading="loading">
         <el-table-column prop="name" label="螺丝名称" width="150" sortable />
         <el-table-column prop="headType" label="头型" width="100" sortable :filters="headTypeFilters" :filter-method="filterHandler" />
         <el-table-column prop="punch" label="冲头" width="100" sortable />
@@ -34,6 +34,9 @@
           </template>
         </el-table-column>
       </el-table>
+      <div v-if="!loading && tableData.length === 0" class="empty-state">
+        <el-empty description="暂无数据" />
+      </div>
     </el-card>
 
     <!-- 添加/编辑对话框 -->
@@ -45,7 +48,7 @@
       <el-form ref="formRef" :model="form" :rules="formRules" label-width="100px">
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="螺丝名称">
+            <el-form-item label="螺丝名称" prop="name">
               <el-input v-model="form.name" />
             </el-form-item>
           </el-col>
@@ -162,6 +165,7 @@ const punchList = ref<any[]>([])
 const dieList = ref<any[]>([])
 const dialogVisible = ref(false)
 const isEdit = ref(false)
+const loading = ref(true)
 
 // 表单引用
 const formRef = ref<FormInstance>()
@@ -240,6 +244,7 @@ onMounted(() => {
 })
 
 async function loadData() {
+  loading.value = true
   try {
     const [screws, punches, dies] = await Promise.all([
       screwSpecApi.getAll(),
@@ -252,6 +257,8 @@ async function loadData() {
   } catch (error) {
     ElMessage.error('加载数据失败')
     console.error(error)
+  } finally {
+    loading.value = false
   }
 }
 

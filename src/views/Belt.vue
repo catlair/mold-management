@@ -13,7 +13,7 @@
 
       <el-tabs v-model="activeTab">
         <el-tab-pane label="皮带信息" name="info">
-          <el-table :data="beltList" border style="width: 100%">
+          <el-table :data="beltList" border style="width: 100%" v-loading="loading">
             <el-table-column prop="name" label="名称" width="200" sortable />
             <el-table-column prop="spec" label="规格" width="120" sortable />
             <el-table-column prop="machine" label="适用机器" width="120" sortable :filters="machineFilters" :filter-method="filterHandler" />
@@ -81,13 +81,13 @@
     <!-- 添加/编辑对话框 -->
     <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑皮带' : '添加皮带'" width="500px">
       <el-form ref="formRef" :model="form" :rules="formRules" label-width="80px">
-        <el-form-item label="名称">
+        <el-form-item label="名称" prop="name">
           <el-input v-model="form.name" />
         </el-form-item>
-        <el-form-item label="规格">
+        <el-form-item label="规格" prop="spec">
           <el-input v-model="form.spec" />
         </el-form-item>
-        <el-form-item label="适用机器">
+        <el-form-item label="适用机器" prop="machine">
           <el-input v-model="form.machine" />
         </el-form-item>
         <el-form-item label="安全库存">
@@ -112,7 +112,7 @@
           <el-input-number v-model="orderForm.quantity" :min="1" />
         </el-form-item>
         <el-form-item label="订购时间">
-          <el-date-picker v-model="orderForm.orderDate" type="date" value-format="YYYY-MM-DD" />
+          <el-date-picker v-model="orderForm.orderDate" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" />
         </el-form-item>
         <el-form-item label="到货状态">
           <el-select v-model="orderForm.status">
@@ -165,11 +165,17 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance } from 'element-plus'
 import { beltApi, beltOrderApi, beltUseApi, stockCalcApi } from '../api'
 
+function getCurrentDateTime() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`
+}
+
 const activeTab = ref('info')
 const beltList = ref<any[]>([])
 const orderList = ref<any[]>([])
 const useList = ref<any[]>([])
 const stockList = ref<any[]>([])
+const loading = ref(true)
 
 // 筛选选项
 const machineFilters = computed(() => {
@@ -203,10 +209,10 @@ const isEdit = ref(false)
 const form = ref({ id: '', name: '', spec: '', machine: '', safetyStock: 0 })
 
 const showOrderDialog = ref(false)
-const orderForm = ref({ beltId: '', quantity: 1, orderDate: '', status: '未到货', remark: '' })
+const orderForm = ref({ beltId: '', quantity: 1, orderDate: getCurrentDateTime(), status: '未到货', remark: '' })
 
 const showUseDialog = ref(false)
-const useForm = ref({ beltId: '', user: '', quantity: 1, useDate: '', remark: '' })
+const useForm = ref({ beltId: '', user: '', quantity: 1, useDate: getCurrentDateTime(), remark: '' })
 
 // 表单引用
 const formRef = ref<FormInstance>()
@@ -234,15 +240,17 @@ onMounted(() => {
 })
 
 async function loadData() {
+  loading.value = true
   try {
     beltList.value = await beltApi.getAll()
     orderList.value = await beltOrderApi.getAll()
     useList.value = await beltUseApi.getAll()
-    // 自动计算库存
     stockList.value = await stockCalcApi.calculate('belt')
   } catch (error) {
     ElMessage.error('加载数据失败')
     console.error(error)
+  } finally {
+    loading.value = false
   }
 }
 

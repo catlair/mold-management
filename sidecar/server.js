@@ -8,14 +8,31 @@ import { readFile, writeFile, copyFile } from 'fs/promises'
 import { fileURLToPath } from 'url'
 import { dirname } from 'path'
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = dirname(__filename)
+function getBaseDir() {
+  const isCompiled = typeof Bun !== 'undefined'
+  if (isCompiled) {
+    return process.cwd()
+  }
+  if (typeof process.pkg !== 'undefined') {
+    return dirname(process.execPath)
+  }
+  try {
+    return dirname(fileURLToPath(import.meta.url))
+  } catch {
+    return process.cwd()
+  }
+}
 
-// 打包后用可执行文件所在目录，开发时用脚本所在目录
-const isPackaged = typeof process.pkg !== 'undefined'
-const BASE_DIR = isPackaged ? dirname(process.execPath) : __dirname
-const DATA_DIR = resolve(BASE_DIR, '..', 'data')
-const FILE_PATH = resolve(DATA_DIR, 'mold-data.xlsx')
+const BASE_DIR = getBaseDir()
+const isCompiled = typeof Bun !== 'undefined'
+let DATA_DIR = isCompiled ? resolve(BASE_DIR, 'data') : resolve(BASE_DIR, '..', 'data')
+let FILE_PATH = resolve(DATA_DIR, 'mold-data.xlsx')
+
+function setDataPath(newPath) {
+  DATA_DIR = newPath
+  FILE_PATH = resolve(DATA_DIR, 'mold-data.xlsx')
+  ensureDataDir()
+}
 
 // 表名常量
 const SHEETS = {
@@ -514,6 +531,23 @@ app.post('/api/import', async (c) => {
 app.get('/api/generate-id/:prefix', (c) => {
   const prefix = c.req.param('prefix')
   return c.json({ id: generateId(prefix) })
+})
+
+// 获取当前数据路径
+app.get('/api/data-path', (c) => {
+  return c.json({ dataDir: DATA_DIR, filePath: FILE_PATH })
+})
+
+// 设置数据路径
+app.post('/api/data-path', async (c) => {
+  try {
+    const { path } = await c.req.json()
+    if (!path) return c.json({ error: '未提供路径' }, 400)
+    setDataPath(path)
+    return c.json({ success: true, dataDir: DATA_DIR, filePath: FILE_PATH })
+  } catch (error) {
+    return c.json({ error: error.message }, 500)
+  }
 })
 
 // 计算单个类型库存

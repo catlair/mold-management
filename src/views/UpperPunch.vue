@@ -13,7 +13,7 @@
 
       <el-tabs v-model="activeTab">
         <el-tab-pane label="上冲信息" name="info">
-          <el-table :data="upperPunchList" border style="width: 100%">
+          <el-table :data="upperPunchList" border style="width: 100%" v-loading="loading">
             <el-table-column prop="name" label="名称" width="200" sortable />
             <el-table-column prop="diameter" label="口径" width="100" sortable />
             <el-table-column prop="wireMaterial" label="对应线材" width="120" sortable />
@@ -101,13 +101,13 @@
     <!-- 添加/编辑对话框 -->
     <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑上冲' : '添加上冲'" width="500px">
       <el-form ref="formRef" :model="form" :rules="formRules" label-width="80px">
-        <el-form-item label="名称">
+        <el-form-item label="名称" prop="name">
           <el-input v-model="form.name" />
         </el-form-item>
-        <el-form-item label="口径">
+        <el-form-item label="口径" prop="diameter">
           <el-input v-model="form.diameter" />
         </el-form-item>
-        <el-form-item label="对应线材">
+        <el-form-item label="对应线材" prop="wireMaterial">
           <el-input v-model="form.wireMaterial" />
         </el-form-item>
         <el-form-item label="安全库存">
@@ -132,7 +132,7 @@
           <el-input-number v-model="orderForm.quantity" :min="1" />
         </el-form-item>
         <el-form-item label="订购时间">
-          <el-date-picker v-model="orderForm.orderDate" type="date" value-format="YYYY-MM-DD" />
+          <el-date-picker v-model="orderForm.orderDate" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" />
         </el-form-item>
         <el-form-item label="到货状态">
           <el-select v-model="orderForm.status">
@@ -206,12 +206,18 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance } from 'element-plus'
 import { upperPunchApi, upperPunchOrderApi, upperPunchUseApi, upperPunchLinkApi, stockCalcApi } from '../api'
 
+function getCurrentDateTime() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`
+}
+
 const activeTab = ref('info')
 const upperPunchList = ref<any[]>([])
 const orderList = ref<any[]>([])
 const useList = ref<any[]>([])
 const linkList = ref<any[]>([])
 const stockList = ref<any[]>([])
+const loading = ref(true)
 
 // 筛选选项
 const statusFilters = [
@@ -240,10 +246,10 @@ const isEdit = ref(false)
 const form = ref({ id: '', name: '', diameter: '', wireMaterial: '', safetyStock: 0 })
 
 const showOrderDialog = ref(false)
-const orderForm = ref({ upperPunchId: '', quantity: 1, orderDate: '', status: '未到货', remark: '' })
+const orderForm = ref({ upperPunchId: '', quantity: 1, orderDate: getCurrentDateTime(), status: '未到货', remark: '' })
 
 const showUseDialog = ref(false)
-const useForm = ref({ upperPunchId: '', user: '', quantity: 1, useDate: '', remark: '' })
+const useForm = ref({ upperPunchId: '', user: '', quantity: 1, useDate: getCurrentDateTime(), remark: '' })
 
 const showLinkDialog = ref(false)
 const linkForm = ref({ upperPunchId: '', wireMaterial: '', remark: '' })
@@ -277,16 +283,18 @@ onMounted(() => {
 })
 
 async function loadData() {
+  loading.value = true
   try {
     upperPunchList.value = await upperPunchApi.getAll()
     orderList.value = await upperPunchOrderApi.getAll()
     useList.value = await upperPunchUseApi.getAll()
     linkList.value = await upperPunchLinkApi.getAll()
-    // 自动计算库存
     stockList.value = await stockCalcApi.calculate('upperPunch')
   } catch (error) {
     ElMessage.error('加载数据失败')
     console.error(error)
+  } finally {
+    loading.value = false
   }
 }
 

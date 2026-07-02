@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#409EFF"/>
+      <stop offset="100%" style="stop-color:#337ECC"/>
+    </linearGradient>
+    <linearGradient id="gear" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFFFFF"/>
+      <stop offset="100%" style="stop-color:#E8E8E8"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#000" flood-opacity="0.2"/>
+    </filter>
+  </defs>
+  
+  <!-- Background rounded square -->
+  <rect x="16" y="16" width="480" height="480" rx="96" ry="96" fill="url(#bg)" filter="url(#shadow)"/>
+  
+  <!-- Main gear outer -->
+  <g transform="translate(256,256)" fill="url(#gear)">
+    <!-- Gear teeth -->
+    <path d="M0,-180 L20,-170 L25,-140 L45,-145 L55,-120 L70,-130 L75,-105 L95,-110 L95,-85 L115,-85 L110,-60 L130,-55 L120,-35 L140,-25 L125,-10 L145,0 L125,15 L140,30 L120,40 L130,60 L110,60 L115,85 L95,85 L95,110 L75,105 L70,130 L55,120 L45,145 L25,140 L20,170 L0,180 L-20,170 L-25,140 L-45,145 L-55,120 L-70,130 L-75,105 L-95,110 L-95,85 L-115,85 L-110,60 L-130,55 L-120,35 L-140,25 L-125,10 L-145,0 L-125,-15 L-140,-30 L-120,-40 L-130,-60 L-110,-60 L-115,-85 L-95,-85 L-95,-110 L-75,-105 L-70,-130 L-55,-120 L-45,-145 L-25,-140 L-20,-170 Z" opacity="0.95"/>
+    <!-- Gear center hole -->
+    <circle cx="0" cy="0" r="70" fill="url(#bg)"/>
+    <!-- Inner ring -->
+    <circle cx="0" cy="0" r="55" fill="none" stroke="url(#gear)" stroke-width="6" opacity="0.8"/>
+  </g>
+  
+  <!-- Mold/screw icon in center -->
+  <g transform="translate(256,256)">
+    <!-- Screw shaft -->
+    <rect x="-8" y="-50" width="16" height="70" rx="4" fill="url(#gear)"/>
+    <!-- Screw head -->
+    <rect x="-20" y="-70" width="40" height="25" rx="6" fill="url(#gear)"/>
+    <!-- Screw thread lines -->
+    <line x1="-6" y1="-15" x2="6" y2="-25" stroke="url(#bg)" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="-6" y1="-5" x2="6" y2="-15" stroke="url(#bg)" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="-6" y1="5" x2="6" y2="-5" stroke="url(#bg)" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="-6" y1="15" x2="6" y2="5" stroke="url(#bg)" stroke-width="2.5" stroke-linecap="round"/>
+  </g>
+  
+  <!-- Small decorative dots -->
+  <circle cx="80" cy="80" r="8" fill="#fff" opacity="0.3"/>
+  <circle cx="432" cy="80" r="6" fill="#fff" opacity="0.2"/>
+  <circle cx="80" cy="432" r="6" fill="#fff" opacity="0.2"/>
+</svg>

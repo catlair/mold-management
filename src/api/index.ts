@@ -1,3 +1,5 @@
+import { invoke } from '@tauri-apps/api/core'
+
 // 表名常量
 export const SHEETS = {
   SCREW_SPEC: '螺丝规格表',
@@ -32,44 +34,14 @@ export const SHEETS = {
   UPPER_PUNCH_STOCK: '上冲库存汇总'
 }
 
-const BASE_URL = 'http://localhost:3001'
-
-// 通用 HTTP 请求
-async function request(url: string, options?: RequestInit) {
-  const response = await fetch(`${BASE_URL}${url}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...options?.headers
-    },
-    ...options
-  })
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: '请求失败' }))
-    throw new Error(error.error || '请求失败')
-  }
-
-  return response.json()
-}
-
-// 创建通用 CRUD API
+// 创建通用 CRUD API (通过 Tauri invoke)
 export function createApi(sheetName: string) {
-  const encodedName = encodeURIComponent(sheetName)
-
   return {
-    getAll: () => request(`/api/${encodedName}`),
-    getById: (id: string) => request(`/api/${encodedName}/${id}`),
-    add: (data: any) => request(`/api/${encodedName}`, {
-      method: 'POST',
-      body: JSON.stringify(data)
-    }),
-    update: (id: string, data: any) => request(`/api/${encodedName}/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data)
-    }),
-    remove: (id: string) => request(`/api/${encodedName}/${id}`, {
-      method: 'DELETE'
-    })
+    getAll: () => invoke<any[]>('get_all_records', { sheetName }),
+    getById: (id: string) => invoke<any>('get_record', { sheetName, id }),
+    add: (data: any) => invoke<any>('add_record', { sheetName, item: data }),
+    update: (id: string, data: any) => invoke<any>('update_record', { sheetName, id, data }),
+    remove: (id: string) => invoke<boolean>('delete_record', { sheetName, id }),
   }
 }
 
@@ -113,15 +85,27 @@ export const upperPunchStockApi = createApi(SHEETS.UPPER_PUNCH_STOCK)
 
 // 库存计算 API
 export const stockCalcApi = {
-  calculateAll: () => request('/api/calculate-stock'),
-  calculate: (type: string) => request(`/api/calculate-stock/${type}`),
+  calculateAll: () => invoke<Record<string, any[]>>('calculate_stock', { stockType: 'all' }),
+  calculate: (type: string) => invoke<any[]>('calculate_stock', { stockType: type }),
 }
 
 // 数据导入导出 API
 export const dataApi = {
-  exportData: () => request('/api/export'),
-  importData: (base64: string) => request('/api/import', {
-    method: 'POST',
-    body: JSON.stringify({ data: base64 })
-  }),
+  exportData: () => invoke<any>('export_data'),
+  importData: (base64: string) => invoke<{ success: boolean; stats: Record<string, number> }>('import_data', { data: base64 }),
+}
+
+// 配置 API
+export const settingsApi = {
+  getDataPath: () => invoke<string>('get_file_path_cmd'),
+  setDataPath: (path: string) => invoke<{ success: boolean; filePath: string }>('set_file_path', { path }),
+}
+
+// 备份 API
+export const backupApi = {
+  backup: () => invoke<{ success: boolean; backupPath: string }>('backup_data'),
+  getConfig: () => invoke<any>('get_backup_config'),
+  setConfig: (backupCount: number, backupPath: string | null) => invoke<any>('set_backup_config', { backupCount, backupPath }),
+  list: () => invoke<{ backups: any[] }>('list_backups'),
+  restore: (backupPath: string) => invoke<{ success: boolean }>('restore_backup', { backupPath }),
 }

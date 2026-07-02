@@ -43,17 +43,11 @@
           <el-icon><DataAnalysis /></el-icon>
           <template #title>库存汇总</template>
         </el-menu-item>
+        <el-menu-item index="/settings">
+          <el-icon><Setting /></el-icon>
+          <template #title>配置</template>
+        </el-menu-item>
       </el-menu>
-      <div class="sidebar-actions" :class="{ collapsed: isCollapse }">
-        <div class="action-btn" @click="handleExport" :title="isCollapse ? '导出数据' : ''">
-          <el-icon><Download /></el-icon>
-          <span v-show="!isCollapse">导出数据</span>
-        </div>
-        <div class="action-btn" @click="handleImport" :title="isCollapse ? '导入数据' : ''">
-          <el-icon><Upload /></el-icon>
-          <span v-show="!isCollapse">导入数据</span>
-        </div>
-      </div>
       <div class="collapse-btn" @click="isCollapse = !isCollapse">
         <el-icon>
           <DArrowLeft v-if="!isCollapse" />
@@ -70,80 +64,10 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { save, open } from '@tauri-apps/plugin-dialog'
-import { readFile, writeFile } from '@tauri-apps/plugin-fs'
-import { dataApi } from './api'
 
 const route = useRoute()
 const activeMenu = computed(() => route.path)
 const isCollapse = ref(false)
-
-async function handleExport() {
-  try {
-    const result = await dataApi.exportData()
-    const bytes = Uint8Array.from(atob(result.data), c => c.charCodeAt(0))
-
-    const filePath = await save({
-      defaultPath: result.filename,
-      filters: [{ name: 'Excel 文件', extensions: ['xlsx'] }]
-    })
-    if (!filePath) return
-
-    await writeFile(filePath, bytes)
-    ElMessage.success('导出成功')
-  } catch (error: any) {
-    if (error !== 'cancel') {
-      ElMessage.error('导出失败: ' + (error.message || error))
-    }
-  }
-}
-
-async function handleImport() {
-  try {
-    const filePath = await open({
-      filters: [{ name: 'Excel 文件', extensions: ['xlsx'] }],
-      multiple: false
-    })
-    if (!filePath) return
-
-    await ElMessageBox.confirm(
-      '导入将替换当前所有数据（原数据会自动备份），确定继续？',
-      '确认导入',
-      { type: 'warning', confirmButtonText: '确定导入', cancelButtonText: '取消' }
-    )
-
-    const fileBuffer = await fetchFileAsBase64(filePath as string)
-    const result = await dataApi.importData(fileBuffer)
-
-    const statsText = Object.entries(result.stats)
-      .map(([name, count]) => `${name}: ${count} 条`)
-      .join('\n')
-
-    await ElMessageBox.alert(
-      `导入成功！\n\n${statsText}`,
-      '导入结果',
-      { type: 'success' }
-    )
-
-    // 刷新页面以加载新数据
-    window.location.reload()
-  } catch (error: any) {
-    if (error !== 'cancel') {
-      ElMessage.error('导入失败: ' + (error.message || error))
-    }
-  }
-}
-
-// 读取本地文件为 base64（通过 Tauri fs 读取）
-async function fetchFileAsBase64(filePath: string): Promise<string> {
-  const bytes = await readFile(filePath)
-  let binary = ''
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i])
-  }
-  return btoa(binary)
-}
 </script>
 
 <style>
@@ -226,37 +150,6 @@ html, body {
   color: #409eff;
 }
 
-.sidebar-actions {
-  border-top: 1px solid #3a4a5c;
-  padding: 8px 0;
-}
-
-.sidebar-actions.collapsed {
-  border-top: none;
-}
-
-.sidebar-actions .action-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  height: 40px;
-  padding: 0 20px;
-  cursor: pointer;
-  color: #bfcbd9;
-  transition: all 0.3s;
-  font-size: 14px;
-}
-
-.sidebar-actions .action-btn:hover {
-  color: #409eff;
-  background: #263445;
-}
-
-.sidebar-actions.collapsed .action-btn {
-  padding: 0;
-}
-
 .app-main {
   background: #f0f2f5;
   padding: 20px;
@@ -282,5 +175,37 @@ html, body {
 /* 表格行悬停效果 */
 .el-table .el-table__body tr:hover td.el-table__cell {
   background: #ecf5ff !important;
+}
+
+/* 空状态 */
+.empty-state {
+  padding: 40px 0;
+  text-align: center;
+}
+
+/* 页面加载动画 */
+.page-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 300px;
+  color: #909399;
+  font-size: 14px;
+}
+
+/* 卡片样式优化 */
+.el-card {
+  border-radius: 8px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.06);
+}
+
+/* 按钮圆角 */
+.el-button {
+  border-radius: 6px;
+}
+
+/* 侧边栏图标对齐 */
+.el-menu-item .el-icon {
+  margin-right: 8px;
 }
 </style>
