@@ -165,7 +165,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance } from 'element-plus'
-import { getCurrentWindow } from '@tauri-apps/api/window'
+import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { screwSpecApi, punchApi, dieApi } from '../api'
 
 const tableData = ref<any[]>([])
@@ -177,15 +177,22 @@ const isFullscreen = ref(false)
 const loading = ref(true)
 
 async function toggleFullscreen() {
-  const win = getCurrentWindow()
-  const full = await win.isFullscreen()
-  await win.setFullscreen(!full)
-  isFullscreen.value = !full
+  try {
+    const win = await WebviewWindow.getByLabel('main')
+    if (!win) return
+    const full = await win.isFullscreen()
+    await win.setFullscreen(!full)
+    isFullscreen.value = !full
+  } catch (e) {
+    console.error('全屏失败:', e)
+  }
 }
 
 onMounted(async () => {
-  const win = getCurrentWindow()
-  isFullscreen.value = await win.isFullscreen()
+  try {
+    const win = await WebviewWindow.getByLabel('main')
+    if (win) isFullscreen.value = await win.isFullscreen()
+  } catch {}
 })
 
 // 表单引用
