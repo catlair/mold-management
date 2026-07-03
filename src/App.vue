@@ -193,7 +193,7 @@ onMounted(() => {
 .app-main {
   background: #f0f2f5;
   padding: 20px;
-  overflow: hidden;
+  overflow: auto;
 }
 
 /* 页面过渡动画 */
