@@ -90,12 +90,15 @@
           <el-button size="small" style="margin-left: auto" @click="loadBackups">刷新</el-button>
         </div>
       </template>
-      <el-table :data="backups" style="width: 100%" max-height="300">
-        <el-table-column prop="name" label="文件名" min-width="200" />
-        <el-table-column prop="modified" label="备份时间" width="180" />
-        <el-table-column label="大小" width="100">
-          <template #default="{ row }">
-            {{ formatSize(row.size) }}
+      <el-table :data="backups" style="width: 100%" max-height="400">
+        <el-table-column prop="backup_time" label="备份时间" width="180" />
+        <el-table-column prop="backup_reason" label="备份原因" width="120" />
+        <el-table-column prop="backup_md5" label="MD5" min-width="200" show-overflow-tooltip />
+        <el-table-column label="锁定" width="80" align="center">
+          <template #default="{ row, $index }">
+            <el-button size="small" :type="row.locked ? 'warning' : 'info'" link @click="handleToggleLock($index)">
+              <el-icon><Lock v-if="row.locked" /><Unlock v-else /></el-icon>
+            </el-button>
           </template>
         </el-table-column>
         <el-table-column label="操作" width="120" fixed="right">
@@ -150,9 +153,21 @@ async function loadBackupConfig() {
 async function loadBackups() {
   try {
     const result = await backupApi.list()
-    backups.value = result.backups || []
+    backups.value = Array.isArray(result) ? result : []
   } catch (error: any) {
     console.error('获取备份列表失败:', error)
+  }
+}
+
+async function handleToggleLock(index: number) {
+  try {
+    const result = await backupApi.toggleLock(index)
+    if (result.success) {
+      backups.value[index].locked = result.locked
+      ElMessage.success(result.locked ? '已锁定' : '已解锁')
+    }
+  } catch (error: any) {
+    ElMessage.error('操作失败: ' + (error.message || error))
   }
 }
 
@@ -178,7 +193,11 @@ async function handleBackupNow() {
   backingUp.value = true
   try {
     const result = await backupApi.backup()
-    ElMessage.success('备份成功: ' + result.backupPath.split(/[/\\]/).pop())
+    if (result.skipped) {
+      ElMessage.info(result.message || '文件内容未变化，跳过备份')
+    } else {
+      ElMessage.success('备份成功')
+    }
     await loadBackups()
   } catch (error: any) {
     ElMessage.error('备份失败: ' + (error.message || error))
@@ -227,12 +246,6 @@ async function resetBackupDir() {
   backupConfig.value.effectiveBackupDir = backupConfig.value.defaultBackupDir
   await backupApi.setConfig(backupCount.value, null)
   ElMessage.success('已恢复默认备份目录')
-}
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return bytes + ' B'
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
 }
 
 async function handleExport() {

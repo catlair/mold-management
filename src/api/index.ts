@@ -103,9 +103,10 @@ export const settingsApi = {
 
 // 备份 API
 export const backupApi = {
-  backup: () => invoke<{ success: boolean; backupPath: string }>('backup_data'),
+  backup: () => invoke<any>('backup_data'),
   getConfig: () => invoke<any>('get_backup_config'),
   setConfig: (backupCount: number, backupPath: string | null) => invoke<any>('set_backup_config', { backupCount, backupPath }),
-  list: () => invoke<{ backups: any[] }>('list_backups'),
+  list: () => invoke<any[]>('list_backups'),
+  toggleLock: (index: number) => invoke<{ success: boolean; locked: boolean }>('toggle_backup_lock', { index }),
   restore: (backupPath: string) => invoke<{ success: boolean }>('restore_backup', { backupPath }),
 }

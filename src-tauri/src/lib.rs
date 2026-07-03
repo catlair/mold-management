@@ -8,6 +8,139 @@ use serde_json::{json, Value};
 use tauri::{State, Manager};
 use chrono::Local;
 
+// ========== 备份记录结构 ==========
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+struct BackupRecord {
+    file_path: String,
+    backup_time: String,
+    backup_reason: String,
+    backup_md5: String,
+    locked: bool,
+}
+
+fn get_backup_index_path(backup_dir: &str) -> PathBuf {
+    PathBuf::from(backup_dir).join("backups.json")
+}
+
+fn load_backup_index(backup_dir: &str) -> Vec<BackupRecord> {
+    let index_path = get_backup_index_path(backup_dir);
+    if index_path.exists() {
+        if let Ok(content) = fs::read_to_string(&index_path) {
+            if let Ok(records) = serde_json::from_str::<Vec<BackupRecord>>(&content) {
+                return records;
+            }
+        }
+    }
+    vec![]
+}
+
+fn save_backup_index(backup_dir: &str, records: &[BackupRecord]) {
+    let index_path = get_backup_index_path(backup_dir);
+    if let Ok(content) = serde_json::to_string_pretty(records) {
+        let _ = fs::write(index_path, content);
+    }
+}
+
+fn file_md5(path: &str) -> Result<String, String> {
+    use md5::{Md5, Digest};
+    let data = fs::read(path).map_err(|e| e.to_string())?;
+    let mut hasher = Md5::new();
+    hasher.update(&data);
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+fn do_backup(file_path: &str, backup_dir: &str, reason: &str) -> Result<String, String> {
+    if !Path::new(file_path).exists() {
+        return Err("数据文件不存在".to_string());
+    }
+    let _ = fs::create_dir_all(backup_dir);
+
+    let current_md5 = file_md5(file_path)?;
+
+    // 检查最新备份的 MD5
+    let records = load_backup_index(backup_dir);
+    if let Some(latest) = records.last() {
+        if latest.backup_md5 == current_md5 {
+            return Ok(String::new()); // MD5 相同，跳过
+        }
+    }
+
+    // 创建备份
+    let timestamp = Local::now().format("%Y%m%d_%H%M%S");
+    let backup_name = format!("mold-data-backup-{}.xlsx", timestamp);
+    let backup_file = PathBuf::from(backup_dir).join(&backup_name);
+    fs::copy(file_path, &backup_file).map_err(|e| e.to_string())?;
+
+    // 写入记录
+    let mut new_records = records;
+    new_records.push(BackupRecord {
+        file_path: backup_file.to_string_lossy().to_string(),
+        backup_time: Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+        backup_reason: reason.to_string(),
+        backup_md5: current_md5,
+        locked: false,
+    });
+    save_backup_index(backup_dir, &new_records);
+
+    Ok(backup_file.to_string_lossy().to_string())
+}
+
+fn cleanup_old_backups(backup_dir: &str, keep_count: usize) {
+    let mut records = load_backup_index(backup_dir);
+
+    // 统计未锁定的记录
+    let unlocked: Vec<usize> = records.iter()
+        .enumerate()
+        .filter(|(_, r)| !r.locked)
+        .map(|(i, _)| i)
+        .collect();
+
+    // 如果未锁定的数量超过保留数，删除最早的
+    if unlocked.len() > keep_count {
+        let to_remove = unlocked.len() - keep_count;
+        let mut remove_indices: Vec<usize> = unlocked.into_iter().take(to_remove).collect();
+        remove_indices.sort_by(|a, b| b.cmp(a)); // 从后往前删
+
+        for idx in remove_indices {
+            let record = &records[idx];
+            let _ = fs::remove_file(&record.file_path);
+            records.remove(idx);
+        }
+
+        save_backup_index(backup_dir, &records);
+    }
+}
+
+#[tauri::command]
+fn list_backups(state: State<AppState>) -> Result<Value, String> {
+    let path = state.file_path.lock().map_err(|e| e.to_string())?;
+    let backup_dir = get_backup_dir_for_file(&path);
+    let records = load_backup_index(&backup_dir);
+    Ok(serde_json::to_value(records).unwrap_or(json!([])))
+}
+
+#[tauri::command]
+fn toggle_backup_lock(state: State<AppState>, index: usize) -> Result<Value, String> {
+    let path = state.file_path.lock().map_err(|e| e.to_string())?;
+    let backup_dir = get_backup_dir_for_file(&path);
+    let mut records = load_backup_index(&backup_dir);
+    if index < records.len() {
+        records[index].locked = !records[index].locked;
+        save_backup_index(&backup_dir, &records);
+        Ok(json!({ "success": true, "locked": records[index].locked }))
+    } else {
+        Err("无效的索引".to_string())
+    }
+}
+
+fn get_backup_dir_for_file(file_path: &str) -> String {
+    let parent = Path::new(file_path).parent()
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_else(|| "./data".to_string());
+    PathBuf::from(parent).join("backups").to_string_lossy().to_string()
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 struct Config {
     file_path: Option<String>,
@@ -51,87 +184,6 @@ fn load_config(config_path: &Path) -> Config {
 fn save_config(config_path: &Path, config: &Config) {
     if let Ok(content) = serde_json::to_string_pretty(config) {
         let _ = fs::write(config_path, content);
-    }
-}
-
-fn file_md5(path: &str) -> Result<String, String> {
-    use md5::{Md5, Digest};
-    let data = fs::read(path).map_err(|e| e.to_string())?;
-    let mut hasher = Md5::new();
-    hasher.update(&data);
-    Ok(format!("{:x}", hasher.finalize()))
-}
-
-fn do_backup(file_path: &str, backup_dir: &str) -> Result<String, String> {
-    if !Path::new(file_path).exists() {
-        return Err("数据文件不存在".to_string());
-    }
-    let _ = fs::create_dir_all(backup_dir);
-
-    // 计算当前文件 MD5
-    let current_md5 = file_md5(file_path)?;
-
-    // 查找最新的备份文件并比较 MD5
-    if let Ok(entries) = fs::read_dir(backup_dir) {
-        let mut latest_backup: Option<PathBuf> = None;
-        for entry in entries.flatten() {
-            let p = entry.path();
-            if p.extension().map(|e| e == "xlsx").unwrap_or(false)
-                && p.file_name().and_then(|n| n.to_str())
-                    .map(|n| n.contains("backup")).unwrap_or(false)
-            {
-                if let Some(ref latest) = latest_backup {
-                    if let Ok(meta) = p.metadata() {
-                        if let Ok(latest_meta) = latest.metadata() {
-                            if meta.modified().unwrap_or(std::time::SystemTime::UNIX_EPOCH)
-                                > latest_meta.modified().unwrap_or(std::time::SystemTime::UNIX_EPOCH)
-                            {
-                                latest_backup = Some(p);
-                            }
-                        }
-                    }
-                } else {
-                    latest_backup = Some(p);
-                }
-            }
-        }
-
-        // 比较 MD5，相同则跳过
-        if let Some(ref latest) = latest_backup {
-            if let Ok(latest_md5) = file_md5(latest.to_string_lossy().to_string().as_str()) {
-                if current_md5 == latest_md5 {
-                    return Ok(String::new()); // 空字符串表示跳过
-                }
-            }
-        }
-    }
-
-    let timestamp = Local::now().format("%Y%m%d_%H%M%S");
-    let backup_name = format!("mold-data-backup-{}.xlsx", timestamp);
-    let backup_file = PathBuf::from(backup_dir).join(&backup_name);
-    fs::copy(file_path, &backup_file).map_err(|e| e.to_string())?;
-    Ok(backup_file.to_string_lossy().to_string())
-}
-
-fn cleanup_old_backups(backup_dir: &str, keep_count: usize) {
-    if let Ok(entries) = fs::read_dir(backup_dir) {
-        let mut backups: Vec<(String, std::time::SystemTime)> = entries
-            .filter_map(|e| e.ok())
-            .filter(|e| {
-                e.path().extension().map(|ext| ext == "xlsx").unwrap_or(false)
-                    && e.path().file_name().and_then(|n| n.to_str())
-                        .map(|n| n.contains("backup")).unwrap_or(false)
-            })
-            .filter_map(|e| {
-                let time = e.metadata().ok()?.modified().ok()?;
-                let name = e.file_name().to_string_lossy().to_string();
-                Some((name, time))
-            })
-            .collect();
-        backups.sort_by(|a, b| b.1.cmp(&a.1));
-        for (name, _) in backups.into_iter().skip(keep_count) {
-            let _ = fs::remove_file(Path::new(backup_dir).join(&name));
-        }
     }
 }
 
@@ -254,12 +306,16 @@ fn backup_data(state: State<AppState>) -> Result<Value, String> {
     let path = state.file_path.lock().map_err(|e| e.to_string())?;
     let config = state.config.lock().map_err(|e| e.to_string())?;
     let backup_dir = get_backup_dir(&config);
-    let backup_file = do_backup(&path, &backup_dir)?;
+    let backup_file = do_backup(&path, &backup_dir, "手动备份")?;
     let count = config.backup_count;
     drop(config);
     drop(path);
     cleanup_old_backups(&backup_dir, count);
-    Ok(json!({ "success": true, "backupPath": backup_file }))
+    if backup_file.is_empty() {
+        Ok(json!({ "success": true, "skipped": true, "message": "文件内容未变化，跳过备份" }))
+    } else {
+        Ok(json!({ "success": true, "backupPath": backup_file }))
+    }
 }
 
 #[tauri::command]
@@ -287,41 +343,6 @@ fn set_backup_config(state: State<AppState>, backup_count: usize, backup_path: O
 }
 
 #[tauri::command]
-fn list_backups(state: State<AppState>) -> Result<Value, String> {
-    let config = state.config.lock().map_err(|e| e.to_string())?;
-    let backup_dir = get_backup_dir(&config);
-    let mut backups = Vec::new();
-    if let Ok(entries) = fs::read_dir(&backup_dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.extension().map(|e| e == "xlsx").unwrap_or(false) {
-                let name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
-                let size = entry.metadata().map(|m| m.len()).unwrap_or(0);
-                let modified = entry.metadata().ok()
-                    .and_then(|m| m.modified().ok())
-                    .map(|t| {
-                        let datetime: chrono::DateTime<Local> = t.into();
-                        datetime.format("%Y-%m-%d %H:%M:%S").to_string()
-                    })
-                    .unwrap_or_default();
-                backups.push(json!({
-                    "name": name,
-                    "path": path.to_string_lossy(),
-                    "size": size,
-                    "modified": modified,
-                }));
-            }
-        }
-    }
-    backups.sort_by(|a, b| {
-        let a_mod = a["modified"].as_str().unwrap_or("");
-        let b_mod = b["modified"].as_str().unwrap_or("");
-        b_mod.cmp(a_mod)
-    });
-    Ok(json!({ "backups": backups }))
-}
-
-#[tauri::command]
 fn restore_backup(state: State<AppState>, backup_path: String) -> Result<Value, String> {
     if !Path::new(&backup_path).exists() {
         return Err("备份文件不存在".to_string());
@@ -329,7 +350,7 @@ fn restore_backup(state: State<AppState>, backup_path: String) -> Result<Value, 
     let file_path = state.file_path.lock().map_err(|e| e.to_string())?;
     let config = state.config.lock().map_err(|e| e.to_string())?;
     let backup_dir = get_backup_dir(&config);
-    let _ = do_backup(&file_path, &backup_dir);
+    let _ = do_backup(&file_path, &backup_dir, "恢复前备份");
     fs::copy(&backup_path, &*file_path).map_err(|e| e.to_string())?;
     Ok(json!({ "success": true }))
 }
@@ -356,7 +377,7 @@ pub fn run() {
 
     // 启动时备份
     let backup_dir = get_backup_dir(&config);
-    let _ = do_backup(&initial_path, &backup_dir);
+    let _ = do_backup(&initial_path, &backup_dir, "应用启动");
     cleanup_old_backups(&backup_dir, config.backup_count);
 
     let app_state = AppState {
@@ -384,18 +405,18 @@ pub fn run() {
             get_backup_config,
             set_backup_config,
             list_backups,
+            toggle_backup_lock,
             restore_backup,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(move |app_handle, event| {
             if let tauri::RunEvent::Exit = event {
-                // 退出时备份 - 通过 app_handle 获取 state
                 if let Some(state) = app_handle.try_state::<AppState>() {
                     let fp = state.file_path.lock().unwrap().clone();
                     let config = state.config.lock().unwrap().clone();
                     let backup_dir = get_backup_dir(&config);
-                    let _ = do_backup(&fp, &backup_dir);
+                    let _ = do_backup(&fp, &backup_dir, "应用退出");
                     cleanup_old_backups(&backup_dir, config.backup_count);
                 }
             }
