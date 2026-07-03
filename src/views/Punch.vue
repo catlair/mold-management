@@ -464,4 +464,7 @@ async function handleDeleteLink(row: any) {
   display: flex;
   justify-content: center;
 }
+.stock-center :deep(.el-table) {
+  width: auto !important;
+}
 </style>

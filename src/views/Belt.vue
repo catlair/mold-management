@@ -346,4 +346,7 @@ async function handleUseSubmit() {
   display: flex;
   justify-content: center;
 }
+.stock-center :deep(.el-table) {
+  width: auto !important;
+}
 </style>
