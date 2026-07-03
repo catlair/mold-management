@@ -21,15 +21,18 @@
       <el-tabs v-model="activeTab">
         <el-tab-pane label="冲头信息" name="info">
           <el-table :data="punchList" border style="width: 100%" v-loading="loading">
-            <el-table-column prop="name" label="名称" width="180" sortable />
+            <el-table-column prop="name" label="名称" width="180" sortable>
+              <template #default="{ row }">
+                <el-link type="primary" :underline="false" @click="showLinkedScrews(row)">{{ row.name }}</el-link>
+              </template>
+            </el-table-column>
             <el-table-column prop="spec" label="规格" width="140" sortable />
             <el-table-column prop="material" label="材质" width="140" sortable :filters="materialFilters" :filter-method="filterHandler" />
             <el-table-column prop="safetyStock" label="安全库存" width="120" sortable />
             <el-table-column prop="remark" label="备注" min-width="150" />
-            <el-table-column label="操作" width="200" fixed="right">
+            <el-table-column label="操作" width="150" fixed="right">
               <template #default="{ row }">
                 <el-button size="small" @click="handleEdit(row)">编辑</el-button>
-                <el-button size="small" type="info" @click="showLinkedScrews(row)">关联螺丝</el-button>
                 <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
               </template>
             </el-table-column>
