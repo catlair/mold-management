@@ -2,7 +2,7 @@
   <el-container class="app-container">
     <el-aside :width="isCollapse ? '64px' : '200px'" class="app-aside">
       <div class="logo" :class="{ 'logo-collapse': isCollapse }">
-        <img v-if="!isCollapse" src="./assets/hero.png" alt="" class="logo-icon" />
+        <img v-if="!isCollapse" src="./assets/logo.svg" alt="" class="logo-icon" />
         <h1 v-show="!isCollapse">模具管理</h1>
         <h1 v-show="isCollapse">模</h1>
       </div>
