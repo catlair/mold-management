@@ -1,14 +1,20 @@
 <template>
-  <div class="page-container">
+  <div class="page-container" :class="{ 'is-fullscreen': isFullscreen }">
     <el-card>
       <template #header>
         <div class="card-header">
           <el-icon><Box /></el-icon>
           <span>主模具管理</span>
-          <el-button type="primary" @click="handleAdd">
-            <el-icon><Plus /></el-icon>
-            添加主模具
-          </el-button>
+          <div class="header-right">
+            <el-button type="primary" @click="handleAdd">
+              <el-icon><Plus /></el-icon>
+              添加主模具
+            </el-button>
+            <el-button @click="toggleFullscreen">
+              <el-icon><FullScreen v-if="!isFullscreen" /><Close v-else /></el-icon>
+              {{ isFullscreen ? '退出全屏' : '全屏' }}
+            </el-button>
+          </div>
         </div>
       </template>
 
@@ -216,6 +222,12 @@ import { mainMoldApi, mainMoldOrderApi, mainMoldUseApi, mainMoldLinkApi, stockCa
 function getCurrentDateTime() {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`
+}
+
+const isFullscreen = ref(false)
+
+function toggleFullscreen() {
+  isFullscreen.value = !isFullscreen.value
 }
 
 const activeTab = ref('info')
@@ -428,5 +440,30 @@ async function handleDeleteLink(row: any) {
 }
 .stock-center :deep(.el-table) {
   width: auto !important;
+}
+.page-container.is-fullscreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 2000;
+  background: #f0f2f5;
+  padding: 20px;
+  overflow: auto;
+}
+.page-container.is-fullscreen .el-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.page-container.is-fullscreen .el-card__body {
+  flex: 1;
+  overflow: auto;
+}
+.header-right {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
 }
 </style>
