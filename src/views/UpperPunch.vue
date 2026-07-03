@@ -217,6 +217,7 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance } from 'element-plus'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import { upperPunchApi, upperPunchOrderApi, upperPunchUseApi, upperPunchLinkApi, stockCalcApi } from '../api'
 
 function getCurrentDateTime() {
@@ -226,9 +227,21 @@ function getCurrentDateTime() {
 
 const isFullscreen = ref(false)
 
-function toggleFullscreen() {
-  isFullscreen.value = !isFullscreen.value
+async function toggleFullscreen() {
+  const next = !isFullscreen.value
+  isFullscreen.value = next
+  try {
+    const win = getCurrentWindow()
+    await win.setFullscreen(next)
+  } catch {}
 }
+
+onMounted(async () => {
+  try {
+    const win = getCurrentWindow()
+    isFullscreen.value = await win.isFullscreen()
+  } catch {}
+})
 
 const activeTab = ref('info')
 const upperPunchList = ref<any[]>([])

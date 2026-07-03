@@ -54,11 +54,58 @@ fn save_config(config_path: &Path, config: &Config) {
     }
 }
 
+fn file_md5(path: &str) -> Result<String, String> {
+    use md5::{Md5, Digest};
+    let data = fs::read(path).map_err(|e| e.to_string())?;
+    let mut hasher = Md5::new();
+    hasher.update(&data);
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
 fn do_backup(file_path: &str, backup_dir: &str) -> Result<String, String> {
     if !Path::new(file_path).exists() {
         return Err("数据文件不存在".to_string());
     }
     let _ = fs::create_dir_all(backup_dir);
+
+    // 计算当前文件 MD5
+    let current_md5 = file_md5(file_path)?;
+
+    // 查找最新的备份文件并比较 MD5
+    if let Ok(entries) = fs::read_dir(backup_dir) {
+        let mut latest_backup: Option<PathBuf> = None;
+        for entry in entries.flatten() {
+            let p = entry.path();
+            if p.extension().map(|e| e == "xlsx").unwrap_or(false)
+                && p.file_name().and_then(|n| n.to_str())
+                    .map(|n| n.contains("backup")).unwrap_or(false)
+            {
+                if let Some(ref latest) = latest_backup {
+                    if let Ok(meta) = p.metadata() {
+                        if let Ok(latest_meta) = latest.metadata() {
+                            if meta.modified().unwrap_or(std::time::SystemTime::UNIX_EPOCH)
+                                > latest_meta.modified().unwrap_or(std::time::SystemTime::UNIX_EPOCH)
+                            {
+                                latest_backup = Some(p);
+                            }
+                        }
+                    }
+                } else {
+                    latest_backup = Some(p);
+                }
+            }
+        }
+
+        // 比较 MD5，相同则跳过
+        if let Some(ref latest) = latest_backup {
+            if let Ok(latest_md5) = file_md5(latest.to_string_lossy().to_string().as_str()) {
+                if current_md5 == latest_md5 {
+                    return Ok(String::new()); // 空字符串表示跳过
+                }
+            }
+        }
+    }
+
     let timestamp = Local::now().format("%Y%m%d_%H%M%S");
     let backup_name = format!("mold-data-backup-{}.xlsx", timestamp);
     let backup_file = PathBuf::from(backup_dir).join(&backup_name);
