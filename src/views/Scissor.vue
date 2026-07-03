@@ -84,18 +84,20 @@
         </el-tab-pane>
 
         <el-tab-pane label="库存汇总" name="stock">
-          <el-table :data="stockList" border style="width: 100%">
-            <el-table-column prop="name" label="剪刀名称" width="120" />
-            <el-table-column prop="currentStock" label="当前库存" width="100" sortable />
-            <el-table-column prop="safetyStock" label="安全库存" width="100" sortable />
-            <el-table-column prop="status" label="库存状态" width="100" :filters="stockStatusFilters" :filter-method="filterHandler">
-              <template #default="{ row }">
-                <el-tag :type="row.status === '需订购' ? 'danger' : 'success'">
-                  {{ row.status }}
-                </el-tag>
-              </template>
-            </el-table-column>
-          </el-table>
+          <div class="stock-center">
+            <el-table :data="stockList" border>
+              <el-table-column prop="name" label="剪刀名称" width="140" sortable />
+              <el-table-column prop="currentStock" label="当前库存" width="120" sortable />
+              <el-table-column prop="safetyStock" label="安全库存" width="120" sortable />
+              <el-table-column prop="status" label="库存状态" width="120" :filters="stockStatusFilters" :filter-method="filterHandler">
+                <template #default="{ row }">
+                  <el-tag :type="row.status === '需订购' ? 'danger' : 'success'" effect="dark" round>
+                    {{ row.status }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
         </el-tab-pane>
       </el-tabs>
     </el-card>
@@ -419,5 +421,9 @@ async function handleDeleteLink(row: any) {
 <style scoped>
 .page-container {
   height: 100%;
+}
+.stock-center {
+  display: flex;
+  justify-content: center;
 }
 </style>
