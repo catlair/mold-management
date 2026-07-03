@@ -115,7 +115,7 @@
         <el-form-item label="规格" prop="spec">
           <el-input v-model="form.spec" />
         </el-form-item>
-        <el-form-item label="材质" prop="material">
+        <el-form-item label="材质">
           <el-input v-model="form.material" />
         </el-form-item>
         <el-form-item label="安全库存">
@@ -299,7 +299,6 @@ const linkFormRef = ref<FormInstance>()
 const formRules = {
   name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
   spec: [{ required: true, message: '请输入规格', trigger: 'blur' }],
-  material: [{ required: true, message: '请输入材质', trigger: 'blur' }],
 }
 const orderFormRules = {
   punchId: [{ required: true, message: '请选择冲头', trigger: 'change' }],
