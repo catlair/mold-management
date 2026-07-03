@@ -75,6 +75,36 @@ fn cell_to_string(cell: &Data) -> String {
     }
 }
 
+fn get_sheet_prefix(sheet_name: &str) -> &'static str {
+    match sheet_name {
+        "螺丝规格表" => "LS",
+        "冲头信息表" => "CT",
+        "冲头订购记录" => "CG",
+        "冲头领用记录" => "CL",
+        "冲头-螺丝规格关联" => "GL",
+        "牙板信息表" => "YB",
+        "牙板订购记录" => "YG",
+        "牙板领用记录" => "YL",
+        "牙板-螺丝规格关联" => "YL",
+        "皮带信息表" => "PD",
+        "皮带订购记录" => "PG",
+        "皮带使用记录" => "PS",
+        "主模具信息表" => "ZM",
+        "主模具订购记录" => "ZG",
+        "主模具使用记录" => "ZS",
+        "主模具-线材关联" => "ZL",
+        "剪刀信息表" => "JD",
+        "剪刀订购记录" => "JG",
+        "剪刀使用记录" => "JS",
+        "剪刀-线材关联" => "JL",
+        "上冲信息表" => "SC",
+        "上冲订购记录" => "SG",
+        "上冲使用记录" => "SS",
+        "上冲-线材关联" => "SL",
+        _ => "ID",
+    }
+}
+
 fn generate_id(prefix: &str) -> String {
     let now = Local::now();
     let date_part = now.format("%y%m%d").to_string();
@@ -147,8 +177,8 @@ pub fn add_row(file_path: &str, sheet_name: &str, item: &HashMap<String, String>
     }
     let mut result = item.clone();
     if result.get("id").map(|v| v.is_empty()).unwrap_or(true) || !result.contains_key("id") {
-        let prefix: String = sheet_name.chars().take(2).collect();
-        result.insert("id".to_string(), generate_id(&prefix));
+        let prefix = get_sheet_prefix(sheet_name);
+        result.insert("id".to_string(), generate_id(prefix));
     }
     let mut all_rows = get_all(file_path, sheet_name)?;
     all_rows.push(result.clone());

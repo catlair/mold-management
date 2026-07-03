@@ -21,11 +21,19 @@
       <el-tabs v-model="activeTab">
         <el-tab-pane label="牙板信息" name="info">
           <el-table :data="dieList" border style="width: 100%" v-loading="loading">
-            <el-table-column prop="name" label="名称" width="180" sortable />
-            <el-table-column prop="machineType" label="机型" width="140" sortable :filters="machineTypeFilters" :filter-method="filterHandler" />
-            <el-table-column prop="wireDiameter" label="线径" width="120" sortable />
-            <el-table-column prop="safetyStock" label="安全库存" width="120" sortable />
-            <el-table-column prop="remark" label="备注" min-width="150" />
+            <el-table-column prop="name" label="名称" width="160" sortable />
+            <el-table-column prop="machineType" label="机型" width="120" sortable :filters="machineTypeFilters" :filter-method="filterHandler" />
+            <el-table-column prop="wireDiameter" label="线径" width="100" sortable />
+            <el-table-column prop="safetyStock" label="安全库存" width="100" sortable />
+            <el-table-column prop="currentStock" label="当前库存" width="100" sortable />
+            <el-table-column prop="status" label="库存状态" width="100" sortable>
+              <template #default="{ row }">
+                <el-tag v-if="row.status" :type="row.status === '需订购' ? 'danger' : 'success'" effect="dark" round size="small">
+                  {{ row.status }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="remark" label="备注" min-width="120" />
             <el-table-column label="操作" width="150" fixed="right">
               <template #default="{ row }">
                 <el-button size="small" @click="handleEdit(row)">编辑</el-button>
@@ -67,23 +75,6 @@
             <el-table-column prop="useDate" label="领用时间" width="180" sortable />
             <el-table-column prop="remark" label="备注" min-width="150" />
           </el-table>
-        </el-tab-pane>
-
-        <el-tab-pane label="库存汇总" name="stock">
-          <div class="stock-center">
-            <el-table :data="stockList" border>
-              <el-table-column prop="name" label="牙板名称" width="140" sortable />
-              <el-table-column prop="currentStock" label="当前库存" width="120" sortable />
-              <el-table-column prop="safetyStock" label="安全库存" width="120" sortable />
-              <el-table-column prop="status" label="库存状态" width="120" :filters="stockStatusFilters" :filter-method="filterHandler">
-                <template #default="{ row }">
-                  <el-tag :type="row.status === '需订购' ? 'danger' : 'success'" effect="dark" round>
-                    {{ row.status }}
-                  </el-tag>
-                </template>
-              </el-table-column>
-            </el-table>
-          </div>
         </el-tab-pane>
 
         <el-tab-pane label="螺丝规格关联" name="link">
@@ -263,7 +254,6 @@ const activeTab = ref('info')
 const dieList = ref<any[]>([])
 const orderList = ref<any[]>([])
 const useList = ref<any[]>([])
-const stockList = ref<any[]>([])
 const linkList = ref<any[]>([])
 const screwSpecList = ref<any[]>([])
 const loading = ref(true)
@@ -277,11 +267,6 @@ const machineTypeFilters = computed(() => {
 const statusFilters = [
   { text: '未到货', value: '未到货' },
   { text: '已到货', value: '已到货' }
-]
-
-const stockStatusFilters = [
-  { text: '需订购', value: '需订购' },
-  { text: '安全', value: '安全' }
 ]
 
 function filterHandler(value: string, row: any, column: any) {
@@ -347,19 +332,26 @@ onMounted(() => {
 async function loadData() {
   loading.value = true
   try {
-    const [dies, orders, uses, links, screwSpecs] = await Promise.all([
+    const [dies, orders, uses, links, screwSpecs, stockData] = await Promise.all([
       dieApi.getAll(),
       dieOrderApi.getAll(),
       dieUseApi.getAll(),
       dieLinkApi.getAll(),
-      screwSpecApi.getAll()
+      screwSpecApi.getAll(),
+      stockCalcApi.calculate('die')
     ])
-    dieList.value = dies
+    const stockMap: Record<string, any> = {}
+    stockData.forEach((s: any) => { stockMap[s.dieId] = s })
+    dieList.value = dies.map((d: any) => ({
+      ...d,
+      currentStock: stockMap[d.id]?.currentStock ?? '',
+      safetyStock: stockMap[d.id]?.safetyStock ?? d.safetyStock,
+      status: stockMap[d.id]?.status ?? '',
+    }))
     orderList.value = orders
     useList.value = uses
     linkList.value = links
     screwSpecList.value = screwSpecs
-    stockList.value = await stockCalcApi.calculate('die')
   } catch (error) {
     ElMessage.error('加载数据失败')
     console.error(error)

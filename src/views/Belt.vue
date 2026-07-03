@@ -21,10 +21,18 @@
       <el-tabs v-model="activeTab">
         <el-tab-pane label="皮带信息" name="info">
           <el-table :data="beltList" border style="width: 100%" v-loading="loading">
-            <el-table-column prop="name" label="名称" width="180" sortable />
-            <el-table-column prop="machine" label="适用机器" width="140" sortable :filters="machineFilters" :filter-method="filterHandler" />
-            <el-table-column prop="safetyStock" label="安全库存" width="120" sortable />
-            <el-table-column prop="remark" label="备注" min-width="150" />
+            <el-table-column prop="name" label="名称" width="160" sortable />
+            <el-table-column prop="machine" label="适用机器" width="120" sortable :filters="machineFilters" :filter-method="filterHandler" />
+            <el-table-column prop="safetyStock" label="安全库存" width="100" sortable />
+            <el-table-column prop="currentStock" label="当前库存" width="100" sortable />
+            <el-table-column prop="status" label="库存状态" width="100" sortable>
+              <template #default="{ row }">
+                <el-tag v-if="row.status" :type="row.status === '需订购' ? 'danger' : 'success'" effect="dark" round size="small">
+                  {{ row.status }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="remark" label="备注" min-width="120" />
             <el-table-column label="操作" width="150" fixed="right">
               <template #default="{ row }">
                 <el-button size="small" @click="handleEdit(row)">编辑</el-button>
@@ -66,23 +74,6 @@
             <el-table-column prop="useDate" label="使用时间" width="180" sortable />
             <el-table-column prop="remark" label="备注" min-width="150" />
           </el-table>
-        </el-tab-pane>
-
-        <el-tab-pane label="库存汇总" name="stock">
-          <div class="stock-center">
-            <el-table :data="stockList" border>
-              <el-table-column prop="name" label="皮带名称" width="140" sortable />
-              <el-table-column prop="currentStock" label="当前库存" width="120" sortable />
-              <el-table-column prop="safetyStock" label="安全库存" width="120" sortable />
-              <el-table-column prop="status" label="库存状态" width="120" :filters="stockStatusFilters" :filter-method="filterHandler">
-                <template #default="{ row }">
-                  <el-tag :type="row.status === '需订购' ? 'danger' : 'success'" effect="dark" round>
-                    {{ row.status }}
-                  </el-tag>
-                </template>
-              </el-table-column>
-            </el-table>
-          </div>
         </el-tab-pane>
       </el-tabs>
     </el-card>
@@ -202,7 +193,6 @@ const activeTab = ref('info')
 const beltList = ref<any[]>([])
 const orderList = ref<any[]>([])
 const useList = ref<any[]>([])
-const stockList = ref<any[]>([])
 const loading = ref(true)
 
 // 筛选选项
@@ -214,11 +204,6 @@ const machineFilters = computed(() => {
 const statusFilters = [
   { text: '未到货', value: '未到货' },
   { text: '已到货', value: '已到货' }
-]
-
-const stockStatusFilters = [
-  { text: '需订购', value: '需订购' },
-  { text: '安全', value: '安全' }
 ]
 
 function filterHandler(value: string, row: any, column: any) {
@@ -269,10 +254,22 @@ onMounted(() => {
 async function loadData() {
   loading.value = true
   try {
-    beltList.value = await beltApi.getAll()
-    orderList.value = await beltOrderApi.getAll()
-    useList.value = await beltUseApi.getAll()
-    stockList.value = await stockCalcApi.calculate('belt')
+    const [belts, orders, uses, stockData] = await Promise.all([
+      beltApi.getAll(),
+      beltOrderApi.getAll(),
+      beltUseApi.getAll(),
+      stockCalcApi.calculate('belt')
+    ])
+    const stockMap: Record<string, any> = {}
+    stockData.forEach((s: any) => { stockMap[s.beltId] = s })
+    beltList.value = belts.map((b: any) => ({
+      ...b,
+      currentStock: stockMap[b.id]?.currentStock ?? '',
+      safetyStock: stockMap[b.id]?.safetyStock ?? b.safetyStock,
+      status: stockMap[b.id]?.status ?? '',
+    }))
+    orderList.value = orders
+    useList.value = uses
   } catch (error) {
     ElMessage.error('加载数据失败')
     console.error(error)

@@ -21,11 +21,19 @@
       <el-tabs v-model="activeTab">
         <el-tab-pane label="主模具信息" name="info">
           <el-table :data="mainMoldList" border style="width: 100%" v-loading="loading">
-            <el-table-column prop="name" label="名称" width="180" sortable />
-            <el-table-column prop="holeDiameter" label="孔径" width="120" sortable />
-            <el-table-column prop="wireMaterial" label="对应线材" width="140" sortable />
-            <el-table-column prop="safetyStock" label="安全库存" width="120" sortable />
-            <el-table-column prop="remark" label="备注" min-width="150" />
+            <el-table-column prop="name" label="名称" width="160" sortable />
+            <el-table-column prop="holeDiameter" label="孔径" width="100" sortable />
+            <el-table-column prop="wireMaterial" label="对应线材" width="120" sortable />
+            <el-table-column prop="safetyStock" label="安全库存" width="100" sortable />
+            <el-table-column prop="currentStock" label="当前库存" width="100" sortable />
+            <el-table-column prop="status" label="库存状态" width="100" sortable>
+              <template #default="{ row }">
+                <el-tag v-if="row.status" :type="row.status === '需订购' ? 'danger' : 'success'" effect="dark" round size="small">
+                  {{ row.status }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="remark" label="备注" min-width="120" />
             <el-table-column label="操作" width="150" fixed="right">
               <template #default="{ row }">
                 <el-button size="small" @click="handleEdit(row)">编辑</el-button>
@@ -65,7 +73,7 @@
             <el-table-column prop="user" label="使用人" width="120" sortable />
             <el-table-column prop="quantity" label="使用数量" width="120" sortable />
             <el-table-column prop="useDate" label="使用时间" width="180" sortable />
-            <el-table-column prop="remark" label="备注" min-width="150" />
+            <el-table-column prop="remark" label="备注" min-width="120" />
           </el-table>
         </el-tab-pane>
 
@@ -317,11 +325,24 @@ onMounted(() => {
 async function loadData() {
   loading.value = true
   try {
-    mainMoldList.value = await mainMoldApi.getAll()
-    orderList.value = await mainMoldOrderApi.getAll()
-    useList.value = await mainMoldUseApi.getAll()
-    linkList.value = await mainMoldLinkApi.getAll()
-    stockList.value = await stockCalcApi.calculate('mainMold')
+    const [molds, orders, uses, links, stockData] = await Promise.all([
+      mainMoldApi.getAll(),
+      mainMoldOrderApi.getAll(),
+      mainMoldUseApi.getAll(),
+      mainMoldLinkApi.getAll(),
+      stockCalcApi.calculate('mainMold')
+    ])
+    const stockMap: Record<string, any> = {}
+    stockData.forEach((s: any) => { stockMap[s.mainMoldId] = s })
+    mainMoldList.value = molds.map((m: any) => ({
+      ...m,
+      currentStock: stockMap[m.id]?.currentStock ?? '',
+      safetyStock: stockMap[m.id]?.safetyStock ?? m.safetyStock,
+      status: stockMap[m.id]?.status ?? '',
+    }))
+    orderList.value = orders
+    useList.value = uses
+    linkList.value = links
   } catch (error) {
     ElMessage.error('加载数据失败')
     console.error(error)
