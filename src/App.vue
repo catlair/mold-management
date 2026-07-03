@@ -1,12 +1,11 @@
 <template>
   <el-container class="app-container">
-    <el-aside :width="isCollapse ? '64px' : '200px'" class="app-aside">
+    <el-aside :width="isCollapse ? '64px' : '220px'" class="app-aside">
       <div class="logo" :class="{ 'logo-collapse': isCollapse }">
         <img v-if="!isCollapse" src="./assets/logo.svg" alt="" class="logo-icon" />
-        <h1 v-show="!isCollapse">模具管理</h1>
-        <h1 v-show="isCollapse">模</h1>
+        <span v-show="!isCollapse" class="logo-text">模具管理</span>
       </div>
-      <el-scrollbar>
+      <el-scrollbar class="menu-scrollbar">
         <el-menu
           :default-active="activeMenu"
           :collapse="isCollapse"
@@ -93,29 +92,41 @@ onMounted(() => {
 </script>
 
 <style>
+:root {
+  --primary: #4f6ef7;
+  --primary-light: #6b8aff;
+  --sidebar-bg: #1a1f36;
+  --sidebar-hover: #252b45;
+  --sidebar-active: rgba(79, 110, 247, 0.15);
+  --sidebar-text: #8b92a8;
+  --sidebar-text-active: #fff;
+  --bg: #f5f6fa;
+  --card-bg: #fff;
+  --border: #ebeef5;
+}
+
 .app-container {
   height: 100vh;
 }
 
 .app-aside {
-  background: linear-gradient(180deg, #2b3a4e 0%, #243243 100%);
+  background: var(--sidebar-bg);
   overflow: hidden;
-  transition: width 0.3s ease-in-out;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   display: flex;
   flex-direction: column;
-  will-change: width;
-  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.15);
+  box-shadow: 2px 0 12px rgba(0, 0, 0, 0.08);
 }
 
 .logo {
-  height: 60px;
+  height: 64px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  background: rgba(0, 0, 0, 0.2);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  gap: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
 }
 
 .logo-collapse {
@@ -123,190 +134,209 @@ onMounted(() => {
 }
 
 .logo-icon {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
 }
 
-.logo h1 {
+.logo-text {
   color: #fff;
-  font-size: 16px;
-  font-weight: 600;
-  white-space: nowrap;
-  letter-spacing: 2px;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.menu-scrollbar {
+  flex: 1;
 }
 
 .el-menu-vertical {
   border-right: none;
   background: transparent;
+  padding: 8px 0;
 }
 
 .el-menu-vertical:not(.el-menu--collapse) {
-  width: 200px;
+  width: 220px;
 }
 
 .el-menu-vertical .el-menu-item {
-  color: #bfcbd9;
-  height: 48px;
-  line-height: 48px;
-  border-radius: 0;
-  margin: 2px 8px;
+  color: var(--sidebar-text);
+  height: 46px;
+  line-height: 46px;
+  margin: 2px 10px;
   border-radius: 8px;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
 }
 
 .el-menu-vertical .el-menu-item:hover {
-  background: rgba(64, 158, 255, 0.15);
-  color: #409eff;
+  background: var(--sidebar-hover);
+  color: var(--sidebar-text-active);
 }
 
 .el-menu-vertical .el-menu-item.is-active {
-  background: rgba(64, 158, 255, 0.2);
-  color: #409eff;
-  font-weight: 500;
+  background: var(--sidebar-active);
+  color: var(--primary-light);
+  font-weight: 600;
+}
+
+.el-menu-vertical .el-menu-item .el-icon {
+  font-size: 18px;
 }
 
 .menu-group-title {
-  font-size: 12px;
-  color: #8a919e;
-  text-transform: uppercase;
-  letter-spacing: 1px;
+  font-size: 11px;
+  color: #5a6178;
+  letter-spacing: 1.5px;
+  font-weight: 600;
 }
 
 .collapse-btn {
   width: 100%;
-  height: 40px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: #8a919e;
-  background: rgba(0, 0, 0, 0.2);
-  transition: color 0.3s;
+  color: var(--sidebar-text);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  transition: all 0.2s;
   flex-shrink: 0;
 }
 
 .collapse-btn:hover {
-  color: #409eff;
-  background: rgba(64, 158, 255, 0.1);
+  color: var(--primary-light);
+  background: var(--sidebar-hover);
 }
 
 .app-main {
-  background: #f0f2f5;
-  padding: 20px;
+  background: var(--bg);
+  padding: 24px;
   overflow: auto;
 }
 
-/* 页面过渡动画 */
+/* 过渡动画 */
 .fade-slide-enter-active,
 .fade-slide-leave-active {
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition: opacity 0.25s ease, transform 0.25s ease;
 }
 
 .fade-slide-enter-from {
   opacity: 0;
-  transform: translateY(10px);
+  transform: translateY(8px);
 }
 
 .fade-slide-leave-to {
   opacity: 0;
-  transform: translateY(-10px);
+  transform: translateY(-8px);
 }
 
-/* 全局表格样式 */
+/* 表格样式 */
 .el-table {
-  border-radius: 8px;
+  border-radius: 10px;
   overflow: hidden;
 }
 
 .el-table .el-table__cell {
   text-align: center;
+  padding: 10px 0;
 }
 
 .el-table th.el-table__cell {
-  background: #f5f7fa !important;
+  background: #fafbfc !important;
   color: #303133 !important;
   font-weight: 600;
   font-size: 13px;
+  border-bottom: 2px solid var(--border) !important;
 }
 
 .el-table .el-table__body tr:nth-child(even) td.el-table__cell {
-  background: #fafafa !important;
+  background: #fafbfc !important;
 }
 
 .el-table .el-table__body tr:hover td.el-table__cell {
-  background: #ecf5ff !important;
+  background: #f0f5ff !important;
 }
 
-/* 全局卡片样式 */
+/* 卡片样式 */
 .el-card {
   border-radius: 12px;
-  border: none;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
   overflow: hidden;
 }
 
 .el-card__header {
-  border-bottom: 1px solid #f0f0f0;
-  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  padding: 18px 24px;
 }
 
-/* 全局按钮样式 */
+.el-card__body {
+  padding: 20px 24px;
+}
+
+/* 按钮样式 */
 .el-button {
   border-radius: 8px;
   font-weight: 500;
 }
 
-/* 全局标签样式 */
-.el-tag {
-  border-radius: 6px;
+.el-button--primary {
+  box-shadow: 0 2px 6px rgba(79, 110, 247, 0.25);
 }
 
-/* 对话框美化 */
+.el-button--primary:hover {
+  box-shadow: 0 4px 12px rgba(79, 110, 247, 0.35);
+}
+
+/* 标签样式 */
+.el-tag {
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+/* 对话框 */
 .el-dialog {
   border-radius: 12px;
   overflow: hidden;
 }
 
 .el-dialog__header {
-  border-bottom: 1px solid #f0f0f0;
-  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  padding: 18px 24px;
   margin: 0;
 }
 
 .el-dialog__body {
-  padding: 24px 20px;
+  padding: 24px;
 }
 
-/* 表单项优化 */
+/* 表单项 */
 .el-form-item__label {
   font-weight: 500;
   color: #303133;
 }
 
-/* 页面容器通用样式 */
+/* 页面容器 */
 .page-container {
   display: flex;
   flex-direction: column;
-  gap: 0;
 }
 
 .card-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 16px;
+  gap: 10px;
+  font-size: 17px;
   font-weight: 600;
-  color: #303133;
+  color: #1a1f36;
 }
 
-/* 操作按钮区 */
 .action-buttons {
   display: flex;
   gap: 12px;
   margin-bottom: 16px;
 }
 
-/* 表格上方操作栏 */
 .tab-header {
   margin-bottom: 12px;
   display: flex;
