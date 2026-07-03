@@ -1,18 +1,24 @@
 <template>
-  <div class="page-container">
+  <div class="page-container" :class="{ 'is-fullscreen': isFullscreen }">
     <el-card>
       <template #header>
         <div class="card-header">
           <el-icon><Document /></el-icon>
           <span>螺丝规格管理</span>
-          <el-button type="primary" @click="handleAdd">
-            <el-icon><Plus /></el-icon>
-            添加规格
-          </el-button>
+          <div class="header-right">
+            <el-button type="primary" @click="handleAdd">
+              <el-icon><Plus /></el-icon>
+              添加规格
+            </el-button>
+            <el-button @click="isFullscreen = !isFullscreen">
+              <el-icon><FullScreen v-if="!isFullscreen" /><Close v-else /></el-icon>
+              {{ isFullscreen ? '退出全屏' : '全屏' }}
+            </el-button>
+          </div>
         </div>
       </template>
 
-      <el-table :data="tableData" border style="width: 100%" max-height="600" v-loading="loading">
+      <el-table :data="tableData" border style="width: 100%" v-loading="loading" :max-height="isFullscreen ? tableMaxHeight : undefined">
         <el-table-column prop="name" label="螺丝名称" width="160" sortable />
         <el-table-column prop="headType" label="头型" width="120" sortable :filters="headTypeFilters" :filter-method="filterHandler" />
         <el-table-column prop="punch" label="冲头" width="120" sortable />
@@ -166,6 +172,8 @@ const punchList = ref<any[]>([])
 const dieList = ref<any[]>([])
 const dialogVisible = ref(false)
 const isEdit = ref(false)
+const isFullscreen = ref(false)
+const tableMaxHeight = computed(() => window.innerHeight - 200)
 const loading = ref(true)
 
 // 表单引用
@@ -333,5 +341,30 @@ async function handleSubmit() {
 <style scoped>
 .page-container {
   height: 100%;
+}
+.page-container.is-fullscreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 9999;
+  background: #f0f2f5;
+  padding: 20px;
+  overflow: auto;
+}
+.page-container.is-fullscreen .el-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.page-container.is-fullscreen .el-card__body {
+  flex: 1;
+  overflow: auto;
+}
+.header-right {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
 }
 </style>
