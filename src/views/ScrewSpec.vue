@@ -10,7 +10,7 @@
               <el-icon><Plus /></el-icon>
               添加规格
             </el-button>
-            <el-button @click="isFullscreen = !isFullscreen">
+            <el-button @click="toggleFullscreen">
               <el-icon><FullScreen v-if="!isFullscreen" /><Close v-else /></el-icon>
               {{ isFullscreen ? '退出全屏' : '全屏' }}
             </el-button>
@@ -18,7 +18,7 @@
         </div>
       </template>
 
-      <el-table :data="tableData" border style="width: 100%" v-loading="loading" :max-height="isFullscreen ? tableMaxHeight : undefined">
+      <el-table :data="tableData" border style="width: 100%" v-loading="loading">
         <el-table-column prop="name" label="螺丝名称" width="160" sortable />
         <el-table-column prop="headType" label="头型" width="120" sortable :filters="headTypeFilters" :filter-method="filterHandler" />
         <el-table-column prop="punch" label="冲头" width="120" sortable />
@@ -165,6 +165,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance } from 'element-plus'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import { screwSpecApi, punchApi, dieApi } from '../api'
 
 const tableData = ref<any[]>([])
@@ -173,8 +174,19 @@ const dieList = ref<any[]>([])
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const isFullscreen = ref(false)
-const tableMaxHeight = computed(() => window.innerHeight - 200)
 const loading = ref(true)
+
+async function toggleFullscreen() {
+  const win = getCurrentWindow()
+  const full = await win.isFullscreen()
+  await win.setFullscreen(!full)
+  isFullscreen.value = !full
+}
+
+onMounted(async () => {
+  const win = getCurrentWindow()
+  isFullscreen.value = await win.isFullscreen()
+})
 
 // 表单引用
 const formRef = ref<FormInstance>()
@@ -341,26 +353,6 @@ async function handleSubmit() {
 <style scoped>
 .page-container {
   height: 100%;
-}
-.page-container.is-fullscreen {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  z-index: 9999;
-  background: #f0f2f5;
-  padding: 20px;
-  overflow: auto;
-}
-.page-container.is-fullscreen .el-card {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-.page-container.is-fullscreen .el-card__body {
-  flex: 1;
-  overflow: auto;
 }
 .header-right {
   display: flex;
