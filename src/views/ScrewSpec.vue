@@ -165,7 +165,6 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance } from 'element-plus'
-import { WebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { screwSpecApi, punchApi, dieApi } from '../api'
 
 const tableData = ref<any[]>([])
@@ -176,24 +175,9 @@ const isEdit = ref(false)
 const isFullscreen = ref(false)
 const loading = ref(true)
 
-async function toggleFullscreen() {
-  try {
-    const win = await WebviewWindow.getByLabel('main')
-    if (!win) return
-    const full = await win.isFullscreen()
-    await win.setFullscreen(!full)
-    isFullscreen.value = !full
-  } catch (e) {
-    console.error('全屏失败:', e)
-  }
+function toggleFullscreen() {
+  isFullscreen.value = !isFullscreen.value
 }
-
-onMounted(async () => {
-  try {
-    const win = await WebviewWindow.getByLabel('main')
-    if (win) isFullscreen.value = await win.isFullscreen()
-  } catch {}
-})
 
 // 表单引用
 const formRef = ref<FormInstance>()
@@ -360,6 +344,27 @@ async function handleSubmit() {
 <style scoped>
 .page-container {
   height: 100%;
+}
+.page-container.is-fullscreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 2000;
+  background: #f0f2f5;
+  padding: 20px;
+  overflow: auto;
+}
+.page-container.is-fullscreen .el-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+.page-container.is-fullscreen .el-card__body {
+  flex: 1;
+  overflow: auto;
 }
 .header-right {
   display: flex;
