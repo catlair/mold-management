@@ -108,5 +108,5 @@ export const backupApi = {
   setConfig: (backupCount: number, backupPath: string | null) => invoke<any>('set_backup_config', { backupCount, backupPath }),
   list: () => invoke<any[]>('list_backups'),
   toggleLock: (index: number) => invoke<{ success: boolean; locked: boolean }>('toggle_backup_lock', { index }),
-  restore: (backupPath: string) => invoke<{ success: boolean }>('restore_backup', { backupPath }),
+  restore: (backupPath: string) => invoke<{ success: boolean }>('restore_backup', { backup_path: backupPath }),
 }

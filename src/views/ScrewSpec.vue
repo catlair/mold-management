@@ -21,7 +21,12 @@
       <el-table :data="tableData" border style="width: 100%" v-loading="loading">
         <el-table-column prop="name" label="螺丝名称" width="160" sortable />
         <el-table-column prop="headType" label="头型" width="120" sortable :filters="headTypeFilters" :filter-method="filterHandler" />
-        <el-table-column prop="punch" label="冲头" width="120" sortable />
+        <el-table-column prop="punch" label="冲头" width="120" sortable>
+          <template #default="{ row }">
+            <el-link v-if="row.punch" type="primary" :underline="false" @click="showPunchStock(row.punch)">{{ row.punch }}</el-link>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="threadType" label="牙型" width="120" sortable :filters="threadTypeFilters" :filter-method="filterHandler" />
         <el-table-column prop="die" label="牙板" width="120" sortable />
         <el-table-column prop="headSize" label="头/垫片大小" width="140" sortable />
@@ -158,6 +163,33 @@
         </span>
       </template>
     </el-dialog>
+
+    <!-- 冲头库存信息弹窗 -->
+    <el-dialog v-model="showPunchStockDialog" :title="`冲头库存 - ${punchStockInfo.name || ''}`" width="500px">
+      <div v-if="punchStockInfo.name" class="punch-stock-info">
+        <div class="info-row">
+          <span class="label">冲头名称：</span>
+          <span class="value">{{ punchStockInfo.name }}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">当前库存：</span>
+          <span class="value">{{ punchStockInfo.currentStock ?? '-' }}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">安全库存：</span>
+          <span class="value">{{ punchStockInfo.safetyStock ?? '-' }}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">库存状态：</span>
+          <el-tag :type="punchStockInfo.status === '需订购' ? 'danger' : 'success'" effect="dark" round>
+            {{ punchStockInfo.status || '-' }}
+          </el-tag>
+        </div>
+      </div>
+      <div v-else style="text-align: center; color: #909399; padding: 20px">
+        未找到该冲头的库存信息
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -166,7 +198,7 @@ import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance } from 'element-plus'
 import { getCurrentWindow } from '@tauri-apps/api/window'
-import { screwSpecApi, punchApi, dieApi } from '../api'
+import { screwSpecApi, punchApi, dieApi, stockCalcApi } from '../api'
 
 const tableData = ref<any[]>([])
 const punchList = ref<any[]>([])
@@ -226,6 +258,27 @@ const dieOptions = computed(() => {
     }
   })
 })
+
+// 冲头库存信息
+const showPunchStockDialog = ref(false)
+const punchStockInfo = ref<any>({})
+
+async function showPunchStock(punchName: string) {
+  try {
+    const stockData = await stockCalcApi.calculate('punch')
+    const match = stockData.find((s: any) => s.name === punchName)
+    if (match) {
+      punchStockInfo.value = match
+    } else {
+      const fuzzy = stockData.find((s: any) => s.name && s.name.includes(punchName))
+      punchStockInfo.value = fuzzy || { name: punchName }
+    }
+    showPunchStockDialog.value = true
+  } catch {
+    punchStockInfo.value = { name: punchName }
+    showPunchStockDialog.value = true
+  }
+}
 
 // 筛选选项
 const headTypeFilters = computed(() => {
