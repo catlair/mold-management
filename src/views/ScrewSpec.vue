@@ -165,6 +165,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance } from 'element-plus'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import { screwSpecApi, punchApi, dieApi } from '../api'
 
 const tableData = ref<any[]>([])
@@ -175,11 +176,26 @@ const isEdit = ref(false)
 const isFullscreen = ref(false)
 const loading = ref(true)
 
-function toggleFullscreen() {
-  isFullscreen.value = !isFullscreen.value
+async function toggleFullscreen() {
+  const next = !isFullscreen.value
+  isFullscreen.value = next
+  try {
+    const win = getCurrentWindow()
+    await win.setFullscreen(next)
+  } catch {}
 }
 
-// 表单引用
+onMounted(async () => {
+  try {
+    const win = getCurrentWindow()
+    isFullscreen.value = await win.isFullscreen()
+  } catch {}
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && isFullscreen.value) {
+      toggleFullscreen()
+    }
+  })
+})
 const formRef = ref<FormInstance>()
 
 // 验证规则
