@@ -209,11 +209,11 @@ async function handleBackupNow() {
 async function handleRestore(backup: any) {
   try {
     await ElMessageBox.confirm(
-      `确定要恢复此备份吗？\n${backup.name}\n\n当前数据将自动备份。`,
+      `确定要恢复此备份吗？\n${backup.file_path}\n\n当前数据将自动备份。`,
       '确认恢复',
       { type: 'warning', confirmButtonText: '确定恢复', cancelButtonText: '取消' }
     )
-    await backupApi.restore(backup.path)
+    await backupApi.restore(backup.file_path)
     ElMessage.success('恢复成功，请重启应用')
   } catch (error: any) {
     if (error !== 'cancel') {
