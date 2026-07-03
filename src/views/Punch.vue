@@ -26,9 +26,10 @@
             <el-table-column prop="material" label="材质" width="140" sortable :filters="materialFilters" :filter-method="filterHandler" />
             <el-table-column prop="safetyStock" label="安全库存" width="120" sortable />
             <el-table-column prop="remark" label="备注" min-width="150" />
-            <el-table-column label="操作" width="150" fixed="right">
+            <el-table-column label="操作" width="200" fixed="right">
               <template #default="{ row }">
                 <el-button size="small" @click="handleEdit(row)">编辑</el-button>
+                <el-button size="small" type="info" @click="showLinkedScrews(row)">关联螺丝</el-button>
                 <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
               </template>
             </el-table-column>
@@ -111,6 +112,24 @@
         </el-tab-pane>
       </el-tabs>
     </el-card>
+
+    <!-- 关联螺丝对话框 -->
+    <el-dialog v-model="showLinkedScrewsDialog" :title="`关联螺丝 - ${linkedPunchName}`" width="700px">
+      <el-table :data="linkedScrews" border style="width: 100%" v-loading="linkedLoading">
+        <el-table-column prop="name" label="螺丝名称" width="150" sortable />
+        <el-table-column prop="headType" label="头型" width="100" />
+        <el-table-column prop="threadType" label="牙型" width="100" />
+        <el-table-column prop="headSize" label="头/垫片大小" width="120" />
+        <el-table-column prop="headHeight" label="头高" width="80" />
+        <el-table-column prop="length" label="长度" width="80" />
+        <el-table-column prop="threadDiameter" label="牙径" width="80" />
+        <el-table-column prop="wireMaterial" label="线材" width="80" />
+        <el-table-column prop="remark" label="备注" min-width="120" />
+      </el-table>
+      <div v-if="!linkedLoading && linkedScrews.length === 0" style="text-align: center; color: #909399; padding: 20px">
+        该冲头暂无关联螺丝规格
+      </div>
+    </el-dialog>
 
     <!-- 添加/编辑对话框 -->
     <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑冲头' : '添加冲头'" width="500px">
@@ -304,6 +323,29 @@ function getScrewSpecName(screwSpecId: string) {
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const form = ref({ id: '', name: '', spec: '', material: '', safetyStock: 0, remark: '' })
+
+const showLinkedScrewsDialog = ref(false)
+const linkedScrews = ref<any[]>([])
+const linkedPunchName = ref('')
+const linkedLoading = ref(false)
+
+async function showLinkedScrews(punch: any) {
+  linkedPunchName.value = punch.name
+  linkedScrews.value = []
+  linkedLoading.value = true
+  showLinkedScrewsDialog.value = true
+  try {
+    // 找到所有关联该冲头的记录
+    const links = linkList.value.filter(l => l.punchId === punch.id)
+    // 获取关联的螺丝规格
+    const screwIds = links.map(l => l.screwSpecId)
+    linkedScrews.value = screwSpecList.value.filter(s => screwIds.includes(s.id))
+  } catch (error) {
+    ElMessage.error('加载关联数据失败')
+  } finally {
+    linkedLoading.value = false
+  }
+}
 
 const showOrderDialog = ref(false)
 const orderForm = ref({ punchId: '', quantity: 1, orderDate: getCurrentDateTime(), status: '未到货', remark: '' })
