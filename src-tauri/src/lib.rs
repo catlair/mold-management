@@ -52,27 +52,40 @@ fn file_md5(path: &str) -> Result<String, String> {
 
 fn do_backup(file_path: &str, backup_dir: &str, reason: &str) -> Result<String, String> {
     if !Path::new(file_path).exists() {
-        return Err("数据文件不存在".to_string());
+        return Err(format!("数据文件不存在: {}", file_path));
     }
-    let _ = fs::create_dir_all(backup_dir);
+
+    // 确保备份目录存在
+    fs::create_dir_all(backup_dir).map_err(|e| format!("创建备份目录失败: {}", e))?;
+    if !Path::new(backup_dir).exists() {
+        return Err(format!("备份目录创建失败: {}", backup_dir));
+    }
 
     let current_md5 = file_md5(file_path)?;
 
-    // 检查最新备份的 MD5
+    // 与所有历史备份比较 MD5，任一相同则跳过
     let records = load_backup_index(backup_dir);
-    if let Some(latest) = records.last() {
-        if latest.backup_md5 == current_md5 {
-            return Ok(String::new()); // MD5 相同，跳过
+    for record in &records {
+        if record.backup_md5 == current_md5 {
+            return Ok(String::new());
         }
     }
 
-    // 创建备份
+    // 创建备份文件
     let timestamp = Local::now().format("%Y%m%d_%H%M%S");
     let backup_name = format!("mold-data-backup-{}.xlsx", timestamp);
     let backup_file = PathBuf::from(backup_dir).join(&backup_name);
-    fs::copy(file_path, &backup_file).map_err(|e| e.to_string())?;
+    let bytes_copied = fs::copy(file_path, &backup_file).map_err(|e| format!("复制文件失败: {}", e))?;
 
-    // 写入记录
+    // 验证备份文件已创建且有内容
+    if !backup_file.exists() {
+        return Err("备份文件创建失败".to_string());
+    }
+    if bytes_copied == 0 {
+        return Err("备份文件为空".to_string());
+    }
+
+    // 写入索引记录
     let mut new_records = records;
     new_records.push(BackupRecord {
         file_path: backup_file.to_string_lossy().to_string(),
@@ -356,10 +369,17 @@ fn restore_backup(state: State<AppState>, backup_path: String) -> Result<Value, 
 }
 
 fn default_backup_dir() -> String {
-    std::env::current_exe()
-        .ok()
-        .and_then(|p| p.parent().map(|d| d.join("data").join("backups").to_string_lossy().to_string()))
-        .unwrap_or_else(|| "./data/backups".to_string())
+    // 优先使用 exe 同级的 data/backups 目录
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            let backup_dir = exe_dir.join("data").join("backups");
+            return backup_dir.to_string_lossy().to_string();
+        }
+    }
+    // 回退到当前工作目录
+    std::env::current_dir()
+        .map(|d| d.join("data").join("backups").to_string_lossy().to_string())
+        .unwrap_or_else(|_| "./data/backups".to_string())
 }
 
 fn get_backup_dir(config: &Config) -> String {
