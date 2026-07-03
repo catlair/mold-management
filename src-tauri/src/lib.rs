@@ -128,7 +128,8 @@ fn cleanup_old_backups(backup_dir: &str, keep_count: usize) {
 #[tauri::command]
 fn list_backups(state: State<AppState>) -> Result<Value, String> {
     let path = state.file_path.lock().map_err(|e| e.to_string())?;
-    let backup_dir = get_backup_dir_for_file(&path);
+    let config = state.config.lock().map_err(|e| e.to_string())?;
+    let backup_dir = get_backup_dir_for_file(&path, &config);
     let records = load_backup_index(&backup_dir);
     Ok(serde_json::to_value(records).unwrap_or(json!([])))
 }
@@ -136,7 +137,8 @@ fn list_backups(state: State<AppState>) -> Result<Value, String> {
 #[tauri::command]
 fn toggle_backup_lock(state: State<AppState>, index: usize) -> Result<Value, String> {
     let path = state.file_path.lock().map_err(|e| e.to_string())?;
-    let backup_dir = get_backup_dir_for_file(&path);
+    let config = state.config.lock().map_err(|e| e.to_string())?;
+    let backup_dir = get_backup_dir_for_file(&path, &config);
     let mut records = load_backup_index(&backup_dir);
     if index < records.len() {
         records[index].locked = !records[index].locked;
@@ -147,11 +149,17 @@ fn toggle_backup_lock(state: State<AppState>, index: usize) -> Result<Value, Str
     }
 }
 
-fn get_backup_dir_for_file(file_path: &str) -> String {
-    let parent = Path::new(file_path).parent()
-        .map(|p| p.to_string_lossy().to_string())
-        .unwrap_or_else(|| "./data".to_string());
-    PathBuf::from(parent).join("backups").to_string_lossy().to_string()
+fn get_backup_dir_for_file(file_path: &str, config: &Config) -> String {
+    // 优先使用用户配置的备份路径
+    if let Some(ref custom) = config.backup_path {
+        if !custom.is_empty() {
+            return custom.clone();
+        }
+    }
+    // 没配置则用数据文件同级 backups 目录
+    Path::new(file_path).parent()
+        .map(|p| p.join("backups").to_string_lossy().to_string())
+        .unwrap_or_else(|| default_backup_dir())
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -318,11 +326,11 @@ fn calculate_stock(state: State<AppState>, stock_type: String) -> Result<Value, 
 fn backup_data(state: State<AppState>) -> Result<Value, String> {
     let path = state.file_path.lock().map_err(|e| e.to_string())?;
     let config = state.config.lock().map_err(|e| e.to_string())?;
-    let backup_dir = get_backup_dir(&config);
-    let backup_file = do_backup(&path, &backup_dir, "手动备份")?;
+    let backup_dir = get_backup_dir_for_file(&path, &config);
     let count = config.backup_count;
     drop(config);
     drop(path);
+    let backup_file = do_backup(&state.file_path.lock().map_err(|e| e.to_string())?, &backup_dir, "手动备份")?;
     cleanup_old_backups(&backup_dir, count);
     if backup_file.is_empty() {
         Ok(json!({ "success": true, "skipped": true, "message": "文件内容未变化，跳过备份" }))
@@ -333,8 +341,9 @@ fn backup_data(state: State<AppState>) -> Result<Value, String> {
 
 #[tauri::command]
 fn get_backup_config(state: State<AppState>) -> Result<Value, String> {
+    let path = state.file_path.lock().map_err(|e| e.to_string())?;
     let config = state.config.lock().map_err(|e| e.to_string())?;
-    let backup_dir = get_backup_dir(&config);
+    let backup_dir = get_backup_dir_for_file(&path, &config);
     Ok(json!({
         "backupCount": config.backup_count,
         "backupPath": config.backup_path,
@@ -362,7 +371,7 @@ fn restore_backup(state: State<AppState>, backup_path: String) -> Result<Value, 
     }
     let file_path = state.file_path.lock().map_err(|e| e.to_string())?;
     let config = state.config.lock().map_err(|e| e.to_string())?;
-    let backup_dir = get_backup_dir(&config);
+    let backup_dir = get_backup_dir_for_file(&file_path, &config);
     let _ = do_backup(&file_path, &backup_dir, "恢复前备份");
     fs::copy(&backup_path, &*file_path).map_err(|e| e.to_string())?;
     Ok(json!({ "success": true }))
@@ -382,10 +391,6 @@ fn default_backup_dir() -> String {
         .unwrap_or_else(|_| "./data/backups".to_string())
 }
 
-fn get_backup_dir(config: &Config) -> String {
-    config.backup_path.clone().unwrap_or_else(default_backup_dir)
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let config_path = get_config_path();
@@ -396,7 +401,7 @@ pub fn run() {
         .unwrap_or_else(|| excel::get_default_file_path());
 
     // 启动时备份
-    let backup_dir = get_backup_dir(&config);
+    let backup_dir = get_backup_dir_for_file(&initial_path, &config);
     let _ = do_backup(&initial_path, &backup_dir, "应用启动");
     cleanup_old_backups(&backup_dir, config.backup_count);
 
@@ -435,7 +440,7 @@ pub fn run() {
                 if let Some(state) = app_handle.try_state::<AppState>() {
                     let fp = state.file_path.lock().unwrap().clone();
                     let config = state.config.lock().unwrap().clone();
-                    let backup_dir = get_backup_dir(&config);
+                    let backup_dir = get_backup_dir_for_file(&fp, &config);
                     let _ = do_backup(&fp, &backup_dir, "应用退出");
                     cleanup_old_backups(&backup_dir, config.backup_count);
                 }
