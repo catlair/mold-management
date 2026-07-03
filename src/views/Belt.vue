@@ -16,7 +16,6 @@
         <el-tab-pane label="皮带信息" name="info">
           <el-table :data="beltList" border style="width: 100%" v-loading="loading">
             <el-table-column prop="name" label="名称" width="180" sortable />
-            <el-table-column prop="spec" label="规格" width="140" sortable />
             <el-table-column prop="machine" label="适用机器" width="140" sortable :filters="machineFilters" :filter-method="filterHandler" />
             <el-table-column prop="safetyStock" label="安全库存" width="120" sortable />
             <el-table-column prop="remark" label="备注" min-width="150" />
@@ -85,9 +84,6 @@
       <el-form ref="formRef" :model="form" :rules="formRules" label-width="80px">
         <el-form-item label="名称" prop="name">
           <el-input v-model="form.name" />
-        </el-form-item>
-        <el-form-item label="规格" prop="spec">
-          <el-input v-model="form.spec" />
         </el-form-item>
         <el-form-item label="适用机器" prop="machine">
           <el-input v-model="form.machine" />
@@ -211,7 +207,7 @@ function getBeltName(beltId: string) {
 
 const dialogVisible = ref(false)
 const isEdit = ref(false)
-const form = ref({ id: '', name: '', spec: '', machine: '', safetyStock: 0, remark: '' })
+const form = ref({ id: '', name: '', machine: '', safetyStock: 0, remark: '' })
 
 const showOrderDialog = ref(false)
 const orderForm = ref({ beltId: '', quantity: 1, orderDate: getCurrentDateTime(), status: '未到货', remark: '' })
@@ -227,7 +223,6 @@ const useFormRef = ref<FormInstance>()
 // 验证规则
 const formRules = {
   name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
-  spec: [{ required: true, message: '请输入规格', trigger: 'blur' }],
   machine: [{ required: true, message: '请输入适用机器', trigger: 'blur' }],
 }
 const orderFormRules = {
@@ -261,7 +256,7 @@ async function loadData() {
 
 function handleAdd() {
   isEdit.value = false
-  form.value = { id: '', name: '', spec: '', machine: '', safetyStock: 0, remark: '' }
+  form.value = { id: '', name: '', machine: '', safetyStock: 0, remark: '' }
   dialogVisible.value = true
 }
 
