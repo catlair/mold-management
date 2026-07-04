@@ -21,7 +21,11 @@
       <el-tabs v-model="activeTab">
         <el-tab-pane label="牙板信息" name="info">
           <el-table :data="dieList" border style="width: 100%" v-loading="loading">
-            <el-table-column prop="name" label="名称" width="160" sortable />
+            <el-table-column prop="name" label="名称" width="160" sortable>
+              <template #default="{ row }">
+                <el-link type="primary" :underline="false" @click="showLinkedScrews(row)">{{ row.name }}</el-link>
+              </template>
+            </el-table-column>
             <el-table-column prop="machineType" label="机型" width="120" sortable :filters="machineTypeFilters" :filter-method="filterHandler" />
             <el-table-column prop="wireDiameter" label="线径" width="100" sortable />
             <el-table-column prop="safetyStock" label="安全库存" width="100" sortable />
@@ -210,6 +214,24 @@
         <el-button type="primary" @click="handleLinkSubmit">确定</el-button>
       </template>
     </el-dialog>
+
+    <!-- 关联螺丝对话框 -->
+    <el-dialog v-model="showLinkedScrewsDialog" :title="`关联螺丝 - ${linkedDieName}`" width="700px">
+      <el-table :data="linkedScrews" border style="width: 100%" v-loading="linkedLoading">
+        <el-table-column prop="name" label="螺丝名称" width="150" sortable />
+        <el-table-column prop="headType" label="头型" width="100" />
+        <el-table-column prop="threadType" label="牙型" width="100" />
+        <el-table-column prop="headSize" label="头/垫片大小" width="120" />
+        <el-table-column prop="headHeight" label="头高" width="80" />
+        <el-table-column prop="length" label="长度" width="80" />
+        <el-table-column prop="threadDiameter" label="牙径" width="80" />
+        <el-table-column prop="wireMaterial" label="线材" width="80" />
+        <el-table-column prop="remark" label="备注" min-width="120" />
+      </el-table>
+      <div v-if="!linkedLoading && linkedScrews.length === 0" style="text-align: center; color: #909399; padding: 20px">
+        该牙板暂无关联螺丝规格
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -249,6 +271,27 @@ const orderList = ref<any[]>([])
 const useList = ref<any[]>([])
 const linkList = ref<any[]>([])
 const screwSpecList = ref<any[]>([])
+
+const showLinkedScrewsDialog = ref(false)
+const linkedScrews = ref<any[]>([])
+const linkedDieName = ref('')
+const linkedLoading = ref(false)
+
+async function showLinkedScrews(die: any) {
+  linkedDieName.value = die.name
+  linkedScrews.value = []
+  linkedLoading.value = true
+  showLinkedScrewsDialog.value = true
+  try {
+    const links = linkList.value.filter(l => l.dieId === die.id)
+    const screwIds = links.map(l => l.screwSpecId)
+    linkedScrews.value = screwSpecList.value.filter(s => screwIds.includes(s.id))
+  } catch {
+    ElMessage.error('加载关联数据失败')
+  } finally {
+    linkedLoading.value = false
+  }
+}
 const loading = ref(true)
 
 // 筛选选项
