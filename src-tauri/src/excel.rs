@@ -16,31 +16,31 @@ pub const SHEETS: &[(&str, &[(&str, &str)])] = &[
         ("其他备注", "remark"),
     ]),
     ("冲头信息表", &[("内部ID", "id"), ("名称", "name"), ("规格", "spec"), ("材质", "material"), ("安全库存", "safetyStock"), ("备注", "remark")]),
-    ("冲头订购记录", &[("订购ID", "id"), ("冲头ID", "punchId"), ("订购数量", "quantity"), ("订购时间", "orderDate"), ("到货状态", "status"), ("备注", "remark")]),
+    ("冲头入库记录", &[("入库ID", "id"), ("冲头ID", "punchId"), ("入库数量", "quantity"), ("入库时间", "orderDate"), ("到货状态", "status"), ("备注", "remark")]),
     ("冲头领用记录", &[("领用ID", "id"), ("冲头ID", "punchId"), ("领用人", "user"), ("领用数量", "quantity"), ("领用时间", "useDate"), ("备注", "remark")]),
     ("冲头-螺丝规格关联", &[("关联ID", "id"), ("冲头ID", "punchId"), ("螺丝规格ID", "screwSpecId"), ("备注", "remark")]),
     ("冲头库存汇总", &[("冲头ID", "punchId"), ("名称", "name"), ("当前库存", "currentStock"), ("安全库存", "safetyStock"), ("库存状态", "status")]),
     ("牙板信息表", &[("内部ID", "id"), ("名称", "name"), ("机型", "machineType"), ("线径", "wireDiameter"), ("安全库存", "safetyStock"), ("备注", "remark")]),
-    ("牙板订购记录", &[("订购ID", "id"), ("牙板ID", "dieId"), ("订购数量", "quantity"), ("订购时间", "orderDate"), ("到货状态", "status"), ("备注", "remark")]),
+    ("牙板入库记录", &[("入库ID", "id"), ("牙板ID", "dieId"), ("入库数量", "quantity"), ("入库时间", "orderDate"), ("到货状态", "status"), ("备注", "remark")]),
     ("牙板领用记录", &[("领用ID", "id"), ("牙板ID", "dieId"), ("领用人", "user"), ("领用数量", "quantity"), ("领用时间", "useDate"), ("备注", "remark")]),
     ("牙板-螺丝规格关联", &[("关联ID", "id"), ("牙板ID", "dieId"), ("螺丝规格ID", "screwSpecId"), ("备注", "remark")]),
     ("牙板库存汇总", &[("牙板ID", "dieId"), ("名称", "name"), ("当前库存", "currentStock"), ("安全库存", "safetyStock"), ("库存状态", "status")]),
     ("皮带信息表", &[("内部ID", "id"), ("名称", "name"), ("适用机器", "machine"), ("安全库存", "safetyStock"), ("备注", "remark")]),
-    ("皮带订购记录", &[("订购ID", "id"), ("皮带ID", "beltId"), ("订购数量", "quantity"), ("订购时间", "orderDate"), ("到货状态", "status"), ("备注", "remark")]),
+    ("皮带入库记录", &[("入库ID", "id"), ("皮带ID", "beltId"), ("入库数量", "quantity"), ("入库时间", "orderDate"), ("到货状态", "status"), ("备注", "remark")]),
     ("皮带使用记录", &[("使用ID", "id"), ("皮带ID", "beltId"), ("使用人", "user"), ("使用数量", "quantity"), ("使用时间", "useDate"), ("备注", "remark")]),
     ("皮带库存汇总", &[("皮带ID", "beltId"), ("名称", "name"), ("当前库存", "currentStock"), ("安全库存", "safetyStock"), ("库存状态", "status")]),
     ("主模具信息表", &[("内部ID", "id"), ("名称", "name"), ("孔径", "holeDiameter"), ("对应线材", "wireMaterial"), ("安全库存", "safetyStock"), ("备注", "remark")]),
-    ("主模具订购记录", &[("订购ID", "id"), ("主模具ID", "mainMoldId"), ("订购数量", "quantity"), ("订购时间", "orderDate"), ("到货状态", "status"), ("备注", "remark")]),
+    ("主模具入库记录", &[("入库ID", "id"), ("主模具ID", "mainMoldId"), ("入库数量", "quantity"), ("入库时间", "orderDate"), ("到货状态", "status"), ("备注", "remark")]),
     ("主模具使用记录", &[("使用ID", "id"), ("主模具ID", "mainMoldId"), ("使用人", "user"), ("使用数量", "quantity"), ("使用时间", "useDate"), ("备注", "remark")]),
     ("主模具-线材关联", &[("关联ID", "id"), ("主模具ID", "mainMoldId"), ("线材规格", "wireMaterial"), ("备注", "remark")]),
     ("主模具库存汇总", &[("主模具ID", "mainMoldId"), ("名称", "name"), ("当前库存", "currentStock"), ("安全库存", "safetyStock"), ("库存状态", "status")]),
     ("剪刀信息表", &[("内部ID", "id"), ("名称", "name"), ("口径", "diameter"), ("对应线材", "wireMaterial"), ("安全库存", "safetyStock"), ("备注", "remark")]),
-    ("剪刀订购记录", &[("订购ID", "id"), ("剪刀ID", "scissorId"), ("订购数量", "quantity"), ("订购时间", "orderDate"), ("到货状态", "status"), ("备注", "remark")]),
+    ("剪刀入库记录", &[("入库ID", "id"), ("剪刀ID", "scissorId"), ("入库数量", "quantity"), ("入库时间", "orderDate"), ("到货状态", "status"), ("备注", "remark")]),
     ("剪刀使用记录", &[("使用ID", "id"), ("剪刀ID", "scissorId"), ("使用人", "user"), ("使用数量", "quantity"), ("使用时间", "useDate"), ("备注", "remark")]),
     ("剪刀-线材关联", &[("关联ID", "id"), ("剪刀ID", "scissorId"), ("线材规格", "wireMaterial"), ("备注", "remark")]),
     ("剪刀库存汇总", &[("剪刀ID", "scissorId"), ("名称", "name"), ("当前库存", "currentStock"), ("安全库存", "safetyStock"), ("库存状态", "status")]),
     ("上冲信息表", &[("内部ID", "id"), ("名称", "name"), ("口径", "diameter"), ("对应线材", "wireMaterial"), ("安全库存", "safetyStock"), ("备注", "remark")]),
-    ("上冲订购记录", &[("订购ID", "id"), ("上冲ID", "upperPunchId"), ("订购数量", "quantity"), ("订购时间", "orderDate"), ("到货状态", "status"), ("备注", "remark")]),
+    ("上冲入库记录", &[("入库ID", "id"), ("上冲ID", "upperPunchId"), ("入库数量", "quantity"), ("入库时间", "orderDate"), ("到货状态", "status"), ("备注", "remark")]),
     ("上冲使用记录", &[("使用ID", "id"), ("上冲ID", "upperPunchId"), ("使用人", "user"), ("使用数量", "quantity"), ("使用时间", "useDate"), ("备注", "remark")]),
     ("上冲-线材关联", &[("关联ID", "id"), ("上冲ID", "upperPunchId"), ("线材规格", "wireMaterial"), ("备注", "remark")]),
     ("上冲库存汇总", &[("上冲ID", "upperPunchId"), ("名称", "name"), ("当前库存", "currentStock"), ("安全库存", "safetyStock"), ("库存状态", "status")]),
@@ -79,26 +79,26 @@ fn get_sheet_prefix(sheet_name: &str) -> &'static str {
     match sheet_name {
         "螺丝规格表" => "LS",
         "冲头信息表" => "CT",
-        "冲头订购记录" => "CG",
+        "冲头入库记录" => "CG",
         "冲头领用记录" => "CL",
         "冲头-螺丝规格关联" => "GL",
         "牙板信息表" => "YB",
-        "牙板订购记录" => "YG",
+        "牙板入库记录" => "YG",
         "牙板领用记录" => "YL",
         "牙板-螺丝规格关联" => "YL",
         "皮带信息表" => "PD",
-        "皮带订购记录" => "PG",
+        "皮带入库记录" => "PG",
         "皮带使用记录" => "PS",
         "主模具信息表" => "ZM",
-        "主模具订购记录" => "ZG",
+        "主模具入库记录" => "ZG",
         "主模具使用记录" => "ZS",
         "主模具-线材关联" => "ZL",
         "剪刀信息表" => "JD",
-        "剪刀订购记录" => "JG",
+        "剪刀入库记录" => "JG",
         "剪刀使用记录" => "JS",
         "剪刀-线材关联" => "JL",
         "上冲信息表" => "SC",
-        "上冲订购记录" => "SG",
+        "上冲入库记录" => "SG",
         "上冲使用记录" => "SS",
         "上冲-线材关联" => "SL",
         _ => "ID",
@@ -144,7 +144,19 @@ fn create_empty_workbook(file_path: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// 清洗 JSON 数组格式的字符串，如 ["30R特"] → 30R特
+fn normalize_value(val: String) -> String {
+    let trimmed = val.trim();
+    if trimmed.starts_with('[') && trimmed.ends_with(']') {
+        if let Ok(arr) = serde_json::from_str::<Vec<String>>(trimmed) {
+            return arr.join(",");
+        }
+    }
+    val
+}
+
 pub fn get_all(file_path: &str, sheet_name: &str) -> Result<Vec<HashMap<String, String>>, String> {
+    eprintln!("[DEBUG] get_all: file={}, sheet={}", file_path, sheet_name);
     if !Path::new(file_path).exists() {
         create_empty_workbook(file_path)?;
         return Ok(vec![]);
@@ -158,7 +170,7 @@ pub fn get_all(file_path: &str, sheet_name: &str) -> Result<Vec<HashMap<String, 
         let mut item = HashMap::new();
         for (col_idx, cell) in row.iter().enumerate() {
             if col_idx < keys.len() {
-                item.insert(keys[col_idx].to_string(), cell_to_string(cell));
+                item.insert(keys[col_idx].to_string(), normalize_value(cell_to_string(cell)));
             }
         }
         items.push(item);
@@ -213,6 +225,7 @@ pub fn delete_row(file_path: &str, sheet_name: &str, id: &str) -> Result<bool, S
 }
 
 fn write_sheet_data(file_path: &str, sheet_name: &str, rows: &[HashMap<String, String>]) -> Result<(), String> {
+    eprintln!("[DEBUG] write_sheet_data: file={}, sheet={}, rows={}", file_path, sheet_name, rows.len());
     let mut all_sheets_data: Vec<(String, Vec<HashMap<String, String>>)> = Vec::new();
     if Path::new(file_path).exists() {
         let mut wb = open_workbook_auto(file_path).map_err(|e| e.to_string())?;
@@ -296,17 +309,21 @@ pub fn import_data(file_path: &str, data: &[u8]) -> Result<HashMap<String, i64>,
 
 pub fn calculate_stock(file_path: &str, stock_type: &str) -> Result<Vec<HashMap<String, String>>, String> {
     let (info_sheet, order_sheet, use_sheet, stock_sheet, item_id_key) = match stock_type {
-        "punch" => ("冲头信息表", "冲头订购记录", "冲头领用记录", "冲头库存汇总", "punchId"),
-        "die" => ("牙板信息表", "牙板订购记录", "牙板领用记录", "牙板库存汇总", "dieId"),
-        "belt" => ("皮带信息表", "皮带订购记录", "皮带使用记录", "皮带库存汇总", "beltId"),
-        "mainMold" => ("主模具信息表", "主模具订购记录", "主模具使用记录", "主模具库存汇总", "mainMoldId"),
-        "scissor" => ("剪刀信息表", "剪刀订购记录", "剪刀使用记录", "剪刀库存汇总", "scissorId"),
-        "upperPunch" => ("上冲信息表", "上冲订购记录", "上冲使用记录", "上冲库存汇总", "upperPunchId"),
+        "punch" => ("冲头信息表", "冲头入库记录", "冲头领用记录", "冲头库存汇总", "punchId"),
+        "die" => ("牙板信息表", "牙板入库记录", "牙板领用记录", "牙板库存汇总", "dieId"),
+        "belt" => ("皮带信息表", "皮带入库记录", "皮带使用记录", "皮带库存汇总", "beltId"),
+        "mainMold" => ("主模具信息表", "主模具入库记录", "主模具使用记录", "主模具库存汇总", "mainMoldId"),
+        "scissor" => ("剪刀信息表", "剪刀入库记录", "剪刀使用记录", "剪刀库存汇总", "scissorId"),
+        "upperPunch" => ("上冲信息表", "上冲入库记录", "上冲使用记录", "上冲库存汇总", "upperPunchId"),
         _ => return Err("未知类型".to_string()),
     };
+    eprintln!("[DEBUG] calculate_stock: type={}, info={}, order={}, use={}", stock_type, info_sheet, order_sheet, use_sheet);
     let info_items = get_all(file_path, info_sheet)?;
+    eprintln!("[DEBUG] info_items count: {}", info_items.len());
     let orders = get_all(file_path, order_sheet)?;
+    eprintln!("[DEBUG] orders count: {}", orders.len());
     let uses = get_all(file_path, use_sheet)?;
+    eprintln!("[DEBUG] uses count: {}", uses.len());
     let stock_data: Vec<HashMap<String, String>> = info_items.iter().map(|item| {
         let item_id = item.get("id").cloned().unwrap_or_default();
         let total_ordered: i64 = orders.iter()
@@ -328,10 +345,11 @@ pub fn calculate_stock(file_path: &str, stock_type: &str) -> Result<Vec<HashMap<
         row.insert("name".to_string(), item.get("name").cloned().unwrap_or_default());
         row.insert("currentStock".to_string(), current_stock.to_string());
         row.insert("safetyStock".to_string(), safety_stock.to_string());
-        row.insert("status".to_string(), if current_stock < safety_stock { "需订购".to_string() } else { "安全".to_string() });
+        row.insert("status".to_string(), if current_stock < safety_stock { "需入库".to_string() } else { "安全".to_string() });
         row
     }).collect();
     write_sheet_data(file_path, stock_sheet, &stock_data)?;
+    eprintln!("[DEBUG] calculate_stock done: {} items", stock_data.len());
     Ok(stock_data)
 }
 

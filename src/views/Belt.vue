@@ -27,7 +27,7 @@
             <el-table-column prop="currentStock" label="当前库存" width="100" sortable />
             <el-table-column prop="status" label="库存状态" width="100" sortable>
               <template #default="{ row }">
-                <el-tag v-if="row.status" :type="row.status === '需订购' ? 'danger' : 'success'" effect="dark" round size="small">
+                <el-tag v-if="row.status" :type="row.status === '需入库' ? 'danger' : 'success'" effect="dark" round size="small">
                   {{ row.status }}
                 </el-tag>
               </template>
@@ -42,9 +42,9 @@
           </el-table>
         </el-tab-pane>
 
-        <el-tab-pane label="订购记录" name="order">
+        <el-tab-pane label="入库记录" name="order">
           <div class="tab-header">
-            <el-button type="primary" size="small" @click="showOrderDialog = true">新增订购</el-button>
+            <el-button type="primary" size="small" @click="showOrderDialog = true">新增入库</el-button>
           </div>
           <el-table :data="orderList" border style="width: 100%">
             <el-table-column label="皮带" width="140" sortable>
@@ -52,8 +52,8 @@
                 {{ getBeltName(row.beltId) }}
               </template>
             </el-table-column>
-            <el-table-column prop="quantity" label="订购数量" width="120" sortable />
-            <el-table-column prop="orderDate" label="订购时间" width="180" sortable />
+            <el-table-column prop="quantity" label="入库数量" width="120" sortable />
+            <el-table-column prop="orderDate" label="入库时间" width="180" sortable />
             <el-table-column prop="status" label="到货状态" width="120" sortable :filters="statusFilters" :filter-method="filterHandler" />
             <el-table-column prop="remark" label="备注" min-width="150" />
           </el-table>
@@ -100,8 +100,8 @@
       </template>
     </el-dialog>
 
-    <!-- 订购对话框 -->
-    <el-dialog v-model="showOrderDialog" title="新增订购" width="500px">
+    <!-- 入库对话框 -->
+    <el-dialog v-model="showOrderDialog" title="新增入库" width="500px">
       <el-form ref="orderFormRef" :model="orderForm" :rules="orderFormRules" label-width="80px">
         <el-form-item label="皮带">
           <el-select v-model="orderForm.beltId" placeholder="请选择">
@@ -111,7 +111,7 @@
         <el-form-item label="数量">
           <el-input-number v-model="orderForm.quantity" :min="1" />
         </el-form-item>
-        <el-form-item label="订购时间">
+        <el-form-item label="入库时间">
           <el-date-picker v-model="orderForm.orderDate" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" />
         </el-form-item>
         <el-form-item label="到货状态">
@@ -331,7 +331,7 @@ async function handleOrderSubmit() {
     if (!valid) return
     try {
       await beltOrderApi.add(orderForm.value)
-      ElMessage.success('订购记录添加成功')
+      ElMessage.success('入库记录添加成功')
       showOrderDialog.value = false
       orderForm.value = { beltId: '', quantity: 1, orderDate: '', status: '未到货', remark: '' }
       loadData()

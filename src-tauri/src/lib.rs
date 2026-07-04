@@ -225,7 +225,7 @@ fn get_record(state: State<AppState>, sheet_name: String, id: String) -> Result<
 #[tauri::command]
 fn add_record(state: State<AppState>, sheet_name: String, item: Value) -> Result<Value, String> {
     let path = state.file_path.lock().map_err(|e| e.to_string())?;
-    // 将所有值转为字符串
+    // 将所有值转为字符串，数组用逗号连接
     let map: std::collections::HashMap<String, String> = item.as_object()
         .map(|obj| obj.iter().map(|(k, v)| {
             let val = match v {
@@ -233,6 +233,16 @@ fn add_record(state: State<AppState>, sheet_name: String, item: Value) -> Result
                 Value::Number(n) => n.to_string(),
                 Value::Bool(b) => b.to_string(),
                 Value::Null => String::new(),
+                Value::Array(arr) => {
+                    arr.iter().filter_map(|item| {
+                        match item {
+                            Value::String(s) => Some(s.clone()),
+                            Value::Number(n) => Some(n.to_string()),
+                            Value::Bool(b) => Some(b.to_string()),
+                            _ => None,
+                        }
+                    }).collect::<Vec<_>>().join(",")
+                }
                 _ => v.to_string(),
             };
             (k.clone(), val)
@@ -245,7 +255,7 @@ fn add_record(state: State<AppState>, sheet_name: String, item: Value) -> Result
 #[tauri::command]
 fn update_record(state: State<AppState>, sheet_name: String, id: String, data: Value) -> Result<Value, String> {
     let path = state.file_path.lock().map_err(|e| e.to_string())?;
-    // 将所有值转为字符串
+    // 将所有值转为字符串，数组用逗号连接
     let map: std::collections::HashMap<String, String> = data.as_object()
         .map(|obj| obj.iter().map(|(k, v)| {
             let val = match v {
@@ -253,6 +263,16 @@ fn update_record(state: State<AppState>, sheet_name: String, id: String, data: V
                 Value::Number(n) => n.to_string(),
                 Value::Bool(b) => b.to_string(),
                 Value::Null => String::new(),
+                Value::Array(arr) => {
+                    arr.iter().filter_map(|item| {
+                        match item {
+                            Value::String(s) => Some(s.clone()),
+                            Value::Number(n) => Some(n.to_string()),
+                            Value::Bool(b) => Some(b.to_string()),
+                            _ => None,
+                        }
+                    }).collect::<Vec<_>>().join(",")
+                }
                 _ => v.to_string(),
             };
             (k.clone(), val)

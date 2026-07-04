@@ -23,12 +23,17 @@
         <el-table-column prop="headType" label="头型" width="120" sortable :filters="headTypeFilters" :filter-method="filterHandler" />
         <el-table-column prop="punch" label="冲头" width="120" sortable>
           <template #default="{ row }">
-            <el-link v-if="row.punch" type="primary" :underline="false" @click="showPunchStock(row.punch)">{{ row.punch }}</el-link>
+            <el-link v-if="row.punch" type="primary" :underline="false" @click="showPunchDialog(row)">{{ row.punch }}</el-link>
             <span v-else>-</span>
           </template>
         </el-table-column>
         <el-table-column prop="threadType" label="牙型" width="120" sortable :filters="threadTypeFilters" :filter-method="filterHandler" />
-        <el-table-column prop="die" label="牙板" width="120" sortable />
+        <el-table-column prop="die" label="牙板" width="120" sortable>
+          <template #default="{ row }">
+            <el-link v-if="row.die" type="success" :underline="false" @click="showDieDialog(row)">{{ row.die }}</el-link>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="headSize" label="头/垫片大小" width="140" sortable />
         <el-table-column prop="headHeight" label="头高" width="100" sortable />
         <el-table-column prop="length" label="长度" width="100" sortable />
@@ -52,11 +57,7 @@
     </el-card>
 
     <!-- 添加/编辑对话框 -->
-    <el-dialog
-      v-model="dialogVisible"
-      :title="isEdit ? '编辑螺丝规格' : '添加螺丝规格'"
-      width="800px"
-    >
+    <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑螺丝规格' : '添加螺丝规格'" width="800px">
       <el-form ref="formRef" :model="form" :rules="formRules" label-width="100px">
         <el-row :gutter="20">
           <el-col :span="12">
@@ -70,14 +71,9 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="冲头">
-              <el-select v-model="form.punch" placeholder="请选择冲头" filterable allow-create>
-                <el-option
-                  v-for="item in punchOptions"
-                  :key="item.name"
-                  :label="item.name"
-                  :value="item.name"
-                >
+            <el-form-item label="冲头" prop="punch">
+              <el-select v-model="form.punch" placeholder="请选择冲头" filterable allow-create multiple collapse-tags>
+                <el-option v-for="item in punchOptions" :key="item.name" :label="item.name" :value="item.name">
                   <span>{{ item.name }}</span>
                   <span style="float: right; color: #8492a6; font-size: 12px">{{ item.specs }}</span>
                 </el-option>
@@ -90,14 +86,9 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="牙板">
-              <el-select v-model="form.die" placeholder="请选择牙板" filterable allow-create>
-                <el-option
-                  v-for="item in dieOptions"
-                  :key="item.name"
-                  :label="item.name"
-                  :value="item.name"
-                >
+            <el-form-item label="牙板" prop="die">
+              <el-select v-model="form.die" placeholder="请选择牙板" filterable allow-create multiple collapse-tags>
+                <el-option v-for="item in dieOptions" :key="item.name" :label="item.name" :value="item.name">
                   <span>{{ item.name }}</span>
                   <span style="float: right; color: #8492a6; font-size: 12px">{{ item.specs }}</span>
                 </el-option>
@@ -157,38 +148,65 @@
         </el-row>
       </el-form>
       <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="dialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="handleSubmit">确定</el-button>
-        </span>
+        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="handleSubmit">确定</el-button>
       </template>
     </el-dialog>
 
-    <!-- 冲头库存信息弹窗 -->
-    <el-dialog v-model="showPunchStockDialog" :title="`冲头库存 - ${punchStockInfo.name || ''}`" width="500px">
-      <div v-if="punchStockInfo.name" class="punch-stock-info">
-        <div class="info-row">
-          <span class="label">冲头名称：</span>
-          <span class="value">{{ punchStockInfo.name }}</span>
-        </div>
-        <div class="info-row">
-          <span class="label">当前库存：</span>
-          <span class="value">{{ punchStockInfo.currentStock ?? '-' }}</span>
-        </div>
-        <div class="info-row">
-          <span class="label">安全库存：</span>
-          <span class="value">{{ punchStockInfo.safetyStock ?? '-' }}</span>
-        </div>
-        <div class="info-row">
-          <span class="label">库存状态：</span>
-          <el-tag :type="punchStockInfo.status === '需订购' ? 'danger' : 'success'" effect="dark" round>
-            {{ punchStockInfo.status || '-' }}
-          </el-tag>
-        </div>
-      </div>
-      <div v-else style="text-align: center; color: #909399; padding: 20px">
-        未找到该冲头的库存信息
-      </div>
+    <!-- 冲头关联弹窗 -->
+    <el-dialog v-model="punchDialogVisible" title="冲头关联" width="700px">
+      <el-table :data="punchDialogItems" border size="small">
+        <el-table-column prop="name" label="冲头名称" width="100" />
+        <el-table-column prop="spec" label="规格" width="100" />
+        <el-table-column prop="material" label="材质" width="80" />
+        <el-table-column label="当前库存" width="90" align="center">
+          <template #default="{ row: r }">{{ r.currentStock ?? '-' }}</template>
+        </el-table-column>
+        <el-table-column label="安全库存" width="90" align="center">
+          <template #default="{ row: r }">{{ r.safetyStock ?? '-' }}</template>
+        </el-table-column>
+        <el-table-column label="状态" width="90" align="center">
+          <template #default="{ row: r }">
+            <el-tag v-if="r.status" :type="r.status === '需入库' ? 'danger' : 'success'" size="small" round>{{ r.status }}</el-tag>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="外显" width="60" align="center">
+          <template #default="{ row: item }">
+            <el-link :type="item.name === punchDialogPrimary ? 'info' : 'warning'" :underline="false" @click="setPunchPrimary(item)">
+              <el-icon><View /></el-icon>
+            </el-link>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-dialog>
+
+    <!-- 牙板关联弹窗 -->
+    <el-dialog v-model="dieDialogVisible" title="牙板关联" width="700px">
+      <el-table :data="dieDialogItems" border size="small">
+        <el-table-column prop="name" label="牙板名称" width="100" />
+        <el-table-column prop="machineType" label="机型" width="100" />
+        <el-table-column prop="wireDiameter" label="线径" width="80" />
+        <el-table-column label="当前库存" width="90" align="center">
+          <template #default="{ row: r }">{{ r.currentStock ?? '-' }}</template>
+        </el-table-column>
+        <el-table-column label="安全库存" width="90" align="center">
+          <template #default="{ row: r }">{{ r.safetyStock ?? '-' }}</template>
+        </el-table-column>
+        <el-table-column label="状态" width="90" align="center">
+          <template #default="{ row: r }">
+            <el-tag v-if="r.status" :type="r.status === '需入库' ? 'danger' : 'success'" size="small" round>{{ r.status }}</el-tag>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="外显" width="60" align="center">
+          <template #default="{ row: item }">
+            <el-link :type="item.name === dieDialogPrimary ? 'info' : 'warning'" :underline="false" @click="setDiePrimary(item)">
+              <el-icon><View /></el-icon>
+            </el-link>
+          </template>
+        </el-table-column>
+      </el-table>
     </el-dialog>
   </div>
 </template>
@@ -196,6 +214,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { View } from '@element-plus/icons-vue'
 import type { FormInstance } from 'element-plus'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { screwSpecApi, punchApi, dieApi, stockCalcApi } from '../api'
@@ -208,184 +227,176 @@ const isEdit = ref(false)
 const isFullscreen = ref(false)
 const loading = ref(true)
 
+// 关联弹窗状态
+const punchDialogVisible = ref(false)
+const punchDialogItems = ref<any[]>([])
+const punchDialogPrimary = ref('')
+const punchDialogRow = ref<any>({})
+const dieDialogVisible = ref(false)
+const dieDialogItems = ref<any[]>([])
+const dieDialogPrimary = ref('')
+const dieDialogRow = ref<any>({})
+
 async function toggleFullscreen() {
   const next = !isFullscreen.value
   isFullscreen.value = next
-  try {
-    const win = getCurrentWindow()
-    await win.setFullscreen(next)
-  } catch {}
+  try { await getCurrentWindow().setFullscreen(next) } catch {}
 }
 
 onMounted(async () => {
-  try {
-    const win = getCurrentWindow()
-    isFullscreen.value = await win.isFullscreen()
-  } catch {}
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && isFullscreen.value) {
-      toggleFullscreen()
-    }
-  })
+  try { isFullscreen.value = await getCurrentWindow().isFullscreen() } catch {}
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && isFullscreen.value) toggleFullscreen() })
+  loadData()
 })
-const formRef = ref<FormInstance>()
 
-// 验证规则
-const formRules = {
-  name: [{ required: true, message: '请输入螺丝名称', trigger: 'blur' }],
+const formRef = ref<FormInstance>()
+const formRules = { name: [{ required: true, message: '请输入螺丝名称', trigger: 'blur' }] }
+
+// 解析逗号分隔字符串为数组
+function parseNames(val: any): string[] {
+  if (Array.isArray(val)) return val
+  if (!val || typeof val !== 'string') return []
+  const t = val.trim()
+  if (t.startsWith('[')) { try { const a = JSON.parse(t); if (Array.isArray(a)) return a.map(String) } catch {} }
+  return t.split(',').map(s => s.trim()).filter(Boolean)
 }
 
 // 冲头选项（按名称去重）
 const punchOptions = computed(() => {
   const names = [...new Set(punchList.value.map(item => item.name).filter(Boolean))]
-  return names.map(name => {
-    const items = punchList.value.filter(p => p.name === name)
-    return {
-      name,
-      specs: items.map(p => `${p.spec}${p.material ? '(' + p.material + ')' : ''}`).join('、')
-    }
-  })
+  return names.map(name => ({
+    name,
+    specs: punchList.value.filter(p => p.name === name).map(p => `${p.spec}${p.material ? '(' + p.material + ')' : ''}`).join('、')
+  }))
 })
 
 // 牙板选项（按名称去重）
 const dieOptions = computed(() => {
   const names = [...new Set(dieList.value.map(item => item.name).filter(Boolean))]
-  return names.map(name => {
-    const items = dieList.value.filter(d => d.name === name)
-    return {
-      name,
-      specs: items.map(d => `${d.machineType}${d.wireDiameter ? '(' + d.wireDiameter + ')' : ''}`).join('、')
-    }
-  })
+  return names.map(name => ({
+    name,
+    specs: dieList.value.filter(d => d.name === name).map(d => `${d.machineType}${d.wireDiameter ? '(' + d.wireDiameter + ')' : ''}`).join('、')
+  }))
 })
 
-// 冲头库存信息
-const showPunchStockDialog = ref(false)
-const punchStockInfo = ref<any>({})
+const headTypeFilters = computed(() => [...new Set(tableData.value.map(i => i.headType).filter(Boolean))].map(t => ({ text: t, value: t })))
+const threadTypeFilters = computed(() => [...new Set(tableData.value.map(i => i.threadType).filter(Boolean))].map(t => ({ text: t, value: t })))
+const platingFilters = computed(() => [...new Set(tableData.value.map(i => i.plating).filter(Boolean))].map(t => ({ text: t, value: t })))
+function filterHandler(value: string, row: any, column: any) { return row[column.property] === value }
 
-async function showPunchStock(punchName: string) {
-  try {
-    const stockData = await stockCalcApi.calculate('punch')
-    const match = stockData.find((s: any) => s.name === punchName)
-    if (match) {
-      punchStockInfo.value = match
-    } else {
-      const fuzzy = stockData.find((s: any) => s.name && s.name.includes(punchName))
-      punchStockInfo.value = fuzzy || { name: punchName }
-    }
-    showPunchStockDialog.value = true
-  } catch {
-    punchStockInfo.value = { name: punchName }
-    showPunchStockDialog.value = true
-  }
-}
-
-// 筛选选项
-const headTypeFilters = computed(() => {
-  const types = [...new Set(tableData.value.map(item => item.headType).filter(Boolean))]
-  return types.map(t => ({ text: t, value: t }))
-})
-
-const threadTypeFilters = computed(() => {
-  const types = [...new Set(tableData.value.map(item => item.threadType).filter(Boolean))]
-  return types.map(t => ({ text: t, value: t }))
-})
-
-const platingFilters = computed(() => {
-  const types = [...new Set(tableData.value.map(item => item.plating).filter(Boolean))]
-  return types.map(t => ({ text: t, value: t }))
-})
-
-function filterHandler(value: string, row: any, column: any) {
-  const property = column.property
-  return row[property] === value
-}
-
-const form = ref({
-  id: '',
-  customer: '',
-  externalId: '',
-  name: '',
-  headType: '',
-  punch: '',
-  threadType: '',
-  die: '',
-  headSize: '',
-  headHeight: '',
-  length: '',
-  threadDiameter: '',
-  shankLength: '',
-  wireMaterial: '',
-  plating: '',
-  remark: ''
-})
-
-onMounted(() => {
-  loadData()
+const form = ref<any>({
+  id: '', customer: '', externalId: '', name: '', headType: '',
+  punch: [], threadType: '', die: [], headSize: '', headHeight: '',
+  length: '', threadDiameter: '', shankLength: '', wireMaterial: '', plating: '', remark: ''
 })
 
 async function loadData() {
   loading.value = true
   try {
-    const [screws, punches, dies] = await Promise.all([
-      screwSpecApi.getAll(),
-      punchApi.getAll(),
-      dieApi.getAll()
-    ])
+    const [screws, punches, dies] = await Promise.all([screwSpecApi.getAll(), punchApi.getAll(), dieApi.getAll()])
     tableData.value = screws
     punchList.value = punches
     dieList.value = dies
-  } catch (error) {
-    ElMessage.error('加载数据失败')
-    console.error(error)
-  } finally {
-    loading.value = false
-  }
+  } catch (error) { ElMessage.error('加载数据失败'); console.error(error) }
+  finally { loading.value = false }
 }
 
+// ====== 冲头关联弹窗 ======
+function showPunchDialog(row: any) {
+  punchDialogRow.value = row
+  const names = parseNames(row.punch)
+  punchDialogPrimary.value = names[0] || ''
+  const seen = new Set<string>()
+  const items: any[] = []
+  for (const n of names) {
+    for (const m of punchList.value.filter(p => p.name === n)) {
+      if (!seen.has(m.id)) { seen.add(m.id); items.push({ ...m }) }
+    }
+  }
+  if (items.length === 0) for (const n of names) items.push({ id: n, name: n, spec: '', material: '' })
+  stockCalcApi.calculate('punch').then((sd: any[]) => {
+    for (const item of items) {
+      const match = sd.find((s: any) => s.id === item.id || s.name === item.name)
+      if (match) { item.currentStock = match.currentStock; item.safetyStock = match.safetyStock; item.status = match.status }
+    }
+    punchDialogItems.value = [...items]
+  }).catch(() => { punchDialogItems.value = items })
+  punchDialogVisible.value = true
+}
+
+async function setPunchPrimary(item: any) {
+  const row = punchDialogRow.value
+  if (item.name === punchDialogPrimary.value) return
+  const names = parseNames(row.punch)
+  const idx = names.indexOf(item.name)
+  if (idx > 0) { names.splice(idx, 1); names.unshift(item.name) }
+  try {
+    await screwSpecApi.update(row.id, { punch: names.join(',') })
+    punchDialogVisible.value = false
+    loadData()
+  } catch { ElMessage.error('设置失败') }
+}
+
+// ====== 牙板关联弹窗 ======
+function showDieDialog(row: any) {
+  dieDialogRow.value = row
+  const names = parseNames(row.die)
+  dieDialogPrimary.value = names[0] || ''
+  const seen = new Set<string>()
+  const items: any[] = []
+  for (const n of names) {
+    for (const m of dieList.value.filter(d => d.name === n)) {
+      if (!seen.has(m.id)) { seen.add(m.id); items.push({ ...m }) }
+    }
+  }
+  if (items.length === 0) for (const n of names) items.push({ id: n, name: n, machineType: '', wireDiameter: '' })
+  stockCalcApi.calculate('die').then((sd: any[]) => {
+    for (const item of items) {
+      const match = sd.find((s: any) => s.id === item.id || s.name === item.name)
+      if (match) { item.currentStock = match.currentStock; item.safetyStock = match.safetyStock; item.status = match.status }
+    }
+    dieDialogItems.value = [...items]
+  }).catch(() => { dieDialogItems.value = items })
+  dieDialogVisible.value = true
+}
+
+async function setDiePrimary(item: any) {
+  const row = dieDialogRow.value
+  if (item.name === dieDialogPrimary.value) return
+  const names = parseNames(row.die)
+  const idx = names.indexOf(item.name)
+  if (idx > 0) { names.splice(idx, 1); names.unshift(item.name) }
+  try {
+    await screwSpecApi.update(row.id, { die: names.join(',') })
+    dieDialogVisible.value = false
+    loadData()
+  } catch { ElMessage.error('设置失败') }
+}
+
+// ====== CRUD ======
 function handleAdd() {
   isEdit.value = false
   form.value = {
-    id: '',
-    customer: '',
-    externalId: '',
-    name: '',
-    headType: '',
-    punch: '',
-    threadType: '',
-    die: '',
-    headSize: '',
-    headHeight: '',
-    length: '',
-    threadDiameter: '',
-    shankLength: '',
-    wireMaterial: '',
-    plating: '',
-    remark: ''
+    id: '', customer: '', externalId: '', name: '', headType: '',
+    punch: [], threadType: '', die: [], headSize: '', headHeight: '',
+    length: '', threadDiameter: '', shankLength: '', wireMaterial: '', plating: '', remark: ''
   }
   dialogVisible.value = true
 }
 
 function handleEdit(row: any) {
   isEdit.value = true
-  form.value = { ...row }
+  form.value = { ...row, punch: parseNames(row.punch), die: parseNames(row.die) }
   dialogVisible.value = true
 }
 
 async function handleDelete(row: any) {
   try {
-    await ElMessageBox.confirm('确定删除此规格？', '提示', {
-      type: 'warning'
-    })
+    await ElMessageBox.confirm('确定删除此规格？', '提示', { type: 'warning' })
     await screwSpecApi.remove(row.id)
     ElMessage.success('删除成功')
     loadData()
-  } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error('删除失败')
-      console.error(error)
-    }
-  }
+  } catch (e) { if (e !== 'cancel') { ElMessage.error('删除失败'); console.error(e) } }
 }
 
 async function handleSubmit() {
@@ -393,51 +404,24 @@ async function handleSubmit() {
   await formRef.value.validate(async (valid) => {
     if (!valid) return
     try {
-      if (isEdit.value) {
-        await screwSpecApi.update(form.value.id, form.value)
-        ElMessage.success('更新成功')
-      } else {
-        await screwSpecApi.add(form.value)
-        ElMessage.success('添加成功')
+      const payload = {
+        ...form.value,
+        punch: Array.isArray(form.value.punch) ? form.value.punch.join(',') : (form.value.punch || ''),
+        die: Array.isArray(form.value.die) ? form.value.die.join(',') : (form.value.die || '')
       }
+      if (isEdit.value) { await screwSpecApi.update(form.value.id, payload) }
+      else { await screwSpecApi.add(payload) }
       dialogVisible.value = false
       loadData()
-    } catch (error) {
-      ElMessage.error(isEdit.value ? '更新失败' : '添加失败')
-      console.error(error)
-    }
+    } catch (error) { ElMessage.error(isEdit.value ? '更新失败' : '添加失败'); console.error(error) }
   })
 }
 </script>
 
 <style scoped>
-.page-container {
-  height: 100%;
-}
-.page-container.is-fullscreen {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  z-index: 2000;
-  background: #f0f2f5;
-  padding: 20px;
-  overflow: auto;
-}
-.page-container.is-fullscreen .el-card {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  margin: 0;
-}
-.page-container.is-fullscreen .el-card__body {
-  flex: 1;
-  overflow: auto;
-}
-.header-right {
-  display: flex;
-  gap: 8px;
-  margin-left: auto;
-}
+.page-container { height: 100%; }
+.page-container.is-fullscreen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 2000; background: #f0f2f5; padding: 20px; overflow: auto; }
+.page-container.is-fullscreen .el-card { height: 100%; display: flex; flex-direction: column; margin: 0; }
+.page-container.is-fullscreen .el-card__body { flex: 1; overflow: auto; }
+.header-right { display: flex; gap: 8px; margin-left: auto; }
 </style>

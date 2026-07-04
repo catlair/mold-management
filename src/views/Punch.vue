@@ -32,7 +32,7 @@
             <el-table-column prop="currentStock" label="当前库存" width="100" sortable />
             <el-table-column prop="status" label="库存状态" width="100" sortable>
               <template #default="{ row }">
-                <el-tag v-if="row.status" :type="row.status === '需订购' ? 'danger' : 'success'" effect="dark" round size="small">
+                <el-tag v-if="row.status" :type="row.status === '需入库' ? 'danger' : 'success'" effect="dark" round size="small">
                   {{ row.status }}
                 </el-tag>
               </template>
@@ -47,9 +47,9 @@
           </el-table>
         </el-tab-pane>
 
-        <el-tab-pane label="订购记录" name="order">
+        <el-tab-pane label="入库记录" name="order">
           <div class="tab-header">
-            <el-button type="primary" size="small" @click="showOrderDialog = true">新增订购</el-button>
+            <el-button type="primary" size="small" @click="showOrderDialog = true">新增入库</el-button>
           </div>
           <el-table :data="orderList" border style="width: 100%">
             <el-table-column label="冲头" width="140" sortable>
@@ -57,8 +57,8 @@
                 {{ getPunchName(row.punchId) }}
               </template>
             </el-table-column>
-            <el-table-column prop="quantity" label="订购数量" width="120" sortable />
-            <el-table-column prop="orderDate" label="订购时间" width="180" sortable />
+            <el-table-column prop="quantity" label="入库数量" width="120" sortable />
+            <el-table-column prop="orderDate" label="入库时间" width="180" sortable />
             <el-table-column prop="status" label="到货状态" width="120" sortable :filters="statusFilters" :filter-method="filterHandler" />
             <el-table-column prop="remark" label="备注" min-width="150" />
           </el-table>
@@ -150,25 +150,19 @@
       </template>
     </el-dialog>
 
-    <!-- 订购对话框 -->
-    <el-dialog v-model="showOrderDialog" title="新增订购" width="500px">
+    <!-- 入库对话框 -->
+    <el-dialog v-model="showOrderDialog" title="新增入库" width="500px">
       <el-form ref="orderFormRef" :model="orderForm" :rules="orderFormRules" label-width="80px">
-        <el-form-item label="冲头">
-          <el-select v-model="orderForm.punchId" placeholder="请选择">
-            <el-option v-for="item in punchList" :key="item.id" :label="item.name" :value="item.id" />
+        <el-form-item label="冲头" prop="punchId">
+          <el-select v-model="orderForm.punchId" placeholder="请选择冲头" filterable>
+            <el-option v-for="item in punchList" :key="item.id" :label="`${item.name} ${item.spec}${item.material ? ' ' + item.material : ''}`" :value="item.id" />
           </el-select>
         </el-form-item>
         <el-form-item label="数量">
           <el-input-number v-model="orderForm.quantity" :min="1" />
         </el-form-item>
-        <el-form-item label="订购时间">
+        <el-form-item label="入库时间">
           <el-date-picker v-model="orderForm.orderDate" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" />
-        </el-form-item>
-        <el-form-item label="到货状态">
-          <el-select v-model="orderForm.status">
-            <el-option label="未到货" value="未到货" />
-            <el-option label="已到货" value="已到货" />
-          </el-select>
         </el-form-item>
         <el-form-item label="备注">
           <el-input v-model="orderForm.remark" />
@@ -183,9 +177,9 @@
     <!-- 领用对话框 -->
     <el-dialog v-model="showUseDialog" title="新增领用" width="500px">
       <el-form ref="useFormRef" :model="useForm" :rules="useFormRules" label-width="80px">
-        <el-form-item label="冲头">
-          <el-select v-model="useForm.punchId" placeholder="请选择">
-            <el-option v-for="item in punchList" :key="item.id" :label="item.name" :value="item.id" />
+        <el-form-item label="冲头" prop="punchId">
+          <el-select v-model="useForm.punchId" placeholder="请选择冲头" filterable>
+            <el-option v-for="item in punchList" :key="item.id" :label="`${item.name} ${item.spec}${item.material ? ' ' + item.material : ''}`" :value="item.id" />
           </el-select>
         </el-form-item>
         <el-form-item label="领用人">
@@ -215,7 +209,7 @@
             <el-option
               v-for="item in punchList"
               :key="item.id"
-              :label="`${item.name} (${item.spec}${item.material ? ' - ' + item.material : ''})`"
+              :label="`${item.name} ${item.spec}${item.material ? ' ' + item.material : ''}`"
               :value="item.id"
             />
           </el-select>
@@ -296,10 +290,13 @@ function filterHandler(value: string, row: any, column: any) {
   return row[property] === value
 }
 
-// 获取冲头名称
+// 获取冲头完整标识
 function getPunchName(punchId: string) {
   const punch = punchList.value.find(p => p.id === punchId)
-  return punch ? `${punch.name} (${punch.spec})` : punchId
+  if (!punch) return punchId
+  const parts = [punch.name, punch.spec]
+  if (punch.material) parts.push(punch.material)
+  return parts.join(' ')
 }
 
 // 获取螺丝规格名称
@@ -336,7 +333,7 @@ async function showLinkedScrews(punch: any) {
 }
 
 const showOrderDialog = ref(false)
-const orderForm = ref({ punchId: '', quantity: 1, orderDate: getCurrentDateTime(), status: '未到货', remark: '' })
+const orderForm = ref({ punchId: '', quantity: 1, orderDate: getCurrentDateTime(), remark: '' })
 
 const showUseDialog = ref(false)
 const useForm = ref({ punchId: '', user: '', quantity: 1, useDate: getCurrentDateTime(), remark: '' })
@@ -458,9 +455,9 @@ async function handleOrderSubmit() {
     if (!valid) return
     try {
       await punchOrderApi.add(orderForm.value)
-      ElMessage.success('订购记录添加成功')
+      ElMessage.success('入库记录添加成功')
       showOrderDialog.value = false
-      orderForm.value = { punchId: '', quantity: 1, orderDate: '', status: '未到货', remark: '' }
+      orderForm.value = { punchId: '', quantity: 1, orderDate: '', remark: '' }
       loadData()
     } catch (error) {
       ElMessage.error('添加失败')
