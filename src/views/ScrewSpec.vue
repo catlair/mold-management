@@ -23,14 +23,14 @@
         <el-table-column prop="headType" label="头型" width="120" sortable :filters="headTypeFilters" :filter-method="filterHandler" />
         <el-table-column prop="punch" label="冲头" width="120" sortable>
           <template #default="{ row }">
-            <el-link v-if="row.punch" type="primary" :underline="false" @click="showPunchDialog(row)">{{ row.punch }}</el-link>
+            <el-link v-if="row.punch" type="primary" :underline="false" @click="showPunchDialog(row)">{{ parseNames(row.punch)[0] }}</el-link>
             <span v-else>-</span>
           </template>
         </el-table-column>
         <el-table-column prop="threadType" label="牙型" width="120" sortable :filters="threadTypeFilters" :filter-method="filterHandler" />
         <el-table-column prop="die" label="牙板" width="120" sortable>
           <template #default="{ row }">
-            <el-link v-if="row.die" type="success" :underline="false" @click="showDieDialog(row)">{{ row.die }}</el-link>
+            <el-link v-if="row.die" type="success" :underline="false" @click="showDieDialog(row)">{{ parseNames(row.die)[0] }}</el-link>
             <span v-else>-</span>
           </template>
         </el-table-column>
