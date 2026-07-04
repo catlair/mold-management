@@ -252,15 +252,6 @@ onMounted(async () => {
 const formRef = ref<FormInstance>()
 const formRules = { name: [{ required: true, message: '请输入螺丝名称', trigger: 'blur' }] }
 
-// 解析逗号分隔字符串为数组
-function parseNames(val: any): string[] {
-  if (Array.isArray(val)) return val
-  if (!val || typeof val !== 'string') return []
-  const t = val.trim()
-  if (t.startsWith('[')) { try { const a = JSON.parse(t); if (Array.isArray(a)) return a.map(String) } catch {} }
-  return t.split(',').map(s => s.trim()).filter(Boolean)
-}
-
 // 冲头选项（按名称去重）
 const punchOptions = computed(() => {
   const names = [...new Set(punchList.value.map(item => item.name).filter(Boolean))]
@@ -290,17 +281,20 @@ const form = ref<any>({
   length: '', threadDiameter: '', shankLength: '', wireMaterial: '', plating: '', remark: ''
 })
 
-// 解析关联表：punchId/dieId 是信息表的 ID，需要解析成名字
-function resolveLinkNames(linkIdField: string, links: any[], infoList: any[]): Record<string, string[]> {
-  const map: Record<string, string[]> = {}
+// 解析关联表：保留具体的记录 ID，同时解析出名字用于显示
+function resolveLinks(linkIdField: string, links: any[], infoList: any[]): Record<string, { ids: string[], names: string[] }> {
+  const map: Record<string, { ids: string[], names: string[] }> = {}
   for (const link of links) {
     const specId = link.screwSpecId
     const itemId = link[linkIdField]
     if (!specId || !itemId) continue
-    const info = infoList.find((i: any) => i.id === itemId)
-    const name = info ? info.name : itemId
-    if (!map[specId]) map[specId] = []
-    if (!map[specId].includes(name)) map[specId].push(name)
+    if (!map[specId]) map[specId] = { ids: [], names: [] }
+    if (!map[specId].ids.includes(itemId)) {
+      map[specId].ids.push(itemId)
+      const info = infoList.find((i: any) => i.id === itemId)
+      const name = info ? info.name : itemId
+      map[specId].names.push(name)
+    }
   }
   return map
 }
@@ -327,13 +321,14 @@ async function loadData() {
       screwSpecApi.getAll(), punchApi.getAll(), dieApi.getAll(),
       punchLinkApi.getAll(), dieLinkApi.getAll()
     ])
-    const punchNameMap = resolveLinkNames('punchId', punchLinks, punches)
-    const dieNameMap = resolveLinkNames('dieId', dieLinks, dies)
-    // 兼容旧数据：如果关联表没有数据，用主表的逗号分隔字段
+    const punchMap = resolveLinks('punchId', punchLinks, punches)
+    const dieMap = resolveLinks('dieId', dieLinks, dies)
     tableData.value = screws.map((s: any) => ({
       ...s,
-      _punchNames: punchNameMap[s.id] || parseNames(s.punch),
-      _dieNames: dieNameMap[s.id] || parseNames(s.die)
+      _punchIds: punchMap[s.id]?.ids || [],
+      _punchNames: punchMap[s.id]?.names || [],
+      _dieIds: dieMap[s.id]?.ids || [],
+      _dieNames: dieMap[s.id]?.names || []
     }))
     punchList.value = punches
     dieList.value = dies
@@ -345,18 +340,11 @@ async function loadData() {
 function showPunchDialog(row: any) {
   punchDialogRow.value = row
   punchDialogPrimary.value = row.punch || ''
-  const names = row._punchNames || []
-  const seen = new Set<string>()
-  const items: any[] = []
-  for (const n of names) {
-    for (const m of punchList.value.filter(p => p.name === n)) {
-      if (!seen.has(m.id)) { seen.add(m.id); items.push({ ...m }) }
-    }
-  }
-  if (items.length === 0) for (const n of names) items.push({ id: n, name: n, spec: '', material: '' })
+  const ids = row._punchIds || []
+  const items = ids.map((id: string) => punchList.value.find(p => p.id === id)).filter(Boolean).map((p: any) => ({ ...p }))
   stockCalcApi.calculate('punch').then((sd: any[]) => {
     for (const item of items) {
-      const match = sd.find((s: any) => s.id === item.id || s.name === item.name)
+      const match = sd.find((s: any) => s.punchId === item.id)
       if (match) { item.currentStock = match.currentStock; item.safetyStock = match.safetyStock; item.status = match.status }
     }
     punchDialogItems.value = [...items]
@@ -377,18 +365,11 @@ async function setPunchPrimary(item: any) {
 function showDieDialog(row: any) {
   dieDialogRow.value = row
   dieDialogPrimary.value = row.die || ''
-  const names = row._dieNames || []
-  const seen = new Set<string>()
-  const items: any[] = []
-  for (const n of names) {
-    for (const m of dieList.value.filter(d => d.name === n)) {
-      if (!seen.has(m.id)) { seen.add(m.id); items.push({ ...m }) }
-    }
-  }
-  if (items.length === 0) for (const n of names) items.push({ id: n, name: n, machineType: '', wireDiameter: '' })
+  const ids = row._dieIds || []
+  const items = ids.map((id: string) => dieList.value.find(d => d.id === id)).filter(Boolean).map((d: any) => ({ ...d }))
   stockCalcApi.calculate('die').then((sd: any[]) => {
     for (const item of items) {
-      const match = sd.find((s: any) => s.id === item.id || s.name === item.name)
+      const match = sd.find((s: any) => s.dieId === item.id)
       if (match) { item.currentStock = match.currentStock; item.safetyStock = match.safetyStock; item.status = match.status }
     }
     dieDialogItems.value = [...items]
