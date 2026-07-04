@@ -23,14 +23,14 @@
         <el-table-column prop="headType" label="头型" width="120" sortable :filters="headTypeFilters" :filter-method="filterHandler" />
         <el-table-column prop="punch" label="冲头" width="120" sortable>
           <template #default="{ row }">
-            <el-link v-if="row.punch" type="primary" :underline="false" @click="showPunchDialog(row)">{{ parseNames(row.punch)[0] }}</el-link>
+            <el-link v-if="row.punch" type="primary" :underline="false" @click="showPunchDialog(row)">{{ row.punch }}</el-link>
             <span v-else>-</span>
           </template>
         </el-table-column>
         <el-table-column prop="threadType" label="牙型" width="120" sortable :filters="threadTypeFilters" :filter-method="filterHandler" />
         <el-table-column prop="die" label="牙板" width="120" sortable>
           <template #default="{ row }">
-            <el-link v-if="row.die" type="success" :underline="false" @click="showDieDialog(row)">{{ parseNames(row.die)[0] }}</el-link>
+            <el-link v-if="row.die" type="success" :underline="false" @click="showDieDialog(row)">{{ row.die }}</el-link>
             <span v-else>-</span>
           </template>
         </el-table-column>
@@ -217,7 +217,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { View } from '@element-plus/icons-vue'
 import type { FormInstance } from 'element-plus'
 import { getCurrentWindow } from '@tauri-apps/api/window'
-import { screwSpecApi, punchApi, dieApi, stockCalcApi } from '../api'
+import { screwSpecApi, punchApi, dieApi, punchLinkApi, dieLinkApi, stockCalcApi } from '../api'
 
 const tableData = ref<any[]>([])
 const punchList = ref<any[]>([])
@@ -290,11 +290,51 @@ const form = ref<any>({
   length: '', threadDiameter: '', shankLength: '', wireMaterial: '', plating: '', remark: ''
 })
 
+// 解析关联表：punchId/dieId 是信息表的 ID，需要解析成名字
+function resolveLinkNames(linkIdField: string, links: any[], infoList: any[]): Record<string, string[]> {
+  const map: Record<string, string[]> = {}
+  for (const link of links) {
+    const specId = link.screwSpecId
+    const itemId = link[linkIdField]
+    if (!specId || !itemId) continue
+    const info = infoList.find((i: any) => i.id === itemId)
+    const name = info ? info.name : itemId
+    if (!map[specId]) map[specId] = []
+    if (!map[specId].includes(name)) map[specId].push(name)
+  }
+  return map
+}
+
+// 根据名字在信息表中查找 ID（多条同名的都返回）
+function findIdsByNames(names: string[], infoList: any[]): string[] {
+  const ids: string[] = []
+  const seen = new Set<string>()
+  for (const n of names) {
+    for (const item of infoList) {
+      if (item.name === n && !seen.has(item.id)) {
+        ids.push(item.id)
+        seen.add(item.id)
+      }
+    }
+  }
+  return ids
+}
+
 async function loadData() {
   loading.value = true
   try {
-    const [screws, punches, dies] = await Promise.all([screwSpecApi.getAll(), punchApi.getAll(), dieApi.getAll()])
-    tableData.value = screws
+    const [screws, punches, dies, punchLinks, dieLinks] = await Promise.all([
+      screwSpecApi.getAll(), punchApi.getAll(), dieApi.getAll(),
+      punchLinkApi.getAll(), dieLinkApi.getAll()
+    ])
+    const punchNameMap = resolveLinkNames('punchId', punchLinks, punches)
+    const dieNameMap = resolveLinkNames('dieId', dieLinks, dies)
+    // 兼容旧数据：如果关联表没有数据，用主表的逗号分隔字段
+    tableData.value = screws.map((s: any) => ({
+      ...s,
+      _punchNames: punchNameMap[s.id] || parseNames(s.punch),
+      _dieNames: dieNameMap[s.id] || parseNames(s.die)
+    }))
     punchList.value = punches
     dieList.value = dies
   } catch (error) { ElMessage.error('加载数据失败'); console.error(error) }
@@ -304,8 +344,8 @@ async function loadData() {
 // ====== 冲头关联弹窗 ======
 function showPunchDialog(row: any) {
   punchDialogRow.value = row
-  const names = parseNames(row.punch)
-  punchDialogPrimary.value = names[0] || ''
+  punchDialogPrimary.value = row.punch || ''
+  const names = row._punchNames || []
   const seen = new Set<string>()
   const items: any[] = []
   for (const n of names) {
@@ -325,13 +365,9 @@ function showPunchDialog(row: any) {
 }
 
 async function setPunchPrimary(item: any) {
-  const row = punchDialogRow.value
   if (item.name === punchDialogPrimary.value) return
-  const names = parseNames(row.punch)
-  const idx = names.indexOf(item.name)
-  if (idx > 0) { names.splice(idx, 1); names.unshift(item.name) }
   try {
-    await screwSpecApi.update(row.id, { punch: names.join(',') })
+    await screwSpecApi.update(punchDialogRow.value.id, { punch: item.name })
     punchDialogVisible.value = false
     loadData()
   } catch { ElMessage.error('设置失败') }
@@ -340,8 +376,8 @@ async function setPunchPrimary(item: any) {
 // ====== 牙板关联弹窗 ======
 function showDieDialog(row: any) {
   dieDialogRow.value = row
-  const names = parseNames(row.die)
-  dieDialogPrimary.value = names[0] || ''
+  dieDialogPrimary.value = row.die || ''
+  const names = row._dieNames || []
   const seen = new Set<string>()
   const items: any[] = []
   for (const n of names) {
@@ -361,13 +397,9 @@ function showDieDialog(row: any) {
 }
 
 async function setDiePrimary(item: any) {
-  const row = dieDialogRow.value
   if (item.name === dieDialogPrimary.value) return
-  const names = parseNames(row.die)
-  const idx = names.indexOf(item.name)
-  if (idx > 0) { names.splice(idx, 1); names.unshift(item.name) }
   try {
-    await screwSpecApi.update(row.id, { die: names.join(',') })
+    await screwSpecApi.update(dieDialogRow.value.id, { die: item.name })
     dieDialogVisible.value = false
     loadData()
   } catch { ElMessage.error('设置失败') }
@@ -386,7 +418,11 @@ function handleAdd() {
 
 function handleEdit(row: any) {
   isEdit.value = true
-  form.value = { ...row, punch: parseNames(row.punch), die: parseNames(row.die) }
+  form.value = {
+    ...row,
+    punch: [...(row._punchNames || [])],
+    die: [...(row._dieNames || [])]
+  }
   dialogVisible.value = true
 }
 
@@ -394,9 +430,25 @@ async function handleDelete(row: any) {
   try {
     await ElMessageBox.confirm('确定删除此规格？', '提示', { type: 'warning' })
     await screwSpecApi.remove(row.id)
+    // 清理关联表
+    const [pl, dl] = await Promise.all([punchLinkApi.getAll(), dieLinkApi.getAll()])
+    for (const l of pl) { if (l.screwSpecId === row.id) await punchLinkApi.remove(l.id) }
+    for (const l of dl) { if (l.screwSpecId === row.id) await dieLinkApi.remove(l.id) }
     ElMessage.success('删除成功')
     loadData()
   } catch (e) { if (e !== 'cancel') { ElMessage.error('删除失败'); console.error(e) } }
+}
+
+// 同步关联表：先删旧的，再建新的
+async function syncLinks(screwSpecId: string, nameField: string, names: string[], linkApi: any, infoList: any[]) {
+  const allLinks = await linkApi.getAll()
+  for (const l of allLinks.filter((l: any) => l.screwSpecId === screwSpecId)) {
+    await linkApi.remove(l.id)
+  }
+  const ids = findIdsByNames(names, infoList)
+  for (const id of ids) {
+    await linkApi.add({ [nameField]: id, screwSpecId })
+  }
 }
 
 async function handleSubmit() {
@@ -404,13 +456,25 @@ async function handleSubmit() {
   await formRef.value.validate(async (valid) => {
     if (!valid) return
     try {
+      const punchNames = Array.isArray(form.value.punch) ? form.value.punch : []
+      const dieNames = Array.isArray(form.value.die) ? form.value.die : []
+      // 主表只存外显的第一个名字
       const payload = {
         ...form.value,
-        punch: Array.isArray(form.value.punch) ? form.value.punch.join(',') : (form.value.punch || ''),
-        die: Array.isArray(form.value.die) ? form.value.die.join(',') : (form.value.die || '')
+        punch: punchNames[0] || '',
+        die: dieNames[0] || ''
       }
-      if (isEdit.value) { await screwSpecApi.update(form.value.id, payload) }
-      else { await screwSpecApi.add(payload) }
+      let specId: string
+      if (isEdit.value) {
+        await screwSpecApi.update(form.value.id, payload)
+        specId = form.value.id
+      } else {
+        const result = await screwSpecApi.add(payload)
+        specId = result.id
+      }
+      // 同步关联表（用信息表的 ID）
+      await syncLinks(specId, 'punchId', punchNames, punchLinkApi, punchList.value)
+      await syncLinks(specId, 'dieId', dieNames, dieLinkApi, dieList.value)
       dialogVisible.value = false
       loadData()
     } catch (error) { ElMessage.error(isEdit.value ? '更新失败' : '添加失败'); console.error(error) }
