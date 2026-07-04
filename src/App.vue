@@ -1,6 +1,6 @@
 <template>
   <el-container class="app-container">
-    <el-aside :width="isCollapse ? '64px' : '220px'" class="app-aside">
+    <el-aside :width="isCollapse ? '56px' : '180px'" class="app-aside">
       <div class="logo" :class="{ 'logo-collapse': isCollapse }">
         <img v-if="!isCollapse" src="./assets/logo.svg" alt="" class="logo-icon" />
         <span v-show="!isCollapse" class="logo-text">模具管理</span>
@@ -95,11 +95,11 @@ onMounted(() => {
 :root {
   --primary: #4f6ef7;
   --primary-light: #6b8aff;
-  --sidebar-bg: #1a1f36;
-  --sidebar-hover: #252b45;
-  --sidebar-active: rgba(79, 110, 247, 0.15);
-  --sidebar-text: #8b92a8;
-  --sidebar-text-active: #fff;
+  --sidebar-bg: #f0f2f8;
+  --sidebar-hover: #e0e4f0;
+  --sidebar-active: rgba(79, 110, 247, 0.12);
+  --sidebar-text: #4a5068;
+  --sidebar-text-active: var(--primary);
   --bg: #f5f6fa;
   --card-bg: #fff;
   --border: #ebeef5;
@@ -116,16 +116,16 @@ onMounted(() => {
   position: relative;
   display: flex;
   flex-direction: column;
-  box-shadow: 2px 0 12px rgba(0, 0, 0, 0.08);
+  border-right: 1px solid var(--border);
 }
 
 .logo {
-  height: 64px;
+  height: 56px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
 
@@ -139,8 +139,8 @@ onMounted(() => {
 }
 
 .logo-text {
-  color: #fff;
-  font-size: 17px;
+  color: var(--primary);
+  font-size: 16px;
   font-weight: 700;
   letter-spacing: 1px;
 }
@@ -156,16 +156,17 @@ onMounted(() => {
 }
 
 .el-menu-vertical:not(.el-menu--collapse) {
-  width: 220px;
+  width: 180px;
 }
 
 .el-menu-vertical .el-menu-item {
   color: var(--sidebar-text);
-  height: 46px;
-  line-height: 46px;
-  margin: 2px 10px;
-  border-radius: 8px;
+  height: 40px;
+  line-height: 40px;
+  margin: 2px 8px;
+  border-radius: 6px;
   transition: all 0.2s ease;
+  padding-left: 12px !important;
 }
 
 .el-menu-vertical .el-menu-item:hover {
@@ -175,7 +176,7 @@ onMounted(() => {
 
 .el-menu-vertical .el-menu-item.is-active {
   background: var(--sidebar-active);
-  color: var(--primary-light);
+  color: var(--primary);
   font-weight: 600;
 }
 
@@ -185,20 +186,20 @@ onMounted(() => {
 
 .menu-group-title {
   font-size: 11px;
-  color: #5a6178;
+  color: #8a8fa8;
   letter-spacing: 1.5px;
   font-weight: 600;
 }
 
 .collapse-btn {
   width: 100%;
-  height: 44px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   color: var(--sidebar-text);
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid var(--border);
   transition: all 0.2s;
   flex-shrink: 0;
 }
