@@ -43,11 +43,6 @@ const router = createRouter({
       component: () => import('../views/UpperPunch.vue')
     },
     {
-      path: '/inventory',
-      name: 'Inventory',
-      component: () => import('../views/Inventory.vue')
-    },
-    {
       path: '/settings',
       name: 'Settings',
       component: () => import('../views/Settings.vue')

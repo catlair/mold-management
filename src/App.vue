@@ -45,10 +45,6 @@
           </el-menu-item-group>
           <el-menu-item-group>
             <template #title><span v-show="!isCollapse" class="menu-group-title">系统功能</span></template>
-            <el-menu-item index="/inventory">
-              <el-icon><DataAnalysis /></el-icon>
-              <template #title>库存汇总</template>
-            </el-menu-item>
             <el-menu-item index="/settings">
               <el-icon><Setting /></el-icon>
               <template #title>配置</template>
