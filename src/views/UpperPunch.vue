@@ -96,23 +96,6 @@
             </el-table-column>
           </el-table>
         </el-tab-pane>
-
-        <el-tab-pane label="库存汇总" name="stock">
-          <div class="stock-center">
-            <el-table :data="stockList" border>
-              <el-table-column prop="name" label="上冲名称" width="140" sortable />
-              <el-table-column prop="currentStock" label="当前库存" width="120" sortable />
-              <el-table-column prop="safetyStock" label="安全库存" width="120" sortable />
-              <el-table-column prop="status" label="库存状态" width="120" :filters="stockStatusFilters" :filter-method="filterHandler">
-                <template #default="{ row }">
-                  <el-tag :type="row.status === '需入库' ? 'danger' : 'success'" effect="dark" round>
-                    {{ row.status }}
-                  </el-tag>
-                </template>
-              </el-table-column>
-            </el-table>
-          </div>
-        </el-tab-pane>
       </el-tabs>
     </el-card>
 
@@ -256,18 +239,12 @@ const upperPunchList = ref<any[]>([])
 const orderList = ref<any[]>([])
 const useList = ref<any[]>([])
 const linkList = ref<any[]>([])
-const stockList = ref<any[]>([])
 const loading = ref(true)
 
 // 筛选选项
 const statusFilters = [
   { text: '未到货', value: '未到货' },
   { text: '已到货', value: '已到货' }
-]
-
-const stockStatusFilters = [
-  { text: '需入库', value: '需入库' },
-  { text: '安全', value: '安全' }
 ]
 
 function filterHandler(value: string, row: any, column: any) {
