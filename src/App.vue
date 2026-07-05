@@ -246,16 +246,23 @@ onMounted(() => {
   overflow: hidden;
 }
 
-/* 水平滚动条始终可见 */
-.el-table .el-scrollbar__bar.is-horizontal {
-  height: 8px !important;
+/* 表格滚动条始终可见 */
+.el-table .el-scrollbar__bar {
   opacity: 1 !important;
 }
 
+.el-table .el-scrollbar__bar.is-horizontal {
+  height: 8px !important;
+}
+
 .el-table .el-scrollbar__bar.is-horizontal .el-scrollbar__thumb {
-  background: #b0b4bc;
+  background: #b0b4bc !important;
   border-radius: 4px;
-  height: 6px;
+}
+
+/* 菜单隐藏滚动条 */
+.menu-scrollbar .el-scrollbar__bar {
+  display: none !important;
 }
 
 .el-table .el-table__cell {
