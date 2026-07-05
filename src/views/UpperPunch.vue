@@ -20,7 +20,7 @@
 
       <el-tabs v-model="activeTab">
         <el-tab-pane label="上冲信息" name="info">
-           <el-table :data="upperPunchList" border style="width: 100%" v-loading="loading">
+           <el-table :data="upperPunchList" border style="width: 100%" max-height="calc(100vh - 200px)" v-loading="loading">
             <el-table-column prop="name" label="名称" width="160" sortable />
             <el-table-column prop="diameter" label="口径" width="100" sortable />
             <el-table-column prop="wireMaterial" label="对应线材" width="120" sortable />
@@ -447,9 +447,6 @@ async function handleDeleteLink(row: any) {
 </script>
 
 <style scoped>
-.page-container { display: flex; flex-direction: column; height: 100%; }
-.page-container .el-card { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-.page-container .el-card :deep(.el-card__body) { flex: 1; overflow: auto; }
 .stock-center {
   display: flex;
   justify-content: center;
