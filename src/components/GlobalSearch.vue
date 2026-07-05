@@ -106,7 +106,7 @@ function onSearch() {
 }
 
 async function doSearch() {
-  const kw = keyword.value.trim().toLowerCase()
+  const kw = normalize(keyword.value.trim())
   if (!kw) return
   loading.value = true
   try {
@@ -235,8 +235,16 @@ async function doSearch() {
   }
 }
 
+function normalize(s: string): string {
+  return s.toLowerCase().replace(/\s*[xX×]\s*/g, 'x')
+}
+
 function matchFields(kw: string, fields: any[]): boolean {
-  return fields.some(f => f && String(f).toLowerCase().includes(kw))
+  const nkw = normalize(kw)
+  return fields.some(f => {
+    if (!f) return false
+    return normalize(String(f)).includes(nkw)
+  })
 }
 
 function goTo(item: SearchResult) {
