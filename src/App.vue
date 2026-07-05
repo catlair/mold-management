@@ -162,8 +162,11 @@ onMounted(() => {
   margin: 2px 8px;
   border-radius: 6px;
   transition: all 0.2s ease;
-  padding-left: 12px !important;
-  padding-right: 12px !important;
+  padding: 0 16px !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
 }
 
 .el-menu-vertical .el-menu-item:hover {
