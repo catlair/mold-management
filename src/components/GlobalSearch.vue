@@ -121,7 +121,7 @@ async function doSearch() {
     const result: SearchGroup[] = []
 
     // 螺丝规格
-    const screwMatches = screws.filter((s: any) => matchFields(kw, [s.name, s.headType, s.threadType, s.punch, s.die, s.remark]))
+    const screwMatches = screws.filter((s: any) => matchFields(kw, [s.name, s.headType, s.threadType, s.punch, s.die, s.wireMaterial, s.externalId, s.customer, s.remark]))
     if (screwMatches.length) {
       result.push({
         label: `螺丝规格 (${screwMatches.length})`,
@@ -129,7 +129,7 @@ async function doSearch() {
         icon: Document,
         items: screwMatches.map((s: any) => ({
           id: s.id, name: s.name,
-          desc: [s.headType, s.punch && `冲头:${s.punch}`, s.die && `牙板:${s.die}`, s.threadType].filter(Boolean).join(' · '),
+          desc: [s.wireMaterial, s.externalId, s.customer, s.headType, s.punch && `冲头:${s.punch}`, s.die && `牙板:${s.die}`].filter(Boolean).join(' · '),
           route: '/screw-spec'
         }))
       })
