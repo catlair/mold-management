@@ -20,7 +20,7 @@
 
       <el-tabs v-model="activeTab">
         <el-tab-pane label="主模具信息" name="info">
-           <el-table :data="mainMoldList" border style="width: 100%" max-height="calc(100vh - 150px)" v-loading="loading">
+           <el-table :data="mainMoldList" border style="width: 100%" max-height="calc(100vh - 170px)" v-loading="loading">
             <el-table-column prop="name" label="名称" width="160" sortable />
             <el-table-column prop="holeDiameter" label="孔径" width="100" sortable />
             <el-table-column prop="wireMaterial" label="对应线材" width="120" sortable />

@@ -20,7 +20,7 @@
 
       <el-tabs v-model="activeTab">
         <el-tab-pane label="冲头信息" name="info">
-           <el-table :data="punchList" border style="width: 100%" max-height="calc(100vh - 150px)" v-loading="loading">
+           <el-table :data="punchList" border style="width: 100%" max-height="calc(100vh - 170px)" v-loading="loading">
             <el-table-column prop="name" label="名称" width="160" sortable>
               <template #default="{ row }">
                 <el-link type="primary" :underline="false" @click="showLinkedScrews(row)">{{ row.name }}</el-link>
