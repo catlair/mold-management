@@ -214,7 +214,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { View } from '@element-plus/icons-vue'
 import type { FormInstance } from 'element-plus'
@@ -252,7 +252,8 @@ async function toggleFullscreen() {
   const next = !isFullscreen.value
   isFullscreen.value = next
   try { await getCurrentWindow().setFullscreen(next) } catch {}
-  nextTick(() => { mainTableRef.value?.doLayout() })
+  // 等待全屏过渡动画完成后再重绘表格
+  setTimeout(() => { mainTableRef.value?.doLayout() }, 500)
 }
 
 onMounted(async () => {
@@ -489,8 +490,8 @@ async function handleSubmit() {
 .page-container.is-fullscreen .el-card { height: 100%; display: flex; flex-direction: column; margin: 0; border: none; border-radius: 0; box-shadow: none; }
 .page-container.is-fullscreen .el-card__header { display: none; }
 .page-container.is-fullscreen .el-card__body { flex: 1; overflow: auto; padding: 12px; }
-.page-container.is-fullscreen .el-table__body-wrapper { overflow: auto !important; }
-.page-container.is-fullscreen .el-table .el-table__fixed { height: calc(100% - 14px) !important; }
+.page-container.is-fullscreen :deep(.el-table__body-wrapper) { overflow: auto !important; }
+.page-container.is-fullscreen :deep(.el-table__fixed) { height: calc(100% - 14px) !important; }
 
 .header-right { display: flex; gap: 8px; margin-left: auto; }
 </style>
