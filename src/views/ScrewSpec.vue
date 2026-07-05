@@ -18,7 +18,7 @@
         </div>
       </template>
 
-        <el-table :data="tableData" border style="width: 100%" max-height="calc(100vh - 170px)" v-loading="loading">
+        <el-table :data="tableData" border style="width: 100%" :max-height="isFullscreen ? 'calc(100vh - 10px)' : 'calc(100vh - 170px)'" v-loading="loading">
         <el-table-column prop="name" label="螺丝名称" width="160" sortable />
         <el-table-column prop="headType" label="头型" width="120" sortable :filters="headTypeFilters" :filter-method="filterHandler" />
         <el-table-column prop="punch" label="冲头" width="120" sortable>
@@ -485,6 +485,6 @@ async function handleSubmit() {
 .page-container.is-fullscreen .el-card { height: 100%; display: flex; flex-direction: column; margin: 0; border: none; border-radius: 0; box-shadow: none; }
 .page-container.is-fullscreen .el-card__header { display: none; }
 .page-container.is-fullscreen .el-card__body { flex: 1; overflow: auto; padding: 12px; }
-.page-container.is-fullscreen .el-table { max-height: calc(100vh - 10px) !important; }
+
 .header-right { display: flex; gap: 8px; margin-left: auto; }
 </style>

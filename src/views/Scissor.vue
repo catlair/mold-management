@@ -20,7 +20,7 @@
 
       <el-tabs v-model="activeTab">
         <el-tab-pane label="剪刀信息" name="info">
-           <el-table :data="scissorList" border style="width: 100%" max-height="calc(100vh - 170px)" v-loading="loading">
+           <el-table :data="scissorList" border style="width: 100%" :max-height="isFullscreen ? 'calc(100vh - 10px)' : 'calc(100vh - 170px)'" v-loading="loading">
             <el-table-column prop="name" label="名称" width="160" sortable />
             <el-table-column prop="diameter" label="口径" width="100" sortable />
             <el-table-column prop="wireMaterial" label="对应线材" width="120" sortable />
@@ -458,7 +458,7 @@ async function handleDeleteLink(row: any) {
 .page-container.is-fullscreen .el-card { height: 100%; display: flex; flex-direction: column; margin: 0; border: none; border-radius: 0; box-shadow: none; }
 .page-container.is-fullscreen .el-card__header { display: none; }
 .page-container.is-fullscreen .el-card__body { flex: 1; overflow: auto; padding: 12px; }
-.page-container.is-fullscreen .el-table { max-height: calc(100vh - 10px) !important; }
+
 .header-right {
   display: flex;
   gap: 8px;

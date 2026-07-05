@@ -20,7 +20,7 @@
 
       <el-tabs v-model="activeTab">
         <el-tab-pane label="皮带信息" name="info">
-           <el-table :data="beltList" border style="width: 100%" max-height="calc(100vh - 170px)" v-loading="loading">
+           <el-table :data="beltList" border style="width: 100%" :max-height="isFullscreen ? 'calc(100vh - 10px)' : 'calc(100vh - 170px)'" v-loading="loading">
             <el-table-column prop="name" label="名称" width="160" sortable />
             <el-table-column prop="machine" label="适用机器" width="120" sortable :filters="machineFilters" :filter-method="filterHandler" />
             <el-table-column prop="safetyStock" label="安全库存" width="100" sortable />
@@ -377,7 +377,7 @@ async function handleUseSubmit() {
 .page-container.is-fullscreen .el-card { height: 100%; display: flex; flex-direction: column; margin: 0; border: none; border-radius: 0; box-shadow: none; }
 .page-container.is-fullscreen .el-card__header { display: none; }
 .page-container.is-fullscreen .el-card__body { flex: 1; overflow: auto; padding: 12px; }
-.page-container.is-fullscreen .el-table { max-height: calc(100vh - 10px) !important; }
+
 .header-right {
   display: flex;
   gap: 8px;
