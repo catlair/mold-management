@@ -169,6 +169,8 @@ struct Config {
     backup_count: usize,
     #[serde(default)]
     backup_path: Option<String>,
+    #[serde(default)]
+    allow_delete: bool,
 }
 
 fn default_backup_count() -> usize { 10 }
@@ -192,12 +194,14 @@ fn load_config(config_path: &Path) -> Config {
             file_path: None,
             backup_count: 10,
             backup_path: None,
+            allow_delete: false,
         })
     } else {
         Config {
             file_path: None,
             backup_count: 10,
             backup_path: None,
+            allow_delete: false,
         }
     }
 }
@@ -385,6 +389,23 @@ fn set_backup_config(state: State<AppState>, backup_count: usize, backup_path: O
 }
 
 #[tauri::command]
+fn get_allow_delete(state: State<AppState>) -> Result<bool, String> {
+    let config = state.config.lock().map_err(|e| e.to_string())?;
+    Ok(config.allow_delete)
+}
+
+#[tauri::command]
+fn set_allow_delete(state: State<AppState>, allow: bool) -> Result<Value, String> {
+    {
+        let mut config = state.config.lock().map_err(|e| e.to_string())?;
+        config.allow_delete = allow;
+        let config_path = state.config_path.lock().map_err(|e| e.to_string())?;
+        save_config(&config_path, &config);
+    }
+    Ok(json!({ "success": true }))
+}
+
+#[tauri::command]
 fn restore_backup(state: State<AppState>, backup_path: String) -> Result<Value, String> {
     if !Path::new(&backup_path).exists() {
         return Err("备份文件不存在".to_string());
@@ -452,6 +473,8 @@ pub fn run() {
             list_backups,
             toggle_backup_lock,
             restore_backup,
+            get_allow_delete,
+            set_allow_delete,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

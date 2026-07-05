@@ -37,7 +37,7 @@
             <el-table-column label="操作" width="150" fixed="right">
               <template #default="{ row }">
                 <el-button size="small" @click="handleEdit(row)">编辑</el-button>
-                <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
+                <el-button size="small" type="danger" v-if="allowDelete" @click="handleDelete(row)">删除</el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -91,7 +91,7 @@
             <el-table-column prop="remark" label="备注" />
             <el-table-column label="操作" width="100">
               <template #default="{ row }">
-                <el-button size="small" type="danger" @click="handleDeleteLink(row)">删除</el-button>
+                <el-button size="small" type="danger" v-if="allowDelete" @click="handleDeleteLink(row)">删除</el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -210,6 +210,9 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance } from 'element-plus'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { mainMoldApi, mainMoldOrderApi, mainMoldUseApi, mainMoldLinkApi, stockCalcApi } from '../api'
+import { useAllowDelete } from '../composables/useAllowDelete'
+
+const { allowDelete } = useAllowDelete()
 
 function getCurrentDateTime() {
   const d = new Date()

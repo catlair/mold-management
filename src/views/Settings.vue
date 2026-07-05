@@ -51,6 +51,21 @@
     <el-card class="settings-card">
       <template #header>
         <div class="card-header">
+          <el-icon><Warning /></el-icon>
+          <span>安全设置</span>
+        </div>
+      </template>
+      <el-form label-width="120px">
+        <el-form-item label="允许删除">
+          <el-switch v-model="allowDeleteVal" @change="handleAllowDeleteChange" />
+          <span class="form-tip">开启后各管理页面的删除按钮才可见</span>
+        </el-form-item>
+      </el-form>
+    </el-card>
+
+    <el-card class="settings-card">
+      <template #header>
+        <div class="card-header">
           <el-icon><Clock /></el-icon>
           <span>自动备份配置</span>
         </div>
@@ -119,7 +134,7 @@ import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { save, open } from '@tauri-apps/plugin-dialog'
 import { readFile, writeFile } from '@tauri-apps/plugin-fs'
-import { dataApi, settingsApi, backupApi } from '../api'
+import { dataApi, settingsApi, backupApi, allowDeleteApi } from '../api'
 
 const exporting = ref(false)
 const importing = ref(false)
@@ -128,6 +143,12 @@ const dataPath = ref('')
 const backupCount = ref(10)
 const backupConfig = ref<any>({})
 const backups = ref<any[]>([])
+const allowDeleteVal = ref(false)
+
+async function handleAllowDeleteChange(val: boolean) {
+  await allowDeleteApi.set(val)
+  ElMessage.success(val ? '已开启删除功能' : '已关闭删除功能')
+}
 
 onMounted(async () => {
   try {
@@ -138,6 +159,7 @@ onMounted(async () => {
   }
   await loadBackupConfig()
   await loadBackups()
+  try { allowDeleteVal.value = await allowDeleteApi.get() } catch {}
 })
 
 async function loadBackupConfig() {

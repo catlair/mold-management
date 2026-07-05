@@ -47,7 +47,7 @@
         <el-table-column label="操作" width="150" fixed="right">
           <template #default="{ row }">
             <el-button size="small" @click="handleEdit(row)">编辑</el-button>
-            <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
+            <el-button size="small" type="danger" v-if="allowDelete" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -220,7 +220,10 @@ import { View } from '@element-plus/icons-vue'
 import type { FormInstance } from 'element-plus'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { screwSpecApi, punchApi, dieApi, punchLinkApi, dieLinkApi, stockCalcApi } from '../api'
+import { useAllowDelete } from '../composables/useAllowDelete'
 import { toShortCode, matchPunchNames } from '../utils/punchName'
+
+const { allowDelete } = useAllowDelete()
 
 const tableData = ref<any[]>([])
 const punchList = ref<any[]>([])

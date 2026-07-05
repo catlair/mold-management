@@ -110,3 +110,9 @@ export const backupApi = {
   toggleLock: (index: number) => invoke<{ success: boolean; locked: boolean }>('toggle_backup_lock', { index }),
   restore: (backupPath: string) => invoke<{ success: boolean }>('restore_backup', { backupPath }),
 }
+
+// 删除权限 API
+export const allowDeleteApi = {
+  get: () => invoke<boolean>('get_allow_delete'),
+  set: (allow: boolean) => invoke<any>('set_allow_delete', { allow }),
+}
