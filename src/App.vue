@@ -246,6 +246,18 @@ onMounted(() => {
   overflow: hidden;
 }
 
+/* 水平滚动条始终可见 */
+.el-table .el-scrollbar__bar.is-horizontal {
+  height: 8px !important;
+  opacity: 1 !important;
+}
+
+.el-table .el-scrollbar__bar.is-horizontal .el-scrollbar__thumb {
+  background: #b0b4bc;
+  border-radius: 4px;
+  height: 6px;
+}
+
 .el-table .el-table__cell {
   text-align: center;
   padding: 10px 0;
