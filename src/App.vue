@@ -246,6 +246,11 @@ onMounted(() => {
   overflow: hidden;
 }
 
+/* 全屏模式表格高度更大 */
+.page-container.is-fullscreen .el-table {
+  max-height: calc(100vh - 50px) !important;
+}
+
 /* 表格水平滚动条始终可见 - 强制覆盖 JS 行为 */
 .el-table .el-scrollbar__bar.is-horizontal {
   opacity: 1 !important;
