@@ -156,7 +156,9 @@
     <!-- 冲头关联弹窗 -->
     <el-dialog v-model="punchDialogVisible" title="冲头关联" width="700px">
       <el-table :data="punchDialogItems" border size="small">
-        <el-table-column prop="name" label="冲头名称" width="100" />
+        <el-table-column label="冲头名称" width="120">
+          <template #default="{ row: r }">{{ toShortCode(r.name) || r.name }}</template>
+        </el-table-column>
         <el-table-column prop="spec" label="规格" width="100" />
         <el-table-column prop="material" label="材质" width="80" />
         <el-table-column label="当前库存" width="90" align="center">
@@ -173,7 +175,7 @@
         </el-table-column>
         <el-table-column label="外显" width="60" align="center">
           <template #default="{ row: item }">
-            <el-link :type="item.name === punchDialogPrimary ? 'info' : 'warning'" :underline="false" @click="setPunchPrimary(item)">
+            <el-link :type="matchPunchNames(item.name, punchDialogPrimary) ? 'info' : 'warning'" :underline="false" @click="setPunchPrimary(item)">
               <el-icon><View /></el-icon>
             </el-link>
           </template>
@@ -218,6 +220,7 @@ import { View } from '@element-plus/icons-vue'
 import type { FormInstance } from 'element-plus'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { screwSpecApi, punchApi, dieApi, punchLinkApi, dieLinkApi, stockCalcApi } from '../api'
+import { toShortCode, matchPunchNames } from '../utils/punchName'
 
 const tableData = ref<any[]>([])
 const punchList = ref<any[]>([])
@@ -252,13 +255,20 @@ onMounted(async () => {
 const formRef = ref<FormInstance>()
 const formRules = { name: [{ required: true, message: '请输入螺丝名称', trigger: 'blur' }] }
 
-// 冲头选项（按名称去重）
+// 冲头选项（按名称去重，显示简写+全写）
 const punchOptions = computed(() => {
   const names = [...new Set(punchList.value.map(item => item.name).filter(Boolean))]
-  return names.map(name => ({
-    name,
-    specs: punchList.value.filter(p => p.name === name).map(p => `${p.spec}${p.material ? '(' + p.material + ')' : ''}`).join('、')
-  }))
+  return names.map(name => {
+    const short = toShortCode(name)
+    const display = short || name
+    const fullName = short ? name : ''
+    return {
+      name: display, // 简写作为值
+      fullName,       // 全写（如果有）
+      label: fullName ? `${display} (${fullName})` : display,
+      specs: punchList.value.filter(p => p.name === name).map(p => `${p.spec}${p.material ? '(' + p.material + ')' : ''}`).join('、')
+    }
+  })
 })
 
 // 牙板选项（按名称去重）
@@ -281,7 +291,7 @@ const form = ref<any>({
   length: '', threadDiameter: '', shankLength: '', wireMaterial: '', plating: '', remark: ''
 })
 
-// 解析关联表：保留具体的记录 ID，同时解析出名字用于显示
+// 解析关联表：保留具体的记录 ID，同时解析出名字用于显示（全写转简写）
 function resolveLinks(linkIdField: string, links: any[], infoList: any[]): Record<string, { ids: string[], names: string[] }> {
   const map: Record<string, { ids: string[], names: string[] }> = {}
   for (const link of links) {
@@ -292,8 +302,9 @@ function resolveLinks(linkIdField: string, links: any[], infoList: any[]): Recor
     if (!map[specId].ids.includes(itemId)) {
       map[specId].ids.push(itemId)
       const info = infoList.find((i: any) => i.id === itemId)
-      const name = info ? info.name : itemId
-      map[specId].names.push(name)
+      const rawName = info ? info.name : itemId
+      const shortName = toShortCode(rawName) || rawName
+      map[specId].names.push(shortName)
     }
   }
   return map
@@ -305,7 +316,7 @@ function findIdsByNames(names: string[], infoList: any[]): string[] {
   const seen = new Set<string>()
   for (const n of names) {
     for (const item of infoList) {
-      if (item.name === n && !seen.has(item.id)) {
+      if (matchPunchNames(n, item.name) && !seen.has(item.id)) {
         ids.push(item.id)
         seen.add(item.id)
       }
@@ -353,9 +364,10 @@ function showPunchDialog(row: any) {
 }
 
 async function setPunchPrimary(item: any) {
-  if (item.name === punchDialogPrimary.value) return
+  if (matchPunchNames(item.name, punchDialogPrimary.value)) return
   try {
-    await screwSpecApi.update(punchDialogRow.value.id, { punch: item.name })
+    const shortName = toShortCode(item.name) || item.name
+    await screwSpecApi.update(punchDialogRow.value.id, { punch: shortName })
     punchDialogVisible.value = false
     loadData()
   } catch { ElMessage.error('设置失败') }
