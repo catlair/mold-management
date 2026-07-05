@@ -5,6 +5,9 @@
         <img v-if="!isCollapse" src="./assets/logo.svg" alt="" class="logo-icon" />
         <span v-show="!isCollapse" class="logo-text">模具管理</span>
       </div>
+      <div v-show="!isCollapse" class="search-wrapper">
+        <GlobalSearch />
+      </div>
       <el-scrollbar class="menu-scrollbar">
         <el-menu
           :default-active="activeMenu"
@@ -72,6 +75,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
+import GlobalSearch from './components/GlobalSearch.vue'
 
 const route = useRoute()
 const activeMenu = computed(() => route.path)
@@ -143,6 +147,11 @@ onMounted(() => {
 
 .menu-scrollbar {
   flex: 1;
+}
+
+.search-wrapper {
+  padding: 0 10px 8px;
+  flex-shrink: 0;
 }
 
 .el-menu-vertical {
