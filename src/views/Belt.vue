@@ -20,7 +20,7 @@
 
       <el-tabs v-model="activeTab">
         <el-tab-pane label="皮带信息" name="info">
-           <el-table :data="beltList" border style="width: 100%" v-loading="loading" max-height="calc(100vh - 200px)">
+           <el-table :data="beltList" border style="width: 100%" v-loading="loading">
             <el-table-column prop="name" label="名称" width="160" sortable />
             <el-table-column prop="machine" label="适用机器" width="120" sortable :filters="machineFilters" :filter-method="filterHandler" />
             <el-table-column prop="safetyStock" label="安全库存" width="100" sortable />
@@ -366,9 +366,9 @@ async function handleUseSubmit() {
 </script>
 
 <style scoped>
-.page-container {
-  height: 100%;
-}
+.page-container { display: flex; flex-direction: column; height: 100%; }
+.page-container .el-card { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.page-container .el-card :deep(.el-card__body) { flex: 1; overflow: auto; }
 .stock-center {
   display: flex;
   justify-content: center;

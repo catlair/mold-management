@@ -20,7 +20,7 @@
 
       <el-tabs v-model="activeTab">
         <el-tab-pane label="冲头信息" name="info">
-           <el-table :data="punchList" border style="width: 100%" v-loading="loading" max-height="calc(100vh - 200px)">
+           <el-table :data="punchList" border style="width: 100%" v-loading="loading">
             <el-table-column prop="name" label="名称" width="160" sortable>
               <template #default="{ row }">
                 <el-link type="primary" :underline="false" @click="showLinkedScrews(row)">{{ row.name }}</el-link>
@@ -525,9 +525,9 @@ async function handleDeleteLink(row: any) {
 </script>
 
 <style scoped>
-.page-container {
-  height: 100%;
-}
+.page-container { display: flex; flex-direction: column; height: 100%; }
+.page-container .el-card { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.page-container .el-card :deep(.el-card__body) { flex: 1; overflow: auto; }
 .stock-center {
   display: flex;
   justify-content: center;

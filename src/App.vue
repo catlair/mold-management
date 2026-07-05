@@ -222,6 +222,15 @@ onMounted(() => {
   background: var(--bg);
   padding: 24px;
   overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-main > * {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 /* 过渡动画 */
