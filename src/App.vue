@@ -246,18 +246,21 @@ onMounted(() => {
   overflow: hidden;
 }
 
-/* 表格滚动条始终可见 */
-.el-table .el-scrollbar__bar {
-  opacity: 1 !important;
-}
-
+/* 表格水平滚动条始终可见 - 强制覆盖 JS 行为 */
 .el-table .el-scrollbar__bar.is-horizontal {
-  height: 8px !important;
+  opacity: 1 !important;
+  transition: none !important;
+  transform: none !important;
 }
 
 .el-table .el-scrollbar__bar.is-horizontal .el-scrollbar__thumb {
+  opacity: 1 !important;
   background: #b0b4bc !important;
-  border-radius: 4px;
+  transition: background 0.2s !important;
+}
+
+.el-table .el-scrollbar__bar.is-horizontal .el-scrollbar__thumb:hover {
+  background: #909399 !important;
 }
 
 /* 菜单隐藏滚动条 */
