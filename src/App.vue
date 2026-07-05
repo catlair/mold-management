@@ -163,6 +163,7 @@ onMounted(() => {
   border-radius: 6px;
   transition: all 0.2s ease;
   padding-left: 12px !important;
+  padding-right: 12px !important;
 }
 
 .el-menu-vertical .el-menu-item:hover {
