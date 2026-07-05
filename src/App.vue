@@ -248,7 +248,7 @@ onMounted(() => {
 
 /* 全屏模式表格高度更大 */
 .page-container.is-fullscreen .el-table {
-  max-height: calc(100vh - 10px) !important;
+  max-height: 100% !important;
 }
 
 /* 表格水平滚动条始终可见 - 强制覆盖 JS 行为 */
