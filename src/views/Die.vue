@@ -242,6 +242,7 @@ import type { FormInstance } from 'element-plus'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { dieApi, dieOrderApi, dieUseApi, dieLinkApi, screwSpecApi, stockCalcApi } from '../api'
 import { useAllowDelete } from '../composables/useAllowDelete'
+import { useHighlight } from '../composables/useHighlight'
 
 const { allowDelete } = useAllowDelete()
 
@@ -270,6 +271,7 @@ onMounted(async () => {
 
 const activeTab = ref('info')
 const dieList = ref<any[]>([])
+useHighlight(dieList)
 const orderList = ref<any[]>([])
 const useList = ref<any[]>([])
 const linkList = ref<any[]>([])

@@ -211,6 +211,7 @@ import type { FormInstance } from 'element-plus'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { upperPunchApi, upperPunchOrderApi, upperPunchUseApi, upperPunchLinkApi, stockCalcApi } from '../api'
 import { useAllowDelete } from '../composables/useAllowDelete'
+import { useHighlight } from '../composables/useHighlight'
 
 const { allowDelete } = useAllowDelete()
 
@@ -239,6 +240,7 @@ onMounted(async () => {
 
 const activeTab = ref('info')
 const upperPunchList = ref<any[]>([])
+useHighlight(upperPunchList)
 const orderList = ref<any[]>([])
 const useList = ref<any[]>([])
 const linkList = ref<any[]>([])

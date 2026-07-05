@@ -221,11 +221,13 @@ import type { FormInstance } from 'element-plus'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { screwSpecApi, punchApi, dieApi, punchLinkApi, dieLinkApi, stockCalcApi } from '../api'
 import { useAllowDelete } from '../composables/useAllowDelete'
+import { useHighlight } from '../composables/useHighlight'
 import { toShortCode, matchPunchNames } from '../utils/punchName'
 
 const { allowDelete } = useAllowDelete()
 
 const tableData = ref<any[]>([])
+useHighlight(tableData)
 const punchList = ref<any[]>([])
 const dieList = ref<any[]>([])
 const dialogVisible = ref(false)

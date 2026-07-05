@@ -352,4 +352,14 @@ onMounted(() => {
   display: flex;
   justify-content: flex-end;
 }
+
+/* 搜索跳转高亮动画 */
+.highlight-flash {
+  animation: flash-highlight 2s ease;
+}
+@keyframes flash-highlight {
+  0%, 100% { background: inherit; }
+  10%, 30%, 50% { background: #ecf5ff !important; }
+  20%, 40% { background: #d9ecff !important; }
+}
 </style>

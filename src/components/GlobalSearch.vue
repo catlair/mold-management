@@ -240,7 +240,7 @@ function matchFields(kw: string, fields: any[]): boolean {
 function goTo(item: SearchResult) {
   visible.value = false
   keyword.value = ''
-  router.push(item.route)
+  router.push({ path: item.route, query: { highlight: item.id } })
 }
 
 function onKeydown(e: KeyboardEvent) {

@@ -211,6 +211,7 @@ import type { FormInstance } from 'element-plus'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { scissorApi, scissorOrderApi, scissorUseApi, scissorLinkApi, stockCalcApi } from '../api'
 import { useAllowDelete } from '../composables/useAllowDelete'
+import { useHighlight } from '../composables/useHighlight'
 
 const { allowDelete } = useAllowDelete()
 
@@ -239,6 +240,7 @@ onMounted(async () => {
 
 const activeTab = ref('info')
 const scissorList = ref<any[]>([])
+useHighlight(scissorList)
 const orderList = ref<any[]>([])
 const useList = ref<any[]>([])
 const linkList = ref<any[]>([])
