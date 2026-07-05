@@ -18,7 +18,7 @@
         </div>
       </template>
 
-        <el-table :data="tableData" border style="width: 100%" :max-height="isFullscreen ? 'calc(100vh - 26px)' : 'calc(100vh - 170px)'" v-loading="loading" :fit="false">
+        <el-table ref="mainTableRef" :data="tableData" border style="width: 100%" :max-height="isFullscreen ? 'calc(100vh - 26px)' : 'calc(100vh - 170px)'" v-loading="loading" :fit="false">
         <el-table-column prop="name" label="螺丝名称" width="160" sortable />
         <el-table-column prop="headType" label="头型" width="120" sortable :filters="headTypeFilters" :filter-method="filterHandler" />
         <el-table-column prop="punch" label="冲头" width="120" sortable>
@@ -214,7 +214,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { View } from '@element-plus/icons-vue'
 import type { FormInstance } from 'element-plus'
@@ -233,13 +233,16 @@ const dieList = ref<any[]>([])
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const isFullscreen = ref(false)
+const mainTableRef = ref<any>(null)
 const loading = ref(true)
 
-// 关联弹窗状态
+// 冲头关联弹窗
 const punchDialogVisible = ref(false)
 const punchDialogItems = ref<any[]>([])
 const punchDialogPrimary = ref('')
 const punchDialogRow = ref<any>({})
+
+// 牙板关联弹窗
 const dieDialogVisible = ref(false)
 const dieDialogItems = ref<any[]>([])
 const dieDialogPrimary = ref('')
@@ -249,6 +252,7 @@ async function toggleFullscreen() {
   const next = !isFullscreen.value
   isFullscreen.value = next
   try { await getCurrentWindow().setFullscreen(next) } catch {}
+  nextTick(() => { mainTableRef.value?.doLayout() })
 }
 
 onMounted(async () => {
@@ -485,6 +489,8 @@ async function handleSubmit() {
 .page-container.is-fullscreen .el-card { height: 100%; display: flex; flex-direction: column; margin: 0; border: none; border-radius: 0; box-shadow: none; }
 .page-container.is-fullscreen .el-card__header { display: none; }
 .page-container.is-fullscreen .el-card__body { flex: 1; overflow: auto; padding: 12px; }
+.page-container.is-fullscreen .el-table__body-wrapper { overflow: auto !important; }
+.page-container.is-fullscreen .el-table .el-table__fixed { height: calc(100% - 14px) !important; }
 
 .header-right { display: flex; gap: 8px; margin-left: auto; }
 </style>

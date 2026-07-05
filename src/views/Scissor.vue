@@ -20,7 +20,7 @@
 
       <el-tabs v-model="activeTab">
         <el-tab-pane label="剪刀信息" name="info">
-           <el-table :data="scissorList" border style="width: 100%" :max-height="isFullscreen ? 'calc(100vh - 26px)' : 'calc(100vh - 170px)'" v-loading="loading">
+           <el-table ref="mainTableRef" :data="scissorList" border style="width: 100%" :max-height="isFullscreen ? 'calc(100vh - 26px)' : 'calc(100vh - 170px)'" v-loading="loading">
             <el-table-column prop="name" label="名称" width="160" sortable />
             <el-table-column prop="diameter" label="口径" width="100" sortable />
             <el-table-column prop="wireMaterial" label="对应线材" width="120" sortable />
@@ -205,7 +205,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance } from 'element-plus'
 import { getCurrentWindow } from '@tauri-apps/api/window'
@@ -228,6 +228,7 @@ async function toggleFullscreen() {
   try {
     const win = getCurrentWindow()
     await win.setFullscreen(next)
+    nextTick(() => { mainTableRef.value?.doLayout() })
   } catch {}
 }
 
@@ -276,6 +277,7 @@ const useForm = ref({ scissorId: '', user: '', quantity: 1, useDate: getCurrentD
 const showLinkDialog = ref(false)
 const linkForm = ref({ scissorId: '', wireMaterial: '', remark: '' })
 
+const mainTableRef = ref<any>(null)
 // 表单引用
 const formRef = ref<FormInstance>()
 const orderFormRef = ref<FormInstance>()
@@ -458,6 +460,8 @@ async function handleDeleteLink(row: any) {
 .page-container.is-fullscreen .el-card { height: 100%; display: flex; flex-direction: column; margin: 0; border: none; border-radius: 0; box-shadow: none; }
 .page-container.is-fullscreen .el-card__header { display: none; }
 .page-container.is-fullscreen .el-card__body { flex: 1; overflow: auto; padding: 12px; }
+.page-container.is-fullscreen .el-table__body-wrapper { overflow: auto !important; }
+.page-container.is-fullscreen .el-table .el-table__fixed { height: calc(100% - 14px) !important; }
 
 .header-right {
   display: flex;
