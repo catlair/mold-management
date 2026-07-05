@@ -18,39 +18,41 @@
         </div>
       </template>
 
-        <el-table :data="tableData" border style="width: 100%" :max-height="isFullscreen ? 'calc(100vh - 26px)' : 'calc(100vh - 170px)'" v-loading="loading" :fit="false">
-        <el-table-column prop="name" label="螺丝名称" width="160" sortable />
-        <el-table-column prop="headType" label="头型" width="120" sortable :filters="headTypeFilters" :filter-method="filterHandler" />
-        <el-table-column prop="punch" label="冲头" width="120" sortable>
-          <template #default="{ row }">
-            <el-link v-if="row.punch" type="primary" :underline="false" @click="showPunchDialog(row)">{{ row.punch }}</el-link>
-            <span v-else>-</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="threadType" label="牙型" width="120" sortable :filters="threadTypeFilters" :filter-method="filterHandler" />
-        <el-table-column prop="die" label="牙板" width="120" sortable>
-          <template #default="{ row }">
-            <el-link v-if="row.die" type="success" :underline="false" @click="showDieDialog(row)">{{ row.die }}</el-link>
-            <span v-else>-</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="headSize" label="头/垫片大小" width="140" sortable />
-        <el-table-column prop="headHeight" label="头高" width="100" sortable />
-        <el-table-column prop="length" label="长度" width="100" sortable />
-        <el-table-column prop="threadDiameter" label="牙径" width="100" sortable />
-        <el-table-column prop="shankLength" label="光钉长度" width="120" sortable />
-        <el-table-column prop="wireMaterial" label="线材" width="100" sortable />
-        <el-table-column prop="plating" label="电镀" width="120" sortable :filters="platingFilters" :filter-method="filterHandler" />
-        <el-table-column prop="customer" label="客户名" width="120" sortable />
-        <el-table-column prop="externalId" label="外部ID" width="120" sortable />
-        <el-table-column prop="remark" label="备注" min-width="140" />
-        <el-table-column label="操作" width="150" fixed="right">
-          <template #default="{ row }">
-            <el-button size="small" @click="handleEdit(row)">编辑</el-button>
-            <el-button size="small" type="danger" v-if="allowDelete" @click="handleDelete(row)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+        <div class="table-scroll-wrapper" :style="{ height: isFullscreen ? 'calc(100vh - 26px)' : 'calc(100vh - 170px)' }">
+          <el-table :data="tableData" border style="width: 100%" v-loading="loading">
+            <el-table-column prop="name" label="螺丝名称" width="160" sortable />
+            <el-table-column prop="headType" label="头型" width="120" sortable :filters="headTypeFilters" :filter-method="filterHandler" />
+            <el-table-column prop="punch" label="冲头" width="120" sortable>
+              <template #default="{ row }">
+                <el-link v-if="row.punch" type="primary" :underline="false" @click="showPunchDialog(row)">{{ row.punch }}</el-link>
+                <span v-else>-</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="threadType" label="牙型" width="120" sortable :filters="threadTypeFilters" :filter-method="filterHandler" />
+            <el-table-column prop="die" label="牙板" width="120" sortable>
+              <template #default="{ row }">
+                <el-link v-if="row.die" type="success" :underline="false" @click="showDieDialog(row)">{{ row.die }}</el-link>
+                <span v-else>-</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="headSize" label="头/垫片大小" width="140" sortable />
+            <el-table-column prop="headHeight" label="头高" width="100" sortable />
+            <el-table-column prop="length" label="长度" width="100" sortable />
+            <el-table-column prop="threadDiameter" label="牙径" width="100" sortable />
+            <el-table-column prop="shankLength" label="光钉长度" width="120" sortable />
+            <el-table-column prop="wireMaterial" label="线材" width="100" sortable />
+            <el-table-column prop="plating" label="电镀" width="120" sortable :filters="platingFilters" :filter-method="filterHandler" />
+            <el-table-column prop="customer" label="客户名" width="120" sortable />
+            <el-table-column prop="externalId" label="外部ID" width="120" sortable />
+            <el-table-column prop="remark" label="备注" min-width="140" />
+            <el-table-column label="操作" width="150" fixed="right">
+              <template #default="{ row }">
+                <el-button size="small" @click="handleEdit(row)">编辑</el-button>
+                <el-button size="small" type="danger" v-if="allowDelete" @click="handleDelete(row)">删除</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
       <div v-if="!loading && tableData.length === 0" class="empty-state">
         <el-empty description="暂无数据" />
       </div>
@@ -485,6 +487,8 @@ async function handleSubmit() {
 .page-container.is-fullscreen .el-card { height: 100%; display: flex; flex-direction: column; margin: 0; border: none; border-radius: 0; box-shadow: none; }
 .page-container.is-fullscreen .el-card__header { display: none; }
 .page-container.is-fullscreen .el-card__body { flex: 1; overflow: auto; padding: 12px; }
+
+.table-scroll-wrapper { overflow: auto; }
 
 .header-right { display: flex; gap: 8px; margin-left: auto; }
 </style>
