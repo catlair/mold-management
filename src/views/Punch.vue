@@ -23,7 +23,7 @@
           <el-table :data="punchList" border style="width: 100%" v-loading="loading">
             <el-table-column prop="name" label="名称" width="160" sortable>
               <template #default="{ row }">
-                <el-link type="primary" :underline="false" @click="showLinkedScrews(row)">{{ toShortCode(row.name) || row.name }}</el-link>
+                <el-link type="primary" :underline="false" @click="showLinkedScrews(row)">{{ row.name }}</el-link>
               </template>
             </el-table-column>
             <el-table-column prop="spec" label="规格" width="80" sortable />
@@ -242,7 +242,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance } from 'element-plus'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { punchApi, punchOrderApi, punchUseApi, punchLinkApi, screwSpecApi, stockCalcApi } from '../api'
-import { toFullName, toShortCode } from '../utils/punchName'
+import { toFullName } from '../utils/punchName'
 
 function getCurrentDateTime() {
   const d = new Date()
