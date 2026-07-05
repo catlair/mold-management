@@ -20,7 +20,7 @@
 
       <el-tabs v-model="activeTab">
         <el-tab-pane label="牙板信息" name="info">
-          <el-table :data="dieList" border style="width: 100%" v-loading="loading">
+           <el-table :data="dieList" border style="width: 100%" v-loading="loading" max-height="calc(100vh - 200px)">
             <el-table-column prop="name" label="名称" width="160" sortable>
               <template #default="{ row }">
                 <el-link type="primary" :underline="false" @click="showLinkedScrews(row)">{{ row.name }}</el-link>

@@ -20,7 +20,7 @@
 
       <el-tabs v-model="activeTab">
         <el-tab-pane label="上冲信息" name="info">
-          <el-table :data="upperPunchList" border style="width: 100%" v-loading="loading">
+           <el-table :data="upperPunchList" border style="width: 100%" v-loading="loading" max-height="calc(100vh - 200px)">
             <el-table-column prop="name" label="名称" width="160" sortable />
             <el-table-column prop="diameter" label="口径" width="100" sortable />
             <el-table-column prop="wireMaterial" label="对应线材" width="120" sortable />
