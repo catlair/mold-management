@@ -5,9 +5,9 @@
       placeholder="搜索... (Ctrl+K)"
       prefix-icon="Search"
       clearable
-      @focus="openSearch"
       @click="openSearch"
       readonly
+      tabindex="-1"
       class="search-input"
     />
     <el-dialog
@@ -15,7 +15,7 @@
       width="600px"
       :show-close="false"
       class="search-dialog"
-      @close="keyword = ''"
+      @close="onDialogClose"
     >
       <el-input
         ref="searchInputRef"
@@ -73,6 +73,19 @@ const groups = ref<any[]>([])
 
 let searchTimer: any = null
 
+function openSearch() {
+  visible.value = true
+  nextTick(() => {
+    setTimeout(() => {
+      searchInputRef.value?.focus()
+    }, 100)
+  })
+}
+
+function onDialogClose() {
+  keyword.value = ''
+}
+
 interface SearchResult {
   id: string
   name: string
@@ -85,15 +98,6 @@ interface SearchGroup {
   color: string
   icon: any
   items: SearchResult[]
-}
-
-function openSearch() {
-  visible.value = true
-  nextTick(() => {
-    setTimeout(() => {
-      searchInputRef.value?.focus()
-    }, 100)
-  })
 }
 
 function onSearch() {
