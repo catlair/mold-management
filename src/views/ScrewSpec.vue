@@ -18,7 +18,7 @@
         </div>
       </template>
 
-        <el-table :data="tableData" border style="width: 100%" max-height="calc(100vh - 200px)" v-loading="loading">
+        <el-table :data="tableData" border style="width: 100%" max-height="calc(100vh - 50px)" v-loading="loading">
         <el-table-column prop="name" label="螺丝名称" width="160" sortable />
         <el-table-column prop="headType" label="头型" width="120" sortable :filters="headTypeFilters" :filter-method="filterHandler" />
         <el-table-column prop="punch" label="冲头" width="120" sortable>

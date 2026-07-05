@@ -20,7 +20,7 @@
 
       <el-tabs v-model="activeTab">
         <el-tab-pane label="皮带信息" name="info">
-           <el-table :data="beltList" border style="width: 100%" max-height="calc(100vh - 200px)" v-loading="loading">
+           <el-table :data="beltList" border style="width: 100%" max-height="calc(100vh - 50px)" v-loading="loading">
             <el-table-column prop="name" label="名称" width="160" sortable />
             <el-table-column prop="machine" label="适用机器" width="120" sortable :filters="machineFilters" :filter-method="filterHandler" />
             <el-table-column prop="safetyStock" label="安全库存" width="100" sortable />
