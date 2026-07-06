@@ -18,7 +18,8 @@
         </div>
       </template>
 
-        <el-table ref="mainTableRef" :data="tableData" border style="width: 100%" :max-height="isFullscreen ? 'calc(100vh - 26px)' : 'calc(100vh - 170px)'" v-loading="loading" :fit="false">
+        <div class="table-wrapper" :style="{ height: isFullscreen ? 'calc(100vh - 26px)' : 'calc(100vh - 170px)' }">
+        <el-table ref="mainTableRef" :data="tableData" border v-loading="loading">
         <el-table-column prop="name" label="螺丝名称" width="160" sortable />
         <el-table-column prop="headType" label="头型" width="120" sortable :filters="headTypeFilters" :filter-method="filterHandler" />
         <el-table-column prop="punch" label="冲头" width="120" sortable>
@@ -51,6 +52,7 @@
           </template>
         </el-table-column>
       </el-table>
+        </div>
       <div v-if="!loading && tableData.length === 0" class="empty-state">
         <el-empty description="暂无数据" />
       </div>
@@ -490,8 +492,6 @@ async function handleSubmit() {
 .page-container.is-fullscreen .el-card { height: 100%; display: flex; flex-direction: column; margin: 0; border: none; border-radius: 0; box-shadow: none; }
 .page-container.is-fullscreen .el-card__header { display: none; }
 .page-container.is-fullscreen .el-card__body { flex: 1; overflow: auto; padding: 12px; }
-.page-container.is-fullscreen :deep(.el-table__body-wrapper) { overflow: auto !important; }
-.page-container.is-fullscreen :deep(.el-table__fixed) { height: calc(100% - 14px) !important; }
-
+.table-wrapper { overflow: auto; }
 .header-right { display: flex; gap: 8px; margin-left: auto; }
 </style>
