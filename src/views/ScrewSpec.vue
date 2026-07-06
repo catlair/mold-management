@@ -52,7 +52,7 @@
         </el-table-column>
       </el-table>
       <!-- 自定义水平滚动条 -->
-      <div v-if="hasHScroll" class="custom-h-scrollbar" ref="hScrollRef">
+      <div class="custom-h-scrollbar" ref="hScrollRef">
         <div class="custom-h-thumb" :style="{ width: hThumbWidth + 'px', transform: `translateX(${hThumbLeft}px)` }" @mousedown="onThumbMouseDown"></div>
       </div>
       <div v-if="!loading && tableData.length === 0" class="empty-state">
@@ -252,15 +252,15 @@ let dragStartLeft = 0
 function syncHScroll() {
   const tableEl = mainTableRef.value?.$el
   if (!tableEl) return
-  const bodyWrapper = tableEl.querySelector('.el-table__body-wrapper')
-  if (!bodyWrapper) return
-  const scrollWidth = bodyWrapper.scrollWidth
-  const clientWidth = bodyWrapper.clientWidth
+  // el-table max-height 模式下，水平滚动在 .el-scrollbar__wrap 或 .el-table__body-wrapper
+  const scrollEl = tableEl.querySelector('.el-scrollbar__wrap') || tableEl.querySelector('.el-table__body-wrapper')
+  if (!scrollEl) return
+  const scrollWidth = scrollEl.scrollWidth
+  const clientWidth = scrollEl.clientWidth
   hasHScroll.value = scrollWidth > clientWidth
-  if (!hasHScroll.value) return
   const scrollbarWidth = hScrollRef.value?.clientWidth || clientWidth
-  hThumbWidth.value = Math.max(30, (clientWidth / scrollWidth) * scrollbarWidth)
-  hThumbLeft.value = (bodyWrapper.scrollLeft / scrollWidth) * scrollbarWidth
+  hThumbWidth.value = hasHScroll.value ? Math.max(30, (clientWidth / scrollWidth) * scrollbarWidth) : scrollbarWidth
+  hThumbLeft.value = hasHScroll.value ? (scrollEl.scrollLeft / (scrollWidth - clientWidth)) * (scrollbarWidth - hThumbWidth.value) : 0
 }
 
 function onThumbMouseDown(e: MouseEvent) {
