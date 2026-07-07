@@ -243,7 +243,6 @@ onMounted(() => {
 /* 表格样式 */
 .el-table {
   border-radius: 10px;
-  overflow: hidden;
 }
 
 /* 全屏模式表格高度更大 */
@@ -299,7 +298,6 @@ onMounted(() => {
   border-radius: 12px;
   border: 1px solid var(--border);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
-  overflow: hidden;
 }
 
 .el-card__header {
@@ -308,6 +306,7 @@ onMounted(() => {
 }
 
 .el-card__body {
+  overflow: visible;
   padding: 20px 24px;
 }
 
