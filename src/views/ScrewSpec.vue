@@ -51,10 +51,6 @@
           </template>
         </el-table-column>
       </el-table>
-      <!-- 自定义水平滚动条 -->
-      <div class="custom-h-scrollbar" ref="hScrollRef">
-        <div class="custom-h-thumb" :style="{ width: hThumbWidth + 'px', transform: `translateX(${hThumbLeft}px)` }" @mousedown="onThumbMouseDown"></div>
-      </div>
       <div v-if="!loading && tableData.length === 0" class="empty-state">
         <el-empty description="暂无数据" />
       </div>
@@ -218,7 +214,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { View } from '@element-plus/icons-vue'
 import type { FormInstance } from 'element-plus'
@@ -239,64 +235,6 @@ const isEdit = ref(false)
 const isFullscreen = ref(false)
 const mainTableRef = ref<any>(null)
 const loading = ref(true)
-
-// 自定义水平滚动条
-const hScrollRef = ref<any>(null)
-const hThumbWidth = ref(100)
-const hThumbLeft = ref(0)
-const hasHScroll = ref(false)
-let isDragging = false
-let dragStartX = 0
-let dragStartLeft = 0
-
-function syncHScroll() {
-  const tableEl = mainTableRef.value?.$el
-  if (!tableEl) return
-  // el-table max-height 模式下，水平滚动在 .el-scrollbar__wrap 或 .el-table__body-wrapper
-  const scrollEl = tableEl.querySelector('.el-scrollbar__wrap') || tableEl.querySelector('.el-table__body-wrapper')
-  if (!scrollEl) return
-  const scrollWidth = scrollEl.scrollWidth
-  const clientWidth = scrollEl.clientWidth
-  hasHScroll.value = scrollWidth > clientWidth
-  const scrollbarWidth = hScrollRef.value?.clientWidth || clientWidth
-  hThumbWidth.value = hasHScroll.value ? Math.max(30, (clientWidth / scrollWidth) * scrollbarWidth) : scrollbarWidth
-  hThumbLeft.value = hasHScroll.value ? (scrollEl.scrollLeft / (scrollWidth - clientWidth)) * (scrollbarWidth - hThumbWidth.value) : 0
-}
-
-function onThumbMouseDown(e: MouseEvent) {
-  isDragging = true
-  dragStartX = e.clientX
-  dragStartLeft = hThumbLeft.value
-  e.preventDefault()
-}
-
-function onDocMouseMove(e: MouseEvent) {
-  if (!isDragging) return
-  const scrollbarWidth = hScrollRef.value?.clientWidth || 1
-  const bodyWrapper = mainTableRef.value?.$el?.querySelector('.el-table__body-wrapper')
-  if (!bodyWrapper) return
-  const dx = e.clientX - dragStartX
-  const maxLeft = scrollbarWidth - hThumbWidth.value
-  const newLeft = Math.max(0, Math.min(maxLeft, dragStartLeft + dx))
-  hThumbLeft.value = newLeft
-  bodyWrapper.scrollLeft = (newLeft / scrollbarWidth) * bodyWrapper.scrollWidth
-}
-
-function onDocMouseUp() {
-  isDragging = false
-}
-
-onMounted(() => {
-  document.addEventListener('mousemove', onDocMouseMove)
-  document.addEventListener('mouseup', onDocMouseUp)
-  // 定时检测滚动状态
-  setInterval(syncHScroll, 500)
-})
-
-onUnmounted(() => {
-  document.removeEventListener('mousemove', onDocMouseMove)
-  document.removeEventListener('mouseup', onDocMouseUp)
-})
 
 // 冲头关联弹窗
 const punchDialogVisible = ref(false)
@@ -552,27 +490,8 @@ async function handleSubmit() {
 .page-container.is-fullscreen .el-card { height: 100%; display: flex; flex-direction: column; margin: 0; border: none; border-radius: 0; box-shadow: none; }
 .page-container.is-fullscreen .el-card__header { display: none; }
 .page-container.is-fullscreen .el-card__body { flex: 1; overflow: auto; padding: 12px; }
-
-/* 自定义水平滚动条 */
-.custom-h-scrollbar {
-  position: relative;
-  height: 10px;
-  background: #f0f2f5;
-  border-radius: 5px;
-  margin-top: 4px;
-  cursor: pointer;
-}
-.custom-h-thumb {
-  position: absolute;
-  top: 2px;
-  height: 6px;
-  background: #b0b4bc;
-  border-radius: 3px;
-  cursor: grab;
-  transition: background 0.15s;
-}
-.custom-h-thumb:hover { background: #909399; }
-.custom-h-thumb:active { cursor: grabbing; background: #606266; }
+.page-container.is-fullscreen :deep(.el-table__body-wrapper) { overflow: auto !important; }
+.page-container.is-fullscreen :deep(.el-table__fixed) { height: calc(100% - 14px) !important; }
 
 .header-right { display: flex; gap: 8px; margin-left: auto; }
 </style>
