@@ -489,7 +489,9 @@ async function handleSubmit() {
 .page-container.is-fullscreen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 2000; background: #fff; padding: 0; overflow: auto; }
 .page-container.is-fullscreen .el-card { height: 100%; display: flex; flex-direction: column; margin: 0; border: none; border-radius: 0; box-shadow: none; }
 .page-container.is-fullscreen .el-card__header { display: none; }
-.page-container.is-fullscreen .el-card__body { flex: 1; overflow: hidden; padding: 12px; }
+.page-container.is-fullscreen .el-card__body { flex: 1; overflow: auto; padding: 12px; }
+.page-container.is-fullscreen .el-table__body-wrapper { overflow: auto !important; }
+.page-container.is-fullscreen .el-table .el-table__fixed { height: calc(100% - 14px) !important; }
 
 /* 强制el-table水平滚动条始终可见 */
 :deep(.el-table) .el-scrollbar__bar.is-horizontal {
