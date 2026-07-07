@@ -490,8 +490,15 @@ async function handleSubmit() {
 .page-container.is-fullscreen .el-card { height: 100%; display: flex; flex-direction: column; margin: 0; border: none; border-radius: 0; box-shadow: none; }
 .page-container.is-fullscreen .el-card__header { display: none; }
 .page-container.is-fullscreen .el-card__body { flex: 1; overflow: hidden; padding: 12px; }
-.page-container.is-fullscreen :deep(.el-table__body-wrapper) { overflow: auto !important; }
-.page-container.is-fullscreen :deep(.el-table__fixed) { height: calc(100% - 14px) !important; }
+
+/* 强制el-table水平滚动条始终可见 */
+:deep(.el-table) .el-scrollbar__bar.is-horizontal {
+  display: block !important;
+  height: 8px !important;
+}
+:deep(.el-table) .el-scrollbar__bar.is-horizontal .el-scrollbar__thumb {
+  background-color: #b0b4bc !important;
+}
 
 .header-right { display: flex; gap: 8px; margin-left: auto; }
 </style>
