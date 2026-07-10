@@ -18,9 +18,10 @@
         </div>
       </template>
 
+      <div class="table-wrapper" :style="{ height: isFullscreen ? 'calc(100vh - 60px)' : 'calc(100vh - 140px)' }">
       <vxe-table
+        ref="vxeTableRef"
         :data="tableData"
-        :height="isFullscreen ? 'calc(100vh - 60px)' : 'calc(100vh - 140px)'"
         :scroll-x="{ enabled: true, gt: 0 }"
         border
         :loading="loading"
@@ -58,6 +59,7 @@
           </template>
         </vxe-column>
       </vxe-table>
+      </div>
 
       <div v-if="!loading && tableData.length === 0" class="empty-state">
         <el-empty description="暂无数据" />
@@ -472,5 +474,6 @@ async function handleSubmit() {
 .page-container.is-fullscreen .el-card { height: 100%; display: flex; flex-direction: column; margin: 0; border: none; border-radius: 0; box-shadow: none; }
 .page-container.is-fullscreen .el-card__header { display: none; }
 .page-container.is-fullscreen .el-card__body { flex: 1; overflow: hidden; padding: 12px; }
+.table-wrapper { overflow: auto; }
 .header-right { display: flex; gap: 8px; margin-left: auto; }
 </style>
