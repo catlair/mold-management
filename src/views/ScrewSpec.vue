@@ -22,7 +22,6 @@
         :data="tableData"
         :height="isFullscreen ? 'calc(100vh - 60px)' : 'calc(100vh - 140px)'"
         :scroll-x="{ enabled: true, gt: 0 }"
-        :scroll-y="{ enabled: true, gt: 0 }"
         border
         :loading="loading"
         :show-overflow="true"
