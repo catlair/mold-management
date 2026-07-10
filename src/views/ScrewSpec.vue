@@ -18,7 +18,7 @@
         </div>
       </template>
 
-        <el-table ref="mainTableRef" :data="tableData" border style="width: 100%" :max-height="isFullscreen ? 'calc(100vh - 26px)' : 'calc(100vh - 170px)'" v-loading="loading" :fit="false">
+        <el-table ref="mainTableRef" :data="tableData" border style="width: 100%" :max-height="isFullscreen ? 'calc(100vh - 26px)' : 'calc(100vh - 170px)'" v-loading="loading" :fit="false" @scroll="onTableScroll">
         <el-table-column prop="name" label="螺丝名称" width="160" sortable />
         <el-table-column prop="headType" label="头型" width="120" sortable :filters="headTypeFilters" :filter-method="filterHandler" />
         <el-table-column prop="punch" label="冲头" width="120" sortable>
@@ -51,6 +51,9 @@
           </template>
         </el-table-column>
       </el-table>
+      <div class="h-scrollbar-bar" ref="hBarRef" @mousedown="onBarMouseDown">
+        <div class="h-scrollbar-thumb" :style="{ width: hThumbW + 'px', left: hThumbL + 'px' }"></div>
+      </div>
       <div v-if="!loading && tableData.length === 0" class="empty-state">
         <el-empty description="暂无数据" />
       </div>
@@ -235,6 +238,48 @@ const isEdit = ref(false)
 const isFullscreen = ref(false)
 const mainTableRef = ref<any>(null)
 const loading = ref(true)
+
+// 水平滚动条
+const hBarRef = ref<any>(null)
+const hThumbW = ref(100)
+const hThumbL = ref(0)
+let dragLock = false
+
+function onTableScroll({ scrollLeft }: { scrollLeft: number; scrollTop: number }) {
+  if (dragLock) return
+  const wrap = mainTableRef.value?.$el?.querySelector('.el-scrollbar__wrap')
+  if (!wrap) return
+  const maxScroll = wrap.scrollWidth - wrap.clientWidth
+  if (maxScroll <= 0) { hThumbW.value = hBarRef.value?.clientWidth || 100; hThumbL.value = 0; return }
+  const barW = hBarRef.value?.clientWidth || 1
+  hThumbW.value = Math.max(30, (wrap.clientWidth / wrap.scrollWidth) * barW)
+  hThumbL.value = (scrollLeft / maxScroll) * (barW - hThumbW.value)
+}
+
+function onBarMouseDown(e: MouseEvent) {
+  dragLock = true
+  const startX = e.clientX
+  const startLeft = hThumbL.value
+  const barW = hBarRef.value?.clientWidth || 1
+  const wrap = mainTableRef.value?.$el?.querySelector('.el-scrollbar__wrap')
+  const maxScroll = wrap ? wrap.scrollWidth - wrap.clientWidth : 1
+
+  function onMove(ev: MouseEvent) {
+    const dx = ev.clientX - startX
+    const maxL = barW - hThumbW.value
+    const newL = Math.max(0, Math.min(maxL, startLeft + dx))
+    hThumbL.value = newL
+    if (wrap) wrap.scrollLeft = (newL / maxL) * maxScroll
+  }
+  function onUp() {
+    dragLock = false
+    document.removeEventListener('mousemove', onMove)
+    document.removeEventListener('mouseup', onUp)
+  }
+  document.addEventListener('mousemove', onMove)
+  document.addEventListener('mouseup', onUp)
+  e.preventDefault()
+}
 
 // 冲头关联弹窗
 const punchDialogVisible = ref(false)
@@ -489,18 +534,12 @@ async function handleSubmit() {
 .page-container.is-fullscreen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 2000; background: #fff; padding: 0; overflow: auto; }
 .page-container.is-fullscreen .el-card { height: 100%; display: flex; flex-direction: column; margin: 0; border: none; border-radius: 0; box-shadow: none; }
 .page-container.is-fullscreen .el-card__header { display: none; }
-.page-container.is-fullscreen .el-card__body { flex: 1; overflow: auto; padding: 12px; }
-.page-container.is-fullscreen .el-table__body-wrapper { overflow: auto !important; }
-.page-container.is-fullscreen .el-table .el-table__fixed { height: calc(100% - 14px) !important; }
+.page-container.is-fullscreen .el-card__body { flex: 1; overflow: hidden; padding: 12px; }
 
-/* 强制el-table水平滚动条始终可见 */
-:deep(.el-table) .el-scrollbar__bar.is-horizontal {
-  display: block !important;
-  height: 8px !important;
-}
-:deep(.el-table) .el-scrollbar__bar.is-horizontal .el-scrollbar__thumb {
-  background-color: #b0b4bc !important;
-}
+.h-scrollbar-bar { position: relative; height: 8px; background: #e4e7ed; border-radius: 4px; margin-top: 2px; cursor: pointer; }
+.h-scrollbar-thumb { position: absolute; top: 0; height: 8px; background: #b0b4bc; border-radius: 4px; cursor: grab; transition: background 0.15s; }
+.h-scrollbar-thumb:hover { background: #909399; }
+.h-scrollbar-thumb:active { cursor: grabbing; background: #606266; }
 
 .header-right { display: flex; gap: 8px; margin-left: auto; }
 </style>
