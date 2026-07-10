@@ -297,8 +297,10 @@ async function toggleFullscreen() {
   const next = !isFullscreen.value
   isFullscreen.value = next
   try { await getCurrentWindow().setFullscreen(next) } catch {}
-  // 等待全屏过渡动画完成后再重绘表格
-  setTimeout(() => { mainTableRef.value?.doLayout() }, 500)
+  setTimeout(() => {
+    mainTableRef.value?.doLayout()
+    onTableScroll({ scrollLeft: 0, scrollTop: 0 })
+  }, 500)
 }
 
 onMounted(async () => {
