@@ -1,49 +1,35 @@
 {
   "name": "mold-management",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "vue-tsc -b && vite build",
+    "build:sidecar": "bash scripts/build-sidecar.sh",
+    "build:app": "npm run build:sidecar && npx tauri build",
     "preview": "vite preview",
-    "tauri": "tauri dev"
+    "server": "node sidecar/server.js",
+    "tauri": "concurrently \"npm run server\" \"tauri dev\""
   },
   "dependencies": {
-    "@radix-ui/react-alert-dialog": "^1.1.0",
-    "@radix-ui/react-dialog": "^1.1.0",
-    "@radix-ui/react-label": "^2.1.0",
-    "@radix-ui/react-scroll-area": "^1.2.0",
-    "@radix-ui/react-select": "^2.1.0",
-    "@radix-ui/react-separator": "^1.1.0",
-    "@radix-ui/react-slot": "^1.1.0",
-    "@radix-ui/react-switch": "^1.1.0",
-    "@radix-ui/react-tabs": "^1.1.0",
-    "@radix-ui/react-tooltip": "^1.1.0",
-    "@tanstack/react-table": "^8.21.0",
+    "@element-plus/icons-vue": "^2.3.2",
     "@tauri-apps/plugin-dialog": "^2.7.1",
     "@tauri-apps/plugin-fs": "^2.5.1",
-    "class-variance-authority": "^0.7.0",
-    "clsx": "^2.1.0",
-    "cmdk": "^1.0.0",
-    "lucide-react": "^0.460.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-router-dom": "^6.28.0",
-    "sonner": "^1.7.0",
-    "tailwind-merge": "^2.6.0",
-    "tailwindcss-animate": "^1.0.7",
-    "zustand": "^5.0.0"
+    "element-plus": "^2.14.2",
+    "vue": "^3.5.38",
+    "vue-router": "^5.1.0"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.11.3",
-    "@types/react": "^18.3.12",
-    "@types/react-dom": "^18.3.1",
-    "@vitejs/plugin-react": "^4.3.4",
-    "autoprefixer": "^10.4.20",
-    "postcss": "^8.4.49",
-    "tailwindcss": "^3.4.17",
-    "typescript": "~5.6.0",
-    "vite": "^6.0.0"
+    "@types/node": "^24.13.2",
+    "@vitejs/plugin-vue": "^6.0.7",
+    "@vue/tsconfig": "^0.9.1",
+    "concurrently": "^10.0.3",
+    "png-to-ico": "^3.0.1",
+    "png2icons": "^2.0.1",
+    "typescript": "~6.0.2",
+    "vite": "^8.1.0",
+    "vue-tsc": "^3.3.5"
   }
 }
