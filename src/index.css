@@ -1,0 +1,84 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 225 20% 97%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --primary: 230 70% 55%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 225 15% 94%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 225 15% 94%;
+    --muted-foreground: 218 11% 45%;
+    --accent: 225 15% 94%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 230 70% 55%;
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  }
+}
+
+/* 全局表格样式 */
+.table-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.table-container .card-content {
+  flex: 1;
+  overflow: auto;
+  padding: 12px;
+}
+
+/* 水平滚动条 */
+.h-scrollbar-bar {
+  position: relative;
+  height: 8px;
+  background: hsl(var(--secondary));
+  border-radius: 4px;
+  margin-top: 2px;
+  cursor: pointer;
+}
+.h-scrollbar-thumb {
+  position: absolute;
+  top: 0;
+  height: 8px;
+  background: hsl(var(--muted-foreground) / 0.4);
+  border-radius: 4px;
+  cursor: grab;
+  transition: background 0.15s;
+}
+.h-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.6);
+}
+.h-scrollbar-thumb:active {
+  cursor: grabbing;
+  background: hsl(var(--muted-foreground) / 0.8);
+}
+
+/* 搜索高亮动画 */
+.highlight-flash {
+  animation: flash-highlight 2s ease;
+}
+@keyframes flash-highlight {
+  0%, 100% { background: inherit; }
+  10%, 30%, 50% { background: hsl(var(--primary) / 0.08) !important; }
+  20%, 40% { background: hsl(var(--primary) / 0.15) !important; }
+}
