@@ -536,6 +536,11 @@ async function handleSubmit() {
 .page-container.is-fullscreen .el-card__header { display: none; }
 .page-container.is-fullscreen .el-card__body { flex: 1; overflow: hidden; padding: 12px; }
 
+/* 隐藏el-table自带的水平滚动条 */
+:deep(.el-table__body-wrapper)::-webkit-scrollbar { height: 0; }
+:deep(.el-table .el-scrollbar__bar.is-horizontal) { display: none !important; }
+
+/* 自定义水平滚动条 */
 .h-scrollbar-bar { position: relative; height: 8px; background: #e4e7ed; border-radius: 4px; margin-top: 2px; cursor: pointer; }
 .h-scrollbar-thumb { position: absolute; top: 0; height: 8px; background: #b0b4bc; border-radius: 4px; cursor: grab; transition: background 0.15s; }
 .h-scrollbar-thumb:hover { background: #909399; }
