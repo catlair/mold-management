@@ -217,7 +217,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { View } from '@element-plus/icons-vue'
 import type { FormInstance } from 'element-plus'
@@ -307,6 +307,11 @@ onMounted(async () => {
   try { isFullscreen.value = await getCurrentWindow().isFullscreen() } catch {}
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && isFullscreen.value) toggleFullscreen() })
   loadData()
+})
+
+// 数据加载后初始化滚动条位置
+watch(tableData, () => {
+  nextTick(() => setTimeout(() => onTableScroll({ scrollLeft: 0, scrollTop: 0 }), 200))
 })
 
 const formRef = ref<FormInstance>()
