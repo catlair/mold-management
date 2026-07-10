@@ -18,8 +18,7 @@
         </div>
       </template>
 
-        <div class="table-scroll-wrapper" :style="{ height: isFullscreen ? 'calc(100vh - 40px)' : 'calc(100vh - 184px)' }">
-        <el-table :data="tableData" border :fit="false" v-loading="loading">
+        <el-table ref="mainTableRef" :data="tableData" border style="width: 100%" :max-height="isFullscreen ? 'calc(100vh - 40px)' : 'calc(100vh - 184px)'" v-loading="loading" :fit="false">
         <el-table-column prop="name" label="螺丝名称" width="160" sortable />
         <el-table-column prop="headType" label="头型" width="120" sortable :filters="headTypeFilters" :filter-method="filterHandler" />
         <el-table-column prop="punch" label="冲头" width="120" sortable>
@@ -52,7 +51,9 @@
           </template>
         </el-table-column>
       </el-table>
-        </div>
+      <div class="h-scrollbar-bar" ref="hBarRef" @mousedown="onBarMouseDown">
+        <div class="h-scrollbar-thumb" :style="{ width: hThumbW + 'px', left: hThumbL + 'px' }"></div>
+      </div>
       <div v-if="!loading && tableData.length === 0" class="empty-state">
         <el-empty description="暂无数据" />
       </div>
@@ -216,7 +217,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { View } from '@element-plus/icons-vue'
 import type { FormInstance } from 'element-plus'
@@ -235,7 +236,57 @@ const dieList = ref<any[]>([])
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const isFullscreen = ref(false)
+const mainTableRef = ref<any>(null)
 const loading = ref(true)
+
+// 水平滚动条
+const hBarRef = ref<any>(null)
+const hThumbW = ref(100)
+const hThumbL = ref(0)
+let dragLock = false
+let scrollPollTimer: any = null
+
+function syncHBar() {
+  if (dragLock) return
+  const wrap = mainTableRef.value?.$el?.querySelector('.el-scrollbar__wrap')
+  const bar = hBarRef.value
+  if (!wrap || !bar) return
+  const maxScroll = wrap.scrollWidth - wrap.clientWidth
+  if (maxScroll <= 0) { hThumbW.value = bar.clientWidth; hThumbL.value = 0; return }
+  const barW = bar.clientWidth
+  hThumbW.value = Math.max(30, (wrap.clientWidth / wrap.scrollWidth) * barW)
+  hThumbL.value = (wrap.scrollLeft / maxScroll) * (barW - hThumbW.value)
+}
+
+function onBarMouseDown(e: MouseEvent) {
+  dragLock = true
+  const startX = e.clientX
+  const startLeft = hThumbL.value
+  const bar = hBarRef.value
+  const wrap = mainTableRef.value?.$el?.querySelector('.el-scrollbar__wrap')
+  const barW = bar?.clientWidth || 1
+  const maxScroll = wrap ? wrap.scrollWidth - wrap.clientWidth : 1
+
+  function onMove(ev: MouseEvent) {
+    const dx = ev.clientX - startX
+    const maxL = barW - hThumbW.value
+    const newL = Math.max(0, Math.min(maxL, startLeft + dx))
+    hThumbL.value = newL
+    if (wrap) wrap.scrollLeft = (newL / maxL) * maxScroll
+  }
+  function onUp() {
+    dragLock = false
+    document.removeEventListener('mousemove', onMove)
+    document.removeEventListener('mouseup', onUp)
+  }
+  document.addEventListener('mousemove', onMove)
+  document.addEventListener('mouseup', onUp)
+  e.preventDefault()
+}
+
+// 定时轮询同步滚动条位置
+onMounted(() => { scrollPollTimer = setInterval(syncHBar, 200) })
+onUnmounted(() => { clearInterval(scrollPollTimer) })
 
 // 冲头关联弹窗
 const punchDialogVisible = ref(false)
@@ -253,6 +304,7 @@ async function toggleFullscreen() {
   const next = !isFullscreen.value
   isFullscreen.value = next
   try { await getCurrentWindow().setFullscreen(next) } catch {}
+  setTimeout(() => { mainTableRef.value?.doLayout() }, 500)
 }
 
 onMounted(async () => {
@@ -488,7 +540,8 @@ async function handleSubmit() {
 .page-container.is-fullscreen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 2000; background: #fff; padding: 0; overflow: auto; }
 .page-container.is-fullscreen .el-card { height: 100%; display: flex; flex-direction: column; margin: 0; border: none; border-radius: 0; box-shadow: none; }
 .page-container.is-fullscreen .el-card__header { display: none; }
-.page-container.is-fullscreen .el-card__body { flex: 1; overflow: hidden; padding: 12px; }
-.table-scroll-wrapper { overflow: auto; }
+.page-container.is-fullscreen .el-card__body { flex: 1; overflow: auto; padding: 12px; }
+.h-scrollbar-bar { position: sticky; bottom: 0; height: 8px; background: #e4e7ed; border-radius: 4px; margin-top: 4px; cursor: pointer; z-index: 10; }
+
 .header-right { display: flex; gap: 8px; margin-left: auto; }
 </style>
