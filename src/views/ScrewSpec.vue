@@ -541,6 +541,7 @@ async function handleSubmit() {
 .page-container.is-fullscreen .el-card { height: 100%; display: flex; flex-direction: column; margin: 0; border: none; border-radius: 0; box-shadow: none; }
 .page-container.is-fullscreen .el-card__header { display: none; }
 .page-container.is-fullscreen .el-card__body { flex: 1; overflow: auto; padding: 12px; }
+.page-container:not(.is-fullscreen) .el-card__body { overflow: auto; }
 .h-scrollbar-bar { position: sticky; bottom: 0; height: 8px; background: #e4e7ed; border-radius: 4px; margin-top: 4px; cursor: pointer; z-index: 10; }
 
 .header-right { display: flex; gap: 8px; margin-left: auto; }
