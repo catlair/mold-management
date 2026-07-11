@@ -18,47 +18,42 @@
         </div>
       </template>
 
-      <vxe-table
-        ref="vxeTableRef"
-        :data="tableData"
-        border
-        :loading="loading"
-        :show-overflow="true"
-        :scroll-x="{ enabled: true, gt: 0 }"
-      >
-        <vxe-column field="name" title="螺丝名称" width="160" sortable />
-        <vxe-column field="headType" title="头型" width="120" sortable />
-        <vxe-column field="punch" title="冲头" width="120" sortable>
+        <el-table ref="mainTableRef" :data="tableData" border style="width: 100%" :max-height="isFullscreen ? 'calc(100vh - 40px)' : 'calc(100vh - 184px)'" v-loading="loading" :fit="false">
+        <el-table-column prop="name" label="螺丝名称" width="160" sortable />
+        <el-table-column prop="headType" label="头型" width="120" sortable :filters="headTypeFilters" :filter-method="filterHandler" />
+        <el-table-column prop="punch" label="冲头" width="120" sortable>
           <template #default="{ row }">
             <el-link v-if="row.punch" type="primary" :underline="false" @click="showPunchDialog(row)">{{ row.punch }}</el-link>
             <span v-else>-</span>
           </template>
-        </vxe-column>
-        <vxe-column field="threadType" title="牙型" width="120" sortable />
-        <vxe-column field="die" title="牙板" width="120" sortable>
+        </el-table-column>
+        <el-table-column prop="threadType" label="牙型" width="120" sortable :filters="threadTypeFilters" :filter-method="filterHandler" />
+        <el-table-column prop="die" label="牙板" width="120" sortable>
           <template #default="{ row }">
             <el-link v-if="row.die" type="success" :underline="false" @click="showDieDialog(row)">{{ row.die }}</el-link>
             <span v-else>-</span>
           </template>
-        </vxe-column>
-        <vxe-column field="headSize" title="头/垫片大小" width="140" sortable />
-        <vxe-column field="headHeight" title="头高" width="100" sortable />
-        <vxe-column field="length" title="长度" width="100" sortable />
-        <vxe-column field="threadDiameter" title="牙径" width="100" sortable />
-        <vxe-column field="shankLength" title="光钉长度" width="120" sortable />
-        <vxe-column field="wireMaterial" title="线材" width="100" sortable />
-        <vxe-column field="plating" title="电镀" width="120" sortable />
-        <vxe-column field="customer" title="客户名" width="120" sortable />
-        <vxe-column field="externalId" title="外部ID" width="120" sortable />
-        <vxe-column field="remark" title="备注" min-width="140" />
-        <vxe-column title="操作" width="150" fixed="right">
+        </el-table-column>
+        <el-table-column prop="headSize" label="头/垫片大小" width="140" sortable />
+        <el-table-column prop="headHeight" label="头高" width="100" sortable />
+        <el-table-column prop="length" label="长度" width="100" sortable />
+        <el-table-column prop="threadDiameter" label="牙径" width="100" sortable />
+        <el-table-column prop="shankLength" label="光钉长度" width="120" sortable />
+        <el-table-column prop="wireMaterial" label="线材" width="100" sortable />
+        <el-table-column prop="plating" label="电镀" width="120" sortable :filters="platingFilters" :filter-method="filterHandler" />
+        <el-table-column prop="customer" label="客户名" width="120" sortable />
+        <el-table-column prop="externalId" label="外部ID" width="120" sortable />
+        <el-table-column prop="remark" label="备注" min-width="140" />
+        <el-table-column label="操作" width="150" fixed="right">
           <template #default="{ row }">
             <el-button size="small" @click="handleEdit(row)">编辑</el-button>
             <el-button size="small" type="danger" v-if="allowDelete" @click="handleDelete(row)">删除</el-button>
           </template>
-        </vxe-column>
-      </vxe-table>
-
+        </el-table-column>
+      </el-table>
+      <div class="h-scrollbar-bar" ref="hBarRef" @mousedown="onBarMouseDown">
+        <div class="h-scrollbar-thumb" :style="{ width: hThumbW + 'px', left: hThumbL + 'px' }"></div>
+      </div>
       <div v-if="!loading && tableData.length === 0" class="empty-state">
         <el-empty description="暂无数据" />
       </div>
@@ -156,17 +151,17 @@
         </el-row>
       </el-form>
       <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="dialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="handleSubmit">确定</el-button>
-        </span>
+        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="handleSubmit">确定</el-button>
       </template>
     </el-dialog>
 
     <!-- 冲头关联弹窗 -->
     <el-dialog v-model="punchDialogVisible" title="冲头关联" width="700px">
       <el-table :data="punchDialogItems" border size="small">
-        <el-table-column prop="name" label="冲头名称" width="100" />
+        <el-table-column label="冲头名称" width="120">
+          <template #default="{ row: r }">{{ toShortCode(r.name) || r.name }}</template>
+        </el-table-column>
         <el-table-column prop="spec" label="规格" width="100" />
         <el-table-column prop="material" label="材质" width="80" />
         <el-table-column label="当前库存" width="90" align="center">
@@ -183,7 +178,7 @@
         </el-table-column>
         <el-table-column label="外显" width="60" align="center">
           <template #default="{ row: item }">
-            <el-link :type="item.name === punchDialogPrimary ? 'info' : 'warning'" :underline="false" @click="setPunchPrimary(item)">
+            <el-link :type="matchPunchNames(item.name, punchDialogPrimary) ? 'info' : 'warning'" :underline="false" @click="setPunchPrimary(item)">
               <el-icon><View /></el-icon>
             </el-link>
           </template>
@@ -222,7 +217,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { View } from '@element-plus/icons-vue'
 import type { FormInstance } from 'element-plus'
@@ -241,7 +236,57 @@ const dieList = ref<any[]>([])
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const isFullscreen = ref(false)
+const mainTableRef = ref<any>(null)
 const loading = ref(true)
+
+// 水平滚动条
+const hBarRef = ref<any>(null)
+const hThumbW = ref(100)
+const hThumbL = ref(0)
+let dragLock = false
+let scrollPollTimer: any = null
+
+function syncHBar() {
+  if (dragLock) return
+  const wrap = mainTableRef.value?.$el?.querySelector('.el-scrollbar__wrap')
+  const bar = hBarRef.value
+  if (!wrap || !bar) return
+  const maxScroll = wrap.scrollWidth - wrap.clientWidth
+  if (maxScroll <= 0) { hThumbW.value = bar.clientWidth; hThumbL.value = 0; return }
+  const barW = bar.clientWidth
+  hThumbW.value = Math.max(30, (wrap.clientWidth / wrap.scrollWidth) * barW)
+  hThumbL.value = (wrap.scrollLeft / maxScroll) * (barW - hThumbW.value)
+}
+
+function onBarMouseDown(e: MouseEvent) {
+  dragLock = true
+  const startX = e.clientX
+  const startLeft = hThumbL.value
+  const bar = hBarRef.value
+  const wrap = mainTableRef.value?.$el?.querySelector('.el-scrollbar__wrap')
+  const barW = bar?.clientWidth || 1
+  const maxScroll = wrap ? wrap.scrollWidth - wrap.clientWidth : 1
+
+  function onMove(ev: MouseEvent) {
+    const dx = ev.clientX - startX
+    const maxL = barW - hThumbW.value
+    const newL = Math.max(0, Math.min(maxL, startLeft + dx))
+    hThumbL.value = newL
+    if (wrap) wrap.scrollLeft = (newL / maxL) * maxScroll
+  }
+  function onUp() {
+    dragLock = false
+    document.removeEventListener('mousemove', onMove)
+    document.removeEventListener('mouseup', onUp)
+  }
+  document.addEventListener('mousemove', onMove)
+  document.addEventListener('mouseup', onUp)
+  e.preventDefault()
+}
+
+// 定时轮询同步滚动条位置
+onMounted(() => { scrollPollTimer = setInterval(syncHBar, 200) })
+onUnmounted(() => { clearInterval(scrollPollTimer) })
 
 // 冲头关联弹窗
 const punchDialogVisible = ref(false)
@@ -259,6 +304,7 @@ async function toggleFullscreen() {
   const next = !isFullscreen.value
   isFullscreen.value = next
   try { await getCurrentWindow().setFullscreen(next) } catch {}
+  setTimeout(() => { mainTableRef.value?.doLayout() }, 500)
 }
 
 onMounted(async () => {
@@ -270,7 +316,7 @@ onMounted(async () => {
 const formRef = ref<FormInstance>()
 const formRules = { name: [{ required: true, message: '请输入螺丝名称', trigger: 'blur' }] }
 
-// 冲头选项
+// 冲头选项（按名称去重，显示简写+全写）
 const punchOptions = computed(() => {
   const names = [...new Set(punchList.value.map(item => item.name).filter(Boolean))]
   return names.map(name => {
@@ -278,14 +324,15 @@ const punchOptions = computed(() => {
     const display = short || name
     const fullName = short ? name : ''
     return {
-      name: display,
+      name: display, // 简写作为值
+      fullName,       // 全写（如果有）
       label: fullName ? `${display} (${fullName})` : display,
       specs: punchList.value.filter(p => p.name === name).map(p => `${p.spec}${p.material ? '(' + p.material + ')' : ''}`).join('、')
     }
   })
 })
 
-// 牙板选项
+// 牙板选项（按名称去重）
 const dieOptions = computed(() => {
   const names = [...new Set(dieList.value.map(item => item.name).filter(Boolean))]
   return names.map(name => ({
@@ -294,15 +341,20 @@ const dieOptions = computed(() => {
   }))
 })
 
+const headTypeFilters = computed(() => [...new Set(tableData.value.map(i => i.headType).filter(Boolean))].map(t => ({ text: t, value: t })))
+const threadTypeFilters = computed(() => [...new Set(tableData.value.map(i => i.threadType).filter(Boolean))].map(t => ({ text: t, value: t })))
+const platingFilters = computed(() => [...new Set(tableData.value.map(i => i.plating).filter(Boolean))].map(t => ({ text: t, value: t })))
+function filterHandler(value: string, row: any, column: any) { return row[column.property] === value }
+
 const form = ref<any>({
   id: '', customer: '', externalId: '', name: '', headType: '',
   punch: [], threadType: '', die: [], headSize: '', headHeight: '',
   length: '', threadDiameter: '', shankLength: '', wireMaterial: '', plating: '', remark: ''
 })
 
-// 关联表解析
-function resolveLinks(linkIdField: string, links: any[], infoList: any[]) {
-  const map: Record<string, { ids: string[]; names: string[] }> = {}
+// 解析关联表：保留具体的记录 ID，同时解析出名字用于显示（全写转简写）
+function resolveLinks(linkIdField: string, links: any[], infoList: any[]): Record<string, { ids: string[], names: string[] }> {
+  const map: Record<string, { ids: string[], names: string[] }> = {}
   for (const link of links) {
     const specId = link.screwSpecId
     const itemId = link[linkIdField]
@@ -311,14 +363,16 @@ function resolveLinks(linkIdField: string, links: any[], infoList: any[]) {
     if (!map[specId].ids.includes(itemId)) {
       map[specId].ids.push(itemId)
       const info = infoList.find((i: any) => i.id === itemId)
-      const shortName = toShortCode(info?.name || '') || info?.name || itemId
+      const rawName = info ? info.name : itemId
+      const shortName = toShortCode(rawName) || rawName
       map[specId].names.push(shortName)
     }
   }
   return map
 }
 
-function findIdsByNames(names: string[], infoList: any[]) {
+// 根据名字在信息表中查找 ID（多条同名的都返回）
+function findIdsByNames(names: string[], infoList: any[]): string[] {
   const ids: string[] = []
   const seen = new Set<string>()
   for (const n of names) {
@@ -354,7 +408,7 @@ async function loadData() {
   finally { loading.value = false }
 }
 
-// 冲头关联弹窗
+// ====== 冲头关联弹窗 ======
 function showPunchDialog(row: any) {
   punchDialogRow.value = row
   punchDialogPrimary.value = row.punch || ''
@@ -380,7 +434,7 @@ async function setPunchPrimary(item: any) {
   } catch { ElMessage.error('设置失败') }
 }
 
-// 牙板关联弹窗
+// ====== 牙板关联弹窗 ======
 function showDieDialog(row: any) {
   dieDialogRow.value = row
   dieDialogPrimary.value = row.die || ''
@@ -405,7 +459,7 @@ async function setDiePrimary(item: any) {
   } catch { ElMessage.error('设置失败') }
 }
 
-// CRUD
+// ====== CRUD ======
 function handleAdd() {
   isEdit.value = false
   form.value = {
@@ -418,7 +472,11 @@ function handleAdd() {
 
 function handleEdit(row: any) {
   isEdit.value = true
-  form.value = { ...row, punch: [...(row._punchNames || [])], die: [...(row._dieNames || [])] }
+  form.value = {
+    ...row,
+    punch: [...(row._punchNames || [])],
+    die: [...(row._dieNames || [])]
+  }
   dialogVisible.value = true
 }
 
@@ -426,6 +484,7 @@ async function handleDelete(row: any) {
   try {
     await ElMessageBox.confirm('确定删除此规格？', '提示', { type: 'warning' })
     await screwSpecApi.remove(row.id)
+    // 清理关联表
     const [pl, dl] = await Promise.all([punchLinkApi.getAll(), dieLinkApi.getAll()])
     for (const l of pl) { if (l.screwSpecId === row.id) await punchLinkApi.remove(l.id) }
     for (const l of dl) { if (l.screwSpecId === row.id) await dieLinkApi.remove(l.id) }
@@ -434,11 +493,16 @@ async function handleDelete(row: any) {
   } catch (e) { if (e !== 'cancel') { ElMessage.error('删除失败'); console.error(e) } }
 }
 
+// 同步关联表：先删旧的，再建新的
 async function syncLinks(screwSpecId: string, nameField: string, names: string[], linkApi: any, infoList: any[]) {
   const allLinks = await linkApi.getAll()
-  for (const l of allLinks.filter((l: any) => l.screwSpecId === screwSpecId)) { await linkApi.remove(l.id) }
+  for (const l of allLinks.filter((l: any) => l.screwSpecId === screwSpecId)) {
+    await linkApi.remove(l.id)
+  }
   const ids = findIdsByNames(names, infoList)
-  for (const id of ids) { await linkApi.add({ [nameField]: id, screwSpecId }) }
+  for (const id of ids) {
+    await linkApi.add({ [nameField]: id, screwSpecId })
+  }
 }
 
 async function handleSubmit() {
@@ -448,7 +512,12 @@ async function handleSubmit() {
     try {
       const punchNames = Array.isArray(form.value.punch) ? form.value.punch : []
       const dieNames = Array.isArray(form.value.die) ? form.value.die : []
-      const payload = { ...form.value, punch: punchNames[0] || '', die: dieNames[0] || '' }
+      // 主表只存外显的第一个名字
+      const payload = {
+        ...form.value,
+        punch: punchNames[0] || '',
+        die: dieNames[0] || ''
+      }
       let specId: string
       if (isEdit.value) {
         await screwSpecApi.update(form.value.id, payload)
@@ -457,6 +526,7 @@ async function handleSubmit() {
         const result = await screwSpecApi.add(payload)
         specId = result.id
       }
+      // 同步关联表（用信息表的 ID）
       await syncLinks(specId, 'punchId', punchNames, punchLinkApi, punchList.value)
       await syncLinks(specId, 'dieId', dieNames, dieLinkApi, dieList.value)
       dialogVisible.value = false
@@ -467,10 +537,12 @@ async function handleSubmit() {
 </script>
 
 <style scoped>
-.page-container { height: 100%; }
 .page-container.is-fullscreen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 2000; background: #fff; padding: 0; overflow: auto; }
 .page-container.is-fullscreen .el-card { height: 100%; display: flex; flex-direction: column; margin: 0; border: none; border-radius: 0; box-shadow: none; }
 .page-container.is-fullscreen .el-card__header { display: none; }
 .page-container.is-fullscreen .el-card__body { flex: 1; overflow: auto; padding: 12px; }
+.page-container:not(.is-fullscreen) .el-card__body { overflow: auto; }
+.h-scrollbar-bar { position: sticky; bottom: 0; height: 8px; background: #e4e7ed; border-radius: 4px; margin-top: 4px; cursor: pointer; z-index: 10; }
+
 .header-right { display: flex; gap: 8px; margin-left: auto; }
 </style>
