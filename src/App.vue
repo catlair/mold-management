@@ -379,24 +379,6 @@ onMounted(() => {
   justify-content: flex-end;
 }
 
-/* el-table 水平滚动条始终可见 */
-.el-table .el-scrollbar__bar.is-horizontal {
-  display: block !important;
-  height: 10px !important;
-}
-.el-table .el-scrollbar__bar.is-horizontal .el-scrollbar__thumb {
-  background-color: #b0b4cc !important;
-  border-radius: 5px;
-  height: 8px !important;
-  cursor: grab;
-}
-.el-table .el-scrollbar__bar.is-horizontal .el-scrollbar__thumb:hover {
-  background-color: #909399 !important;
-}
-.el-table .el-scrollbar__wrap {
-  overflow-x: auto !important;
-}
-
 /* 搜索跳转高亮动画 */
 .highlight-flash {
   animation: flash-highlight 2s ease;

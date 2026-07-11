@@ -25,6 +25,7 @@
         border
         :loading="loading"
         :show-overflow="true"
+        :scroll-y="{ enabled: false }"
       >
         <vxe-column field="name" title="螺丝名称" width="160" sortable />
         <vxe-column field="headType" title="头型" width="120" sortable />
