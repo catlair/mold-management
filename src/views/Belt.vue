@@ -46,7 +46,8 @@
           <div class="tab-header">
             <el-button type="primary" size="small" @click="showOrderDialog = true">新增入库</el-button>
           </div>
-          <el-table :data="orderList" border style="width: 100%">
+          <el-table :data="orderPaginated" border style="width: 100%">
+
             <el-table-column label="皮带" width="140" sortable>
               <template #default="{ row }">
                 {{ getBeltName(row.beltId) }}
@@ -56,14 +57,25 @@
             <el-table-column prop="orderDate" label="入库时间" width="180" sortable />
             <el-table-column prop="status" label="到货状态" width="120" sortable :filters="statusFilters" :filter-method="filterHandler" />
             <el-table-column prop="remark" label="备注" min-width="150" />
-          </el-table>
+          
+</el-table>
+          <el-pagination
+            v-model:current-page="orderCurrentPage"
+            v-model:page-size="orderPageSize"
+            :page-sizes="[10, 20, 50]"
+            :total="orderList.length"
+            layout="total, sizes, prev, pager, next"
+            small
+            style="margin-top: 12px; justify-content: flex-end;"
+          />
         </el-tab-pane>
 
         <el-tab-pane label="使用记录" name="use">
           <div class="tab-header">
             <el-button type="primary" size="small" @click="showUseDialog = true">新增使用</el-button>
           </div>
-          <el-table :data="useList" border style="width: 100%">
+          <el-table :data="usePaginated" border style="width: 100%">
+
             <el-table-column label="皮带" width="140" sortable>
               <template #default="{ row }">
                 {{ getBeltName(row.beltId) }}
@@ -73,7 +85,17 @@
             <el-table-column prop="quantity" label="使用数量" width="120" sortable />
             <el-table-column prop="useDate" label="使用时间" width="180" sortable />
             <el-table-column prop="remark" label="备注" min-width="150" />
-          </el-table>
+          
+</el-table>
+          <el-pagination
+            v-model:current-page="useCurrentPage"
+            v-model:page-size="usePageSize"
+            :page-sizes="[10, 20, 50]"
+            :total="useList.length"
+            layout="total, sizes, prev, pager, next"
+            small
+            style="margin-top: 12px; justify-content: flex-end;"
+          />
         </el-tab-pane>
       </el-tabs>
     </el-card>
@@ -201,6 +223,19 @@ const orderList = ref<any[]>([])
 const useList = ref<any[]>([])
 const loading = ref(true)
 
+const orderCurrentPage = ref(1)
+const orderPageSize = ref(10)
+const orderPaginated = computed(() => {
+  const start = (orderCurrentPage.value - 1) * orderPageSize.value
+  return orderList.value.slice(start, start + orderPageSize.value)
+})
+const useCurrentPage = ref(1)
+const usePageSize = ref(10)
+const usePaginated = computed(() => {
+  const start = (useCurrentPage.value - 1) * usePageSize.value
+  return useList.value.slice(start, start + usePageSize.value)
+})
+
 // 筛选选项
 const machineFilters = computed(() => {
   const types = [...new Set(beltList.value.map(item => item.machine).filter(Boolean))]
@@ -276,7 +311,9 @@ async function loadData() {
       status: stockMap[b.id]?.status ?? '',
     }))
     orderList.value = orders
+    orderCurrentPage.value = 1
     useList.value = uses
+    useCurrentPage.value = 1
   } catch (error) {
     ElMessage.error('加载数据失败')
     console.error(error)
@@ -378,7 +415,7 @@ async function handleUseSubmit() {
 .page-container.is-fullscreen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 2000; background: #fff; padding: 0; overflow: auto; }
 .page-container.is-fullscreen .el-card { height: 100%; display: flex; flex-direction: column; margin: 0; border: none; border-radius: 0; box-shadow: none; }
 .page-container.is-fullscreen .el-card__header { display: none; }
-.page-container.is-fullscreen .el-card__body { flex: 1; overflow: auto; padding: 12px; }
+.page-container.is-fullscreen .el-card__body { flex: 1; overflow: hidden; padding: 12px; }
 .page-container.is-fullscreen .el-table__body-wrapper { overflow: auto !important; }
 .page-container.is-fullscreen .el-table .el-table__fixed { height: calc(100% - 14px) !important; }
 

@@ -18,7 +18,7 @@
         </div>
       </template>
 
-        <el-table ref="mainTableRef" :data="tableData" border style="width: 100%" :max-height="isFullscreen ? 'calc(100vh - 40px)' : 'calc(100vh - 184px)'" v-loading="loading" :fit="false" @scroll="onTableScroll">
+        <el-table ref="mainTableRef" :data="tableData" border style="width: 100%" :max-height="isFullscreen ? 'calc(100vh - 100px)' : 'calc(100vh - 184px)'" v-loading="loading" :fit="false" @scroll="onTableScroll">
         <el-table-column prop="name" label="螺丝名称" width="160" sortable />
         <el-table-column prop="headType" label="头型" width="120" sortable :filters="headTypeFilters" :filter-method="filterHandler" />
         <el-table-column prop="punch" label="冲头" width="120" sortable>
@@ -91,9 +91,9 @@
           <el-col :span="12">
             <el-form-item label="牙板" prop="die">
               <el-select v-model="form.die" placeholder="请选择牙板" filterable allow-create multiple collapse-tags>
-                <el-option v-for="item in dieOptions" :key="item.name" :label="item.name" :value="item.name">
-                  <span>{{ item.name }}</span>
-                  <span style="float: right; color: #8492a6; font-size: 12px">{{ item.specs }}</span>
+                <el-option v-for="item in dieOptions" :key="item.id" :label="item.label" :value="item.value">
+                  <span>{{ item.shortName }}</span>
+                  <span v-if="item.specs" style="float: right; color: #8492a6; font-size: 12px">{{ item.specs }}</span>
                 </el-option>
               </el-select>
             </el-form-item>
@@ -328,13 +328,13 @@ const punchOptions = computed(() => {
   })
 })
 
-// 牙板选项（按名称去重）
+// 牙板选项（按名称+机型+线径组合区分）
 const dieOptions = computed(() => {
-  const names = [...new Set(dieList.value.map(item => item.name).filter(Boolean))]
-  return names.map(name => ({
-    name,
-    specs: dieList.value.filter(d => d.name === name).map(d => `${d.machineType}${d.wireDiameter ? '(' + d.wireDiameter + ')' : ''}`).join('、')
-  }))
+  return dieList.value.filter(d => d.name).map(d => {
+    const display = [d.name, d.machineType, d.wireDiameter].filter(Boolean).join(' ')
+    const specs = [d.machineType, d.wireDiameter].filter(Boolean).join(' ')
+    return { id: d.id, name: display, label: display, value: display, shortName: d.name, specs }
+  })
 })
 
 const headTypeFilters = computed(() => [...new Set(tableData.value.map(i => i.headType).filter(Boolean))].map(t => ({ text: t, value: t })))
@@ -368,14 +368,23 @@ function resolveLinks(linkIdField: string, links: any[], infoList: any[]): Recor
 }
 
 // 根据名字在信息表中查找 ID（多条同名的都返回）
-function findIdsByNames(names: string[], infoList: any[]): string[] {
+function findIdsByNames(names: string[], infoList: any[], isDie = false): string[] {
   const ids: string[] = []
   const seen = new Set<string>()
   for (const n of names) {
     for (const item of infoList) {
-      if (matchPunchNames(n, item.name) && !seen.has(item.id)) {
-        ids.push(item.id)
-        seen.add(item.id)
+      if (isDie) {
+        // 牙板按 名称+机型+线径 组合匹配
+        const display = [item.name, item.machineType, item.wireDiameter].filter(Boolean).join(' ')
+        if ((display === n || item.name === n) && !seen.has(item.id)) {
+          ids.push(item.id)
+          seen.add(item.id)
+        }
+      } else {
+        if (matchPunchNames(n, item.name) && !seen.has(item.id)) {
+          ids.push(item.id)
+          seen.add(item.id)
+        }
       }
     }
   }
@@ -490,12 +499,12 @@ async function handleDelete(row: any) {
 }
 
 // 同步关联表：先删旧的，再建新的
-async function syncLinks(screwSpecId: string, nameField: string, names: string[], linkApi: any, infoList: any[]) {
+async function syncLinks(screwSpecId: string, nameField: string, names: string[], linkApi: any, infoList: any[], isDie = false) {
   const allLinks = await linkApi.getAll()
   for (const l of allLinks.filter((l: any) => l.screwSpecId === screwSpecId)) {
     await linkApi.remove(l.id)
   }
-  const ids = findIdsByNames(names, infoList)
+  const ids = findIdsByNames(names, infoList, isDie)
   for (const id of ids) {
     await linkApi.add({ [nameField]: id, screwSpecId })
   }
@@ -524,7 +533,7 @@ async function handleSubmit() {
       }
       // 同步关联表（用信息表的 ID）
       await syncLinks(specId, 'punchId', punchNames, punchLinkApi, punchList.value)
-      await syncLinks(specId, 'dieId', dieNames, dieLinkApi, dieList.value)
+      await syncLinks(specId, 'dieId', dieNames, dieLinkApi, dieList.value, true)
       dialogVisible.value = false
       loadData()
     } catch (error) { ElMessage.error(isEdit.value ? '更新失败' : '添加失败'); console.error(error) }
@@ -536,7 +545,7 @@ async function handleSubmit() {
 .page-container.is-fullscreen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 2000; background: #fff; padding: 0; overflow: auto; }
 .page-container.is-fullscreen .el-card { height: 100%; display: flex; flex-direction: column; margin: 0; border: none; border-radius: 0; box-shadow: none; }
 .page-container.is-fullscreen .el-card__header { display: none; }
-.page-container.is-fullscreen .el-card__body { flex: 1; overflow: auto; padding: 12px; }
+.page-container.is-fullscreen .el-card__body { flex: 1; overflow: hidden; padding: 12px; }
 
 /* 隐藏el-table自带的水平滚动条 */
 :deep(.el-table__body-wrapper)::-webkit-scrollbar { height: 0; }

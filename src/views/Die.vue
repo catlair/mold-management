@@ -51,7 +51,8 @@
           <div class="tab-header">
             <el-button type="primary" size="small" @click="showOrderDialog = true">新增入库</el-button>
           </div>
-          <el-table :data="orderList" border style="width: 100%">
+          <el-table :data="orderPaginated" border style="width: 100%">
+
             <el-table-column label="牙板名称" width="140" sortable>
               <template #default="{ row }">
                 {{ getDieName(row.dieId) }}
@@ -60,14 +61,25 @@
             <el-table-column prop="quantity" label="入库数量" width="100" sortable />
             <el-table-column prop="orderDate" label="入库时间" width="180" sortable />
             <el-table-column prop="remark" label="备注" min-width="120" />
-          </el-table>
+          
+</el-table>
+          <el-pagination
+            v-model:current-page="orderCurrentPage"
+            v-model:page-size="orderPageSize"
+            :page-sizes="[10, 20, 50]"
+            :total="orderList.length"
+            layout="total, sizes, prev, pager, next"
+            small
+            style="margin-top: 12px; justify-content: flex-end;"
+          />
         </el-tab-pane>
 
         <el-tab-pane label="领用记录" name="use">
           <div class="tab-header">
             <el-button type="primary" size="small" @click="showUseDialog = true">新增领用</el-button>
           </div>
-          <el-table :data="useList" border style="width: 100%">
+          <el-table :data="usePaginated" border style="width: 100%">
+
             <el-table-column label="牙板名称" width="140" sortable>
               <template #default="{ row }">
                 {{ getDieName(row.dieId) }}
@@ -77,7 +89,17 @@
             <el-table-column prop="quantity" label="领用数量" width="120" sortable />
             <el-table-column prop="useDate" label="领用时间" width="180" sortable />
             <el-table-column prop="remark" label="备注" min-width="150" />
-          </el-table>
+          
+</el-table>
+          <el-pagination
+            v-model:current-page="useCurrentPage"
+            v-model:page-size="usePageSize"
+            :page-sizes="[10, 20, 50]"
+            :total="useList.length"
+            layout="total, sizes, prev, pager, next"
+            small
+            style="margin-top: 12px; justify-content: flex-end;"
+          />
         </el-tab-pane>
 
         <el-tab-pane label="螺丝规格关联" name="link">
@@ -300,6 +322,19 @@ async function showLinkedScrews(die: any) {
 }
 const loading = ref(true)
 
+const orderCurrentPage = ref(1)
+const orderPageSize = ref(10)
+const orderPaginated = computed(() => {
+  const start = (orderCurrentPage.value - 1) * orderPageSize.value
+  return orderList.value.slice(start, start + orderPageSize.value)
+})
+const useCurrentPage = ref(1)
+const usePageSize = ref(10)
+const usePaginated = computed(() => {
+  const start = (useCurrentPage.value - 1) * usePageSize.value
+  return useList.value.slice(start, start + usePageSize.value)
+})
+
 // 筛选选项
 const machineTypeFilters = computed(() => {
   const types = [...new Set(dieList.value.map(item => item.machineType).filter(Boolean))]
@@ -386,7 +421,9 @@ async function loadData() {
       status: stockMap[d.id]?.status ?? '',
     }))
     orderList.value = orders
+    orderCurrentPage.value = 1
     useList.value = uses
+    useCurrentPage.value = 1
     linkList.value = links
     screwSpecList.value = screwSpecs
   } catch (error) {
@@ -521,7 +558,7 @@ async function handleDeleteLink(row: any) {
 .page-container.is-fullscreen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 2000; background: #fff; padding: 0; overflow: auto; }
 .page-container.is-fullscreen .el-card { height: 100%; display: flex; flex-direction: column; margin: 0; border: none; border-radius: 0; box-shadow: none; }
 .page-container.is-fullscreen .el-card__header { display: none; }
-.page-container.is-fullscreen .el-card__body { flex: 1; overflow: auto; padding: 12px; }
+.page-container.is-fullscreen .el-card__body { flex: 1; overflow: hidden; padding: 12px; }
 .page-container.is-fullscreen .el-table__body-wrapper { overflow: auto !important; }
 .page-container.is-fullscreen .el-table .el-table__fixed { height: calc(100% - 14px) !important; }
 
