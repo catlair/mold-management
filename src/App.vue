@@ -568,6 +568,54 @@ body {
   margin-bottom: 12px;
   display: flex;
   justify-content: flex-end;
+  flex-shrink: 0;
+}
+
+/* 记录/关联 tabs：仅中间表格区滚动，工具栏与分页始终留在可视区 */
+.record-pane,
+.association-pane {
+  overflow: hidden;
+}
+
+.record-table-scroll {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+.record-table-scroll > .vxe-table {
+  min-width: 100%;
+}
+
+.record-pagination {
+  flex-shrink: 0;
+  margin-top: 12px;
+  justify-content: flex-end;
+}
+
+.record-table-scroll::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.record-table-scroll::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+  border-radius: 5px;
+}
+
+.record-table-scroll::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border: 2px solid var(--scrollbar-track);
+  border-radius: 5px;
+}
+
+.record-table-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
 }
 
 /* 搜索跳转高亮动画 */

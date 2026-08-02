@@ -85,11 +85,11 @@
           </el-form-item>
           <el-form-item label="备份策略">
             <el-tag type="success">启动时自动备份</el-tag>
-            <el-tag type="success" style="margin-left: 8px">退出时自动备份</el-tag>
+            <el-tag type="success" class="backup-policy-tag">退出时自动备份</el-tag>
           </el-form-item>
         </el-form>
       </div>
-      <div class="action-buttons" style="margin-top: 16px">
+      <div class="action-buttons backup-action">
         <el-button type="primary" @click="handleBackupNow" :loading="backingUp">
           <el-icon><CopyDocument /></el-icon>
           立即备份
@@ -97,12 +97,12 @@
       </div>
     </el-card>
 
-    <el-card class="settings-card">
+    <el-card class="settings-card backup-records-card">
       <template #header>
         <div class="card-header">
           <el-icon><Document /></el-icon>
           <span>备份记录</span>
-          <el-button size="small" style="margin-left: auto" @click="loadBackups">刷新</el-button>
+          <el-button size="small" class="refresh-button" @click="loadBackups">刷新</el-button>
         </div>
       </template>
       <vxe-table :data="backups" style="width: 100%" max-height="400">
@@ -122,7 +122,7 @@
           </template>
         </vxe-column>
       </vxe-table>
-      <div v-if="backups.length === 0" style="text-align: center; color: #909399; padding: 20px">
+      <div v-if="backups.length === 0" class="backup-empty">
         暂无备份记录
       </div>
     </el-card>
@@ -371,32 +371,63 @@ async function handleSelectPath() {
 
 <style scoped>
 .settings-page {
-  max-width: 800px;
-  margin: 0 auto;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-auto-rows: max-content;
+  align-content: start;
+  gap: 14px;
+  padding: 1px;
+  box-sizing: border-box;
+  scrollbar-gutter: stable;
 }
 
 .settings-card {
-  margin-bottom: 20px;
+  min-width: 0;
+  margin: 0;
+}
+
+.settings-card :deep(.el-card__header) {
+  padding: 13px 16px;
+}
+
+.settings-card :deep(.el-card__body) {
+  padding: 14px 16px;
+  overflow: visible;
+}
+
+.backup-records-card :deep(.el-card__body) {
+  overflow: hidden;
 }
 
 .card-header {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 16px;
+  color: var(--text-primary);
+  font-size: 15px;
   font-weight: 600;
 }
 
 .action-buttons {
   display: flex;
-  gap: 16px;
-  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.backup-action {
+  margin-top: 10px;
+  margin-bottom: 0;
 }
 
 .action-desc {
-  color: #909399;
-  font-size: 13px;
-  line-height: 1.8;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.65;
 }
 
 .action-desc p {
@@ -408,25 +439,28 @@ async function handleSelectPath() {
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 10px;
 }
 
 .current-path {
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
 .label {
-  color: #606266;
-  font-size: 14px;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
 }
 
 .path-tag {
-  font-family: monospace;
-  font-size: 13px;
-  max-width: 400px;
+  min-width: 0;
+  max-width: min(400px, 100%);
   overflow: hidden;
+  font-family: "Cascadia Mono", "Segoe UI Mono", monospace;
+  font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -435,19 +469,57 @@ async function handleSelectPath() {
   flex-shrink: 0;
 }
 
+.settings-card :deep(.el-form-item) {
+  margin-bottom: 12px;
+}
+
+.settings-card :deep(.el-form-item:last-child) {
+  margin-bottom: 0;
+}
+
 .backup-config {
   margin-bottom: 0;
 }
 
 .form-tip {
-  color: #909399;
+  margin-left: 10px;
+  color: var(--text-muted);
   font-size: 12px;
-  margin-left: 12px;
 }
 
 .backup-path-row {
+  min-width: 0;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
+}
+
+.backup-path-row .path-tag {
+  flex: 1 1 220px;
+}
+
+.backup-policy-tag {
+  margin-left: 8px;
+}
+
+.refresh-button {
+  margin-left: auto;
+}
+
+.backup-empty {
+  padding: 20px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+@media (min-width: 1100px) {
+  .settings-page {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .backup-records-card {
+    grid-column: 1 / -1;
+  }
 }
 </style>

@@ -39,11 +39,12 @@
           </DataTable>
         </el-tab-pane>
 
-        <el-tab-pane label="入库记录" name="order">
+        <el-tab-pane label="入库记录" name="order" class="record-pane">
           <div class="tab-header">
             <el-button type="primary" size="small" @click="showOrderDialog = true">新增入库</el-button>
           </div>
-          <vxe-table :data="orderPaginated" border style="width: 100%">
+          <div class="record-table-scroll">
+            <vxe-table :data="orderPaginated" border style="width: 100%">
 
             <vxe-column title="皮带" width="140" sortable>
               <template #default="{ row }">
@@ -55,7 +56,8 @@
             <vxe-column field="status" title="到货状态" width="120" sortable :filters="statusFilters" :filter-method="filterHandler" />
             <vxe-column field="remark" title="备注" min-width="150" />
 
-</vxe-table>
+            </vxe-table>
+          </div>
           <el-pagination
             v-model:current-page="orderCurrentPage"
             v-model:page-size="orderPageSize"
@@ -63,15 +65,16 @@
             :total="orderList.length"
             layout="total, sizes, prev, pager, next"
             small
-            style="margin-top: 12px; justify-content: flex-end;"
+            class="record-pagination"
           />
         </el-tab-pane>
 
-        <el-tab-pane label="使用记录" name="use">
+        <el-tab-pane label="使用记录" name="use" class="record-pane">
           <div class="tab-header">
             <el-button type="primary" size="small" @click="showUseDialog = true">新增使用</el-button>
           </div>
-          <vxe-table :data="usePaginated" border style="width: 100%">
+          <div class="record-table-scroll">
+            <vxe-table :data="usePaginated" border style="width: 100%">
 
             <vxe-column title="皮带" width="140" sortable>
               <template #default="{ row }">
@@ -83,7 +86,8 @@
             <vxe-column field="useDate" title="使用时间" width="180" sortable />
             <vxe-column field="remark" title="备注" min-width="150" />
 
-</vxe-table>
+            </vxe-table>
+          </div>
           <el-pagination
             v-model:current-page="useCurrentPage"
             v-model:page-size="usePageSize"
@@ -91,7 +95,7 @@
             :total="useList.length"
             layout="total, sizes, prev, pager, next"
             small
-            style="margin-top: 12px; justify-content: flex-end;"
+            class="record-pagination"
           />
         </el-tab-pane>
       </el-tabs>
