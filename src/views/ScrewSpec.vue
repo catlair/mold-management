@@ -10,10 +10,7 @@
               <el-icon><Plus /></el-icon>
               添加规格
             </el-button>
-            <el-button @click="toggleFullscreen">
-              <el-icon><FullScreen v-if="!isFullscreen" /><Close v-else /></el-icon>
-              {{ isFullscreen ? '退出全屏' : '全屏' }}
-            </el-button>
+            <FullscreenToggle />
           </div>
         </div>
       </template>
@@ -56,9 +53,6 @@
       </div>
     </el-card>
 
-    <el-button v-if="isFullscreen" class="fullscreen-exit-btn" type="danger" circle @click="toggleFullscreen">
-      <el-icon :size="20"><Close /></el-icon>
-    </el-button>
 
     <!-- 添加/编辑对话框 -->
     <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑螺丝规格' : '添加螺丝规格'" width="800px">
@@ -218,18 +212,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, inject } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { View } from '@element-plus/icons-vue'
 import type { FormInstance } from 'element-plus'
-import { getCurrentWindow } from '@tauri-apps/api/window'
 import { screwSpecApi, punchApi, dieApi, punchLinkApi, dieLinkApi, stockCalcApi } from '../api'
 import { useAllowDelete } from '../composables/useAllowDelete'
 import { useHighlight } from '../composables/useHighlight'
+import FullscreenToggle from '../components/FullscreenToggle.vue'
 import DataTable from '../components/DataTable.vue'
 import { toShortCode, matchPunchNames } from '../utils/punchName'
 
 const { allowDelete } = useAllowDelete()
+// 全屏状态由 App 全局提供（isFullscreen 仅用于页面容器样式）
+const { isFullscreen } = inject<any>('fullscreen')!
 
 const tableData = ref<any[]>([])
 useHighlight(tableData)
@@ -237,7 +233,6 @@ const punchList = ref<any[]>([])
 const dieList = ref<any[]>([])
 const dialogVisible = ref(false)
 const isEdit = ref(false)
-const isFullscreen = ref(false)
 const loading = ref(true)
 
 // 冲头关联弹窗
@@ -252,15 +247,7 @@ const dieDialogItems = ref<any[]>([])
 const dieDialogPrimary = ref('')
 const dieDialogRow = ref<any>({})
 
-async function toggleFullscreen() {
-  const next = !isFullscreen.value
-  isFullscreen.value = next
-  try { await getCurrentWindow().setFullscreen(next) } catch {}
-}
-
-onMounted(async () => {
-  try { isFullscreen.value = await getCurrentWindow().isFullscreen() } catch {}
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && isFullscreen.value) toggleFullscreen() })
+onMounted(() => {
   loadData()
 })
 
@@ -501,8 +488,6 @@ async function handleSubmit() {
 .page-container.is-fullscreen .el-card { height: 100%; display: flex; flex-direction: column; margin: 0; border: none; border-radius: 0; box-shadow: none; }
 .page-container.is-fullscreen .el-card__header { display: none; }
 .page-container.is-fullscreen .el-card__body { flex: 1; overflow: hidden; padding: 12px; }
-
-.fullscreen-exit-btn { position: fixed; top: 12px; right: 12px; z-index: 2001; box-shadow: 0 2px 12px rgba(0,0,0,0.15); }
 
 .header-right { display: flex; gap: 8px; margin-left: auto; }
 </style>

@@ -73,13 +73,23 @@
         </transition>
       </router-view>
     </el-main>
+
+    <!-- 全局全屏退出按钮（所有页面共用） -->
+    <el-button v-if="isFullscreen" class="fullscreen-exit-btn" type="danger" circle @click="toggleFullscreen">
+      <el-icon :size="20"><Close /></el-icon>
+    </el-button>
   </el-container>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, provide } from 'vue'
 import { useRoute } from 'vue-router'
 import GlobalSearch from './components/GlobalSearch.vue'
+import { useFullscreen } from './composables/useFullscreen'
+
+// 全屏能力全局注入：页面通过 inject 获取，无需各自实现
+const { isFullscreen, toggleFullscreen } = useFullscreen()
+provide('fullscreen', { isFullscreen, toggleFullscreen })
 
 const route = useRoute()
 const activeMenu = computed(() => route.path)
@@ -266,6 +276,15 @@ onMounted(() => {
 .page-container.is-fullscreen > .el-card > .el-card__body { flex: 1; overflow: hidden; padding: 12px; }
 .page-container.is-fullscreen .el-table {
   max-height: 100% !important;
+}
+
+/* 全屏退出按钮（所有页面共用） */
+.fullscreen-exit-btn {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 2001;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
 }
 
 /* 表格水平滚动条始终可见 - 强制覆盖 JS 行为 */

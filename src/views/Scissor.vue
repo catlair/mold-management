@@ -10,10 +10,7 @@
               <el-icon><Plus /></el-icon>
               添加剪刀
             </el-button>
-            <el-button @click="toggleFullscreen">
-              <el-icon><FullScreen v-if="!isFullscreen" /><Close v-else /></el-icon>
-              {{ isFullscreen ? '退出全屏' : '全屏' }}
-            </el-button>
+            <FullscreenToggle />
           </div>
         </div>
       </template>
@@ -227,40 +224,23 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, inject } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance } from 'element-plus'
-import { getCurrentWindow } from '@tauri-apps/api/window'
 import { scissorApi, scissorOrderApi, scissorUseApi, scissorLinkApi, stockCalcApi } from '../api'
 import { useAllowDelete } from '../composables/useAllowDelete'
 import { useHighlight } from '../composables/useHighlight'
 import DataTable from '../components/DataTable.vue'
+import FullscreenToggle from '../components/FullscreenToggle.vue'
 
 const { allowDelete } = useAllowDelete()
+// 全屏状态由 App 全局提供（isFullscreen 仅用于页面容器样式）
+const { isFullscreen } = inject<any>('fullscreen')!
 
 function getCurrentDateTime() {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`
 }
-
-const isFullscreen = ref(false)
-
-async function toggleFullscreen() {
-  const next = !isFullscreen.value
-  isFullscreen.value = next
-  try {
-    const win = getCurrentWindow()
-    await win.setFullscreen(next)
-    nextTick(() => { mainTableRef.value?.doLayout() })
-  } catch {}
-}
-
-onMounted(async () => {
-  try {
-    const win = getCurrentWindow()
-    isFullscreen.value = await win.isFullscreen()
-  } catch {}
-})
 
 const activeTab = ref('info')
 const scissorList = ref<any[]>([])
@@ -313,7 +293,6 @@ const useForm = ref({ scissorId: '', user: '', quantity: 1, useDate: getCurrentD
 const showLinkDialog = ref(false)
 const linkForm = ref({ scissorId: '', wireMaterial: '', remark: '' })
 
-const mainTableRef = ref<any>(null)
 // 表单引用
 const formRef = ref<FormInstance>()
 const orderFormRef = ref<FormInstance>()
