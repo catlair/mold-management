@@ -1,5 +1,13 @@
 <template>
-  <vxe-table :data="data" border style="width: 100%" :loading="loading">
+  <vxe-table
+    :data="data"
+    border
+    round
+    stripe
+    show-overflow="tooltip"
+    style="width: 100%"
+    :loading="loading"
+  >
     <vxe-column field="name" :title="nameLabel" min-width="150" sortable />
     <vxe-column field="currentStock" title="当前库存" width="120" sortable />
     <vxe-column field="safetyStock" title="安全库存" width="120" sortable />

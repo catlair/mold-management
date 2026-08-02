@@ -59,12 +59,19 @@
           </el-menu-item-group>
         </el-menu>
       </el-scrollbar>
-      <div class="collapse-btn" @click="isCollapse = !isCollapse">
+      <ThemeToggle :collapsed="isCollapse" />
+      <button
+        class="collapse-btn"
+        type="button"
+        :aria-label="isCollapse ? '展开侧边栏' : '收起侧边栏'"
+        :title="isCollapse ? '展开侧边栏' : '收起侧边栏'"
+        @click="isCollapse = !isCollapse"
+      >
         <el-icon>
           <DArrowLeft v-if="!isCollapse" />
           <DArrowRight v-else />
         </el-icon>
-      </div>
+      </button>
     </el-aside>
     <el-main class="app-main">
       <router-view v-slot="{ Component }">
@@ -85,6 +92,7 @@
 import { ref, computed, onMounted, provide } from 'vue'
 import { useRoute } from 'vue-router'
 import GlobalSearch from './components/GlobalSearch.vue'
+import ThemeToggle from './components/ThemeToggle.vue'
 import { useFullscreen } from './composables/useFullscreen'
 
 // 全屏能力全局注入：页面通过 inject 获取，无需各自实现
@@ -107,16 +115,126 @@ onMounted(() => {
 
 <style>
 :root {
-  --primary: #4f6ef7;
-  --primary-light: #6b8aff;
-  --sidebar-bg: #f0f2f8;
-  --sidebar-hover: #e0e4f0;
-  --sidebar-active: rgba(79, 110, 247, 0.12);
-  --sidebar-text: #4a5068;
+  color-scheme: light;
+  --primary: #315ea8;
+  --primary-light: #4774bc;
+  --sidebar-bg: #eef1f5;
+  --sidebar-hover: #e1e6ed;
+  --sidebar-active: rgba(49, 94, 168, 0.12);
+  --sidebar-text: #485365;
   --sidebar-text-active: var(--primary);
-  --bg: #f5f6fa;
-  --card-bg: #fff;
-  --border: #ebeef5;
+  --bg: #f4f6f8;
+  --card-bg: #ffffff;
+  --surface-muted: #f8fafc;
+  --surface-hover: #eef3f8;
+  --text-primary: #1d2735;
+  --text-secondary: #667085;
+  --text-muted: #8a94a4;
+  --border: #dfe4ea;
+  --border-strong: #cdd4dd;
+  --focus-ring: #315ea8;
+  --scrollbar-track: #edf0f4;
+  --scrollbar-thumb: #aab3c0;
+  --scrollbar-thumb-hover: #7f8a99;
+  --shadow-card: 0 1px 3px rgba(23, 34, 51, 0.06), 0 10px 28px rgba(23, 34, 51, 0.04);
+  --el-color-primary: #315ea8;
+  --el-bg-color: var(--card-bg);
+  --el-bg-color-overlay: var(--card-bg);
+  --el-fill-color-blank: var(--card-bg);
+  --el-text-color-primary: var(--text-primary);
+  --el-text-color-regular: var(--text-secondary);
+  --el-border-color: var(--border);
+  --el-border-color-light: var(--border);
+  --el-fill-color-light: var(--surface-muted);
+  --el-mask-color: rgba(15, 23, 42, 0.52);
+  --vxe-ui-font-color: var(--text-primary);
+  --vxe-ui-font-primary-color: var(--primary);
+  --vxe-ui-font-secondary-color: var(--text-secondary);
+  --vxe-ui-layout-background-color: var(--card-bg);
+  --vxe-ui-table-header-font-color: var(--text-primary);
+  --vxe-ui-table-header-background-color: var(--surface-muted);
+  --vxe-ui-table-border-color: var(--border);
+  --vxe-ui-table-row-hover-background-color: var(--surface-hover);
+  --vxe-ui-table-row-striped-background-color: #fbfcfd;
+  --vxe-ui-table-row-hover-striped-background-color: var(--surface-hover);
+  --vxe-ui-loading-background-color: rgba(255, 255, 255, 0.76);
+}
+
+:root.dark {
+  color-scheme: dark;
+  --primary: #7ca1dc;
+  --primary-light: #99b8e6;
+  --sidebar-bg: #171c24;
+  --sidebar-hover: #222a35;
+  --sidebar-active: rgba(124, 161, 220, 0.16);
+  --sidebar-text: #b8c1cf;
+  --sidebar-text-active: var(--primary);
+  --bg: #10141a;
+  --card-bg: #1a2029;
+  --surface-muted: #202731;
+  --surface-hover: #27313d;
+  --text-primary: #edf1f7;
+  --text-secondary: #b7c0ce;
+  --text-muted: #8995a6;
+  --border: #303946;
+  --border-strong: #3d4857;
+  --focus-ring: #90afe0;
+  --scrollbar-track: #171d25;
+  --scrollbar-thumb: #4e5a69;
+  --scrollbar-thumb-hover: #6d7a8b;
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.28), 0 14px 34px rgba(0, 0, 0, 0.18);
+  --el-color-primary: #7ca1dc;
+  --el-bg-color: var(--card-bg);
+  --el-bg-color-overlay: #202731;
+  --el-fill-color-blank: var(--card-bg);
+  --el-fill-color: #242c37;
+  --el-fill-color-light: var(--surface-muted);
+  --el-fill-color-lighter: #232b35;
+  --el-fill-color-extra-light: #202731;
+  --el-text-color-primary: var(--text-primary);
+  --el-text-color-regular: var(--text-secondary);
+  --el-text-color-secondary: var(--text-muted);
+  --el-border-color: var(--border);
+  --el-border-color-light: var(--border);
+  --el-border-color-lighter: #2a333f;
+  --el-border-color-extra-light: #252d37;
+  --el-mask-color: rgba(0, 0, 0, 0.68);
+  --vxe-ui-font-color: var(--text-primary);
+  --vxe-ui-font-primary-color: var(--primary);
+  --vxe-ui-font-secondary-color: var(--text-secondary);
+  --vxe-ui-layout-background-color: var(--card-bg);
+  --vxe-ui-table-header-font-color: var(--text-primary);
+  --vxe-ui-table-header-background-color: var(--surface-muted);
+  --vxe-ui-table-footer-background-color: var(--surface-muted);
+  --vxe-ui-table-border-color: var(--border);
+  --vxe-ui-table-column-hover-background-color: var(--surface-hover);
+  --vxe-ui-table-row-hover-background-color: var(--surface-hover);
+  --vxe-ui-table-row-striped-background-color: #1d242d;
+  --vxe-ui-table-row-hover-striped-background-color: var(--surface-hover);
+  --vxe-ui-loading-background-color: rgba(26, 32, 41, 0.78);
+  --vxe-ui-base-popup-border-color: var(--border);
+  --vxe-ui-input-border-color: var(--border-strong);
+  --vxe-ui-input-disabled-background-color: #202731;
+}
+
+html,
+body,
+#app {
+  margin: 0;
+  min-width: 900px;
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--text-primary);
+}
+
+html {
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+body {
+  font-family: "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 .app-container {
@@ -126,7 +244,7 @@ onMounted(() => {
 .app-aside {
   background: var(--sidebar-bg);
   overflow: hidden;
-  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.2s ease, border-color 0.2s ease;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -209,7 +327,7 @@ onMounted(() => {
 
 .menu-group-title {
   font-size: 11px;
-  color: #8a8fa8;
+  color: var(--text-muted);
   letter-spacing: 1.5px;
   font-weight: 600;
 }
@@ -222,14 +340,27 @@ onMounted(() => {
   justify-content: center;
   cursor: pointer;
   color: var(--sidebar-text);
+  background: transparent;
+  border: 0;
   border-top: 1px solid var(--border);
-  transition: all 0.2s;
+  transition: color 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
   flex-shrink: 0;
 }
 
 .collapse-btn:hover {
   color: var(--primary-light);
   background: var(--sidebar-hover);
+}
+
+.collapse-btn:active {
+  transform: scale(0.98);
+}
+
+.collapse-btn:focus-visible,
+.el-button:focus-visible,
+.el-link:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .app-main {
@@ -267,7 +398,7 @@ onMounted(() => {
 .el-table .el-scrollbar__bar.is-horizontal { display: none !important; }
 
 /* 全屏模式 */
-.page-container.is-fullscreen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 2000; background: #fff; padding: 0; overflow: auto; }
+.page-container.is-fullscreen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 2000; background: var(--bg); padding: 0; overflow: auto; }
 .page-container.is-fullscreen > .el-card { height: 100%; display: flex; flex-direction: column; margin: 0; border: none; border-radius: 0; box-shadow: none; }
 .page-container.is-fullscreen > .el-card > .el-card__header { display: none; }
 .page-container.is-fullscreen > .el-card > .el-card__body { flex: 1; overflow: hidden; padding: 12px; }
@@ -321,7 +452,9 @@ onMounted(() => {
 .el-card {
   border-radius: 12px;
   border: 1px solid var(--border);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  background: var(--card-bg);
+  box-shadow: var(--shadow-card);
+  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .el-card__header {
@@ -373,7 +506,7 @@ onMounted(() => {
 /* 表单项 */
 .el-form-item__label {
   font-weight: 500;
-  color: #303133;
+  color: var(--text-primary);
 }
 
 /* 页面容器 */
@@ -422,7 +555,7 @@ onMounted(() => {
   gap: 10px;
   font-size: 17px;
   font-weight: 600;
-  color: #1a1f36;
+  color: var(--text-primary);
 }
 
 .action-buttons {
@@ -443,7 +576,18 @@ onMounted(() => {
 }
 @keyframes flash-highlight {
   0%, 100% { background: inherit; }
-  10%, 30%, 50% { background: #ecf5ff !important; }
-  20%, 40% { background: #d9ecff !important; }
+  10%, 30%, 50% { background: var(--sidebar-active) !important; }
+  20%, 40% { background: color-mix(in srgb, var(--primary) 22%, var(--card-bg)) !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 </style>

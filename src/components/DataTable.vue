@@ -1,5 +1,11 @@
 <template>
-  <div ref="wrapRef" class="dt-wrap">
+  <div
+    ref="wrapRef"
+    class="dt-wrap"
+    role="region"
+    aria-label="数据表格，可使用方向键滚动"
+    tabindex="0"
+  >
     <vxe-table
       ref="tableRef"
       :data="data"
@@ -10,16 +16,25 @@
       align="center"
       :fit="false"
       :row-config="{ keyField: 'id' }"
-      show-overflow
+      show-overflow="tooltip"
+      show-header-overflow="tooltip"
+      :empty-text="loading ? '正在加载数据' : '暂无数据'"
       class="dt-table"
     >
       <slot />
+      <template #empty>
+        <div class="dt-empty" aria-live="polite">
+          <el-icon class="dt-empty-icon"><DocumentRemove /></el-icon>
+          <span>{{ loading ? '正在加载数据' : '暂无数据' }}</span>
+        </div>
+      </template>
     </vxe-table>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+import { DocumentRemove } from '@element-plus/icons-vue'
 
 const props = defineProps<{
   data: any[]
@@ -67,8 +82,17 @@ onUnmounted(() => { observer?.disconnect() })
   width: 100%;
   flex: 1;
   /* 桌面应用兼容：确保滚动条可见（Chrome/Edge/WebView2） */
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable both-edges;
   scrollbar-width: thin;
-  scrollbar-color: #b0b4bc #f0f2f5;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  border-radius: 9px;
+  outline: none;
+  transition: box-shadow 0.18s ease, background-color 0.18s ease;
+}
+
+.dt-wrap:focus-visible {
+  box-shadow: 0 0 0 2px var(--focus-ring);
 }
 .dt-table {
   width: max-content;
@@ -90,11 +114,11 @@ onUnmounted(() => { observer?.disconnect() })
   position: sticky;
   top: 0;
   z-index: 5;
-  background: #fafbfc;
+  background: var(--surface-muted);
 }
 .dt-wrap :deep(.vxe-header--column) {
-  background: #fafbfc;
-  color: #303133;
+  background: var(--surface-muted);
+  color: var(--text-primary);
   font-weight: 600;
   font-size: 13px;
 }
@@ -104,18 +128,49 @@ onUnmounted(() => { observer?.disconnect() })
   height: 12px;
 }
 .dt-wrap::-webkit-scrollbar-track {
-  background: #f0f2f5;
+  background: var(--scrollbar-track);
   border-radius: 6px;
 }
 .dt-wrap::-webkit-scrollbar-thumb {
-  background: #b0b4bc;
+  background: var(--scrollbar-thumb);
   border-radius: 6px;
-  border: 2px solid #f0f2f5;
+  border: 2px solid var(--scrollbar-track);
 }
 .dt-wrap::-webkit-scrollbar-thumb:hover {
-  background: #909399;
+  background: var(--scrollbar-thumb-hover);
 }
 .dt-wrap::-webkit-scrollbar-thumb:active {
-  background: #606266;
+  background: var(--text-secondary);
+}
+
+.dt-empty {
+  min-height: 180px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.dt-empty-icon {
+  font-size: 30px;
+  opacity: 0.72;
+}
+
+.dt-wrap :deep(.vxe-table--body tr) {
+  transition: background-color 0.14s ease;
+}
+
+.dt-wrap :deep(.vxe-cell) {
+  line-height: 1.45;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dt-wrap,
+  .dt-wrap :deep(.vxe-table--body tr) {
+    transition: none;
+  }
 }
 </style>

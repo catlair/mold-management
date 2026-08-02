@@ -40,7 +40,11 @@
               v-for="item in group.items"
               :key="item.id"
               class="result-item"
+              role="button"
+              tabindex="0"
               @click="goTo(item)"
+              @keydown.enter="goTo(item)"
+              @keydown.space.prevent="goTo(item)"
             >
               <el-icon class="result-icon" :style="{ color: group.color }"><component :is="group.icon" /></el-icon>
               <div class="result-info">
@@ -273,7 +277,7 @@ onUnmounted(() => { document.removeEventListener('keydown', onKeydown) })
   cursor: pointer;
 }
 .search-input :deep(.el-input__wrapper) {
-  background: rgba(255,255,255,0.6);
+  background: color-mix(in srgb, var(--card-bg) 72%, transparent);
   border-radius: 6px;
 }
 .search-dialog :deep(.el-dialog__header) {
@@ -289,7 +293,7 @@ onUnmounted(() => { document.removeEventListener('keydown', onKeydown) })
 }
 .search-empty {
   text-align: center;
-  color: #909399;
+  color: var(--text-muted);
   padding: 24px 0;
   font-size: 14px;
 }
@@ -298,10 +302,10 @@ onUnmounted(() => { document.removeEventListener('keydown', onKeydown) })
 }
 .group-label {
   font-size: 12px;
-  color: #909399;
+  color: var(--text-muted);
   font-weight: 600;
   padding: 4px 0;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--border);
   margin-bottom: 4px;
 }
 .result-item {
@@ -311,10 +315,18 @@ onUnmounted(() => { document.removeEventListener('keydown', onKeydown) })
   padding: 8px 10px;
   border-radius: 6px;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background-color 0.15s ease, transform 0.15s ease;
 }
 .result-item:hover {
-  background: #f5f7fa;
+  background: var(--surface-hover);
+}
+.result-item:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+  background: var(--surface-hover);
+}
+.result-item:active {
+  transform: scale(0.995);
 }
 .result-icon {
   font-size: 18px;
@@ -327,17 +339,17 @@ onUnmounted(() => { document.removeEventListener('keydown', onKeydown) })
 .result-name {
   font-size: 14px;
   font-weight: 500;
-  color: #303133;
+  color: var(--text-primary);
 }
 .result-desc {
   font-size: 12px;
-  color: #909399;
+  color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .result-arrow {
-  color: #c0c4cc;
+  color: var(--text-muted);
   font-size: 14px;
   flex-shrink: 0;
 }
