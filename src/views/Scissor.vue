@@ -18,25 +18,25 @@
       <el-tabs v-model="activeTab">
         <el-tab-pane label="剪刀信息" name="info">
            <DataTable :data="scissorList" :loading="loading">
-            <el-table-column prop="name" label="名称" width="160" sortable />
-            <el-table-column prop="diameter" label="口径" width="100" sortable />
-            <el-table-column prop="wireMaterial" label="对应线材" width="120" sortable />
-            <el-table-column prop="safetyStock" label="安全库存" width="100" sortable />
-            <el-table-column prop="currentStock" label="当前库存" width="100" sortable />
-            <el-table-column prop="status" label="库存状态" width="100" sortable>
+            <vxe-column field="name" title="名称" width="160" sortable />
+            <vxe-column field="diameter" title="口径" width="100" sortable />
+            <vxe-column field="wireMaterial" title="对应线材" width="120" sortable />
+            <vxe-column field="safetyStock" title="安全库存" width="100" sortable />
+            <vxe-column field="currentStock" title="当前库存" width="100" sortable />
+            <vxe-column field="status" title="库存状态" width="100" sortable>
               <template #default="{ row }">
                 <el-tag v-if="row.status" :type="row.status === '需入库' ? 'danger' : 'success'" effect="dark" round size="small">
                   {{ row.status }}
                 </el-tag>
               </template>
-            </el-table-column>
-            <el-table-column prop="remark" label="备注" min-width="120" />
-            <el-table-column label="操作" width="150" fixed="right">
+            </vxe-column>
+            <vxe-column field="remark" title="备注" min-width="120" />
+            <vxe-column title="操作" width="150">
               <template #default="{ row }">
                 <el-button size="small" @click="handleEdit(row)">编辑</el-button>
                 <el-button size="small" type="danger" v-if="allowDelete" @click="handleDelete(row)">删除</el-button>
               </template>
-            </el-table-column>
+            </vxe-column>
           </DataTable>
         </el-tab-pane>
 
@@ -44,19 +44,19 @@
           <div class="tab-header">
             <el-button type="primary" size="small" @click="showOrderDialog = true">新增入库</el-button>
           </div>
-          <el-table :data="orderPaginated" border style="width: 100%">
+          <vxe-table :data="orderPaginated" border style="width: 100%">
 
-            <el-table-column label="剪刀" width="140" sortable>
+            <vxe-column title="剪刀" width="140" sortable>
               <template #default="{ row }">
                 {{ getScissorName(row.scissorId) }}
               </template>
-            </el-table-column>
-            <el-table-column prop="quantity" label="入库数量" width="120" sortable />
-            <el-table-column prop="orderDate" label="入库时间" width="180" sortable />
-            <el-table-column prop="status" label="到货状态" width="120" sortable :filters="statusFilters" :filter-method="filterHandler" />
-            <el-table-column prop="remark" label="备注" min-width="150" />
-          
-</el-table>
+            </vxe-column>
+            <vxe-column field="quantity" title="入库数量" width="120" sortable />
+            <vxe-column field="orderDate" title="入库时间" width="180" sortable />
+            <vxe-column field="status" title="到货状态" width="120" sortable :filters="statusFilters" :filter-method="filterHandler" />
+            <vxe-column field="remark" title="备注" min-width="150" />
+
+</vxe-table>
           <el-pagination
             v-model:current-page="orderCurrentPage"
             v-model:page-size="orderPageSize"
@@ -72,19 +72,19 @@
           <div class="tab-header">
             <el-button type="primary" size="small" @click="showUseDialog = true">新增使用</el-button>
           </div>
-          <el-table :data="usePaginated" border style="width: 100%">
+          <vxe-table :data="usePaginated" border style="width: 100%">
 
-            <el-table-column label="剪刀" width="140" sortable>
+            <vxe-column title="剪刀" width="140" sortable>
               <template #default="{ row }">
                 {{ getScissorName(row.scissorId) }}
               </template>
-            </el-table-column>
-            <el-table-column prop="user" label="使用人" width="120" sortable />
-            <el-table-column prop="quantity" label="使用数量" width="120" sortable />
-            <el-table-column prop="useDate" label="使用时间" width="180" sortable />
-            <el-table-column prop="remark" label="备注" min-width="120" />
-          
-</el-table>
+            </vxe-column>
+            <vxe-column field="user" title="使用人" width="120" sortable />
+            <vxe-column field="quantity" title="使用数量" width="120" sortable />
+            <vxe-column field="useDate" title="使用时间" width="180" sortable />
+            <vxe-column field="remark" title="备注" min-width="120" />
+
+</vxe-table>
           <el-pagination
             v-model:current-page="useCurrentPage"
             v-model:page-size="usePageSize"
@@ -100,20 +100,20 @@
           <div class="tab-header">
             <el-button type="primary" size="small" @click="showLinkDialog = true">新增关联</el-button>
           </div>
-          <el-table :data="linkList" border style="width: 100%">
-            <el-table-column label="剪刀" width="120" sortable>
+          <vxe-table :data="linkList" border style="width: 100%">
+            <vxe-column title="剪刀" width="120" sortable>
               <template #default="{ row }">
                 {{ getScissorName(row.scissorId) }}
               </template>
-            </el-table-column>
-            <el-table-column prop="wireMaterial" label="线材规格" width="120" sortable />
-            <el-table-column prop="remark" label="备注" />
-            <el-table-column label="操作" width="100">
+            </vxe-column>
+            <vxe-column field="wireMaterial" title="线材规格" width="120" sortable />
+            <vxe-column field="remark" title="备注" />
+            <vxe-column title="操作" width="100">
               <template #default="{ row }">
                 <el-button size="small" type="danger" v-if="allowDelete" @click="handleDeleteLink(row)">删除</el-button>
               </template>
-            </el-table-column>
-          </el-table>
+            </vxe-column>
+          </vxe-table>
         </el-tab-pane>
       </el-tabs>
     </el-card>
@@ -265,11 +265,11 @@ const usePaginated = computed(() => {
 
 // 筛选选项
 const statusFilters = [
-  { text: '未到货', value: '未到货' },
-  { text: '已到货', value: '已到货' }
+  { label: '未到货', value: '未到货' },
+  { label: '已到货', value: '已到货' }
 ]
 
-function filterHandler(value: string, row: any, column: any) {
+function filterHandler({ value, row, column }: any) {
   const property = column.property
   return row[property] === value
 }

@@ -18,29 +18,29 @@
       <el-tabs v-model="activeTab">
         <el-tab-pane label="冲头信息" name="info">
            <DataTable :data="punchList" :loading="loading">
-            <el-table-column prop="name" label="名称" width="160" sortable>
+            <vxe-column field="name" title="名称" width="160" sortable>
               <template #default="{ row }">
                 <el-link type="primary" :underline="false" @click="showLinkedScrews(row)">{{ row.name }}</el-link>
               </template>
-            </el-table-column>
-            <el-table-column prop="spec" label="规格" width="80" sortable />
-            <el-table-column prop="material" label="材质" width="120" sortable :filters="materialFilters" :filter-method="filterHandler" />
-            <el-table-column prop="safetyStock" label="安全库存" width="100" sortable />
-            <el-table-column prop="currentStock" label="当前库存" width="100" sortable />
-            <el-table-column prop="status" label="库存状态" width="100" sortable>
+            </vxe-column>
+            <vxe-column field="spec" title="规格" width="80" sortable />
+            <vxe-column field="material" title="材质" width="120" sortable :filters="materialFilters" :filter-method="filterHandler" />
+            <vxe-column field="safetyStock" title="安全库存" width="100" sortable />
+            <vxe-column field="currentStock" title="当前库存" width="100" sortable />
+            <vxe-column field="status" title="库存状态" width="100" sortable>
               <template #default="{ row }">
                 <el-tag v-if="row.status" :type="row.status === '需入库' ? 'danger' : 'success'" effect="dark" round size="small">
                   {{ row.status }}
                 </el-tag>
               </template>
-            </el-table-column>
-            <el-table-column prop="remark" label="备注" min-width="120" />
-            <el-table-column label="操作" width="150" fixed="right">
+            </vxe-column>
+            <vxe-column field="remark" title="备注" min-width="120" />
+            <vxe-column title="操作" width="150">
               <template #default="{ row }">
                 <el-button size="small" @click="handleEdit(row)">编辑</el-button>
                 <el-button size="small" type="danger" v-if="allowDelete" @click="handleDelete(row)">删除</el-button>
               </template>
-            </el-table-column>
+            </vxe-column>
           </DataTable>
         </el-tab-pane>
 
@@ -48,19 +48,19 @@
           <div class="tab-header">
             <el-button type="primary" size="small" @click="showOrderDialog = true">新增入库</el-button>
           </div>
-          <el-table :data="orderPaginated" border style="width: 100%">
+          <vxe-table :data="orderPaginated" border style="width: 100%">
 
-            <el-table-column label="冲头" width="140" sortable>
+            <vxe-column title="冲头" width="140" sortable>
               <template #default="{ row }">
                 {{ getPunchName(row.punchId) }}
               </template>
-            </el-table-column>
-            <el-table-column prop="quantity" label="入库数量" width="120" sortable />
-            <el-table-column prop="orderDate" label="入库时间" width="180" sortable />
-            <el-table-column prop="status" label="到货状态" width="120" sortable :filters="statusFilters" :filter-method="filterHandler" />
-            <el-table-column prop="remark" label="备注" min-width="150" />
-          
-</el-table>
+            </vxe-column>
+            <vxe-column field="quantity" title="入库数量" width="120" sortable />
+            <vxe-column field="orderDate" title="入库时间" width="180" sortable />
+            <vxe-column field="status" title="到货状态" width="120" sortable :filters="statusFilters" :filter-method="filterHandler" />
+            <vxe-column field="remark" title="备注" min-width="150" />
+
+</vxe-table>
           <el-pagination
             v-model:current-page="orderCurrentPage"
             v-model:page-size="orderPageSize"
@@ -76,19 +76,19 @@
           <div class="tab-header">
             <el-button type="primary" size="small" @click="showUseDialog = true">新增领用</el-button>
           </div>
-          <el-table :data="usePaginated" border style="width: 100%">
+          <vxe-table :data="usePaginated" border style="width: 100%">
 
-            <el-table-column label="冲头" width="140" sortable>
+            <vxe-column title="冲头" width="140" sortable>
               <template #default="{ row }">
                 {{ getPunchName(row.punchId) }}
               </template>
-            </el-table-column>
-            <el-table-column prop="user" label="领用人" width="120" sortable />
-            <el-table-column prop="quantity" label="领用数量" width="120" sortable />
-            <el-table-column prop="useDate" label="领用时间" width="180" sortable />
-            <el-table-column prop="remark" label="备注" min-width="150" />
-          
-</el-table>
+            </vxe-column>
+            <vxe-column field="user" title="领用人" width="120" sortable />
+            <vxe-column field="quantity" title="领用数量" width="120" sortable />
+            <vxe-column field="useDate" title="领用时间" width="180" sortable />
+            <vxe-column field="remark" title="备注" min-width="150" />
+
+</vxe-table>
           <el-pagination
             v-model:current-page="useCurrentPage"
             v-model:page-size="usePageSize"
@@ -104,41 +104,41 @@
           <div class="tab-header">
             <el-button type="primary" size="small" @click="showLinkDialog = true">新增关联</el-button>
           </div>
-          <el-table :data="linkList" border style="width: 100%">
-            <el-table-column label="冲头" width="200">
+          <vxe-table :data="linkList" border style="width: 100%">
+            <vxe-column title="冲头" width="200">
               <template #default="{ row }">
                 {{ getPunchName(row.punchId) }}
               </template>
-            </el-table-column>
-            <el-table-column label="螺丝规格" width="200">
+            </vxe-column>
+            <vxe-column title="螺丝规格" width="200">
               <template #default="{ row }">
                 {{ getScrewSpecName(row.screwSpecId) }}
               </template>
-            </el-table-column>
-            <el-table-column prop="remark" label="备注" />
-            <el-table-column label="操作" width="100">
+            </vxe-column>
+            <vxe-column field="remark" title="备注" />
+            <vxe-column title="操作" width="100">
               <template #default="{ row }">
                 <el-button size="small" type="danger" v-if="allowDelete" @click="handleDeleteLink(row)">删除</el-button>
               </template>
-            </el-table-column>
-          </el-table>
+            </vxe-column>
+          </vxe-table>
         </el-tab-pane>
       </el-tabs>
     </el-card>
 
     <!-- 关联螺丝对话框 -->
     <el-dialog v-model="showLinkedScrewsDialog" :title="`关联螺丝 - ${linkedPunchName}`" width="700px">
-      <el-table :data="linkedScrews" border style="width: 100%" v-loading="linkedLoading">
-        <el-table-column prop="name" label="螺丝名称" width="150" sortable />
-        <el-table-column prop="headType" label="头型" width="100" />
-        <el-table-column prop="threadType" label="牙型" width="100" />
-        <el-table-column prop="headSize" label="头/垫片大小" width="120" />
-        <el-table-column prop="headHeight" label="头高" width="80" />
-        <el-table-column prop="length" label="长度" width="80" />
-        <el-table-column prop="threadDiameter" label="牙径" width="80" />
-        <el-table-column prop="wireMaterial" label="线材" width="80" />
-        <el-table-column prop="remark" label="备注" min-width="120" />
-      </el-table>
+      <vxe-table :data="linkedScrews" border style="width: 100%" :loading="linkedLoading">
+        <vxe-column field="name" title="螺丝名称" width="150" sortable />
+        <vxe-column field="headType" title="头型" width="100" />
+        <vxe-column field="threadType" title="牙型" width="100" />
+        <vxe-column field="headSize" title="头/垫片大小" width="120" />
+        <vxe-column field="headHeight" title="头高" width="80" />
+        <vxe-column field="length" title="长度" width="80" />
+        <vxe-column field="threadDiameter" title="牙径" width="80" />
+        <vxe-column field="wireMaterial" title="线材" width="80" />
+        <vxe-column field="remark" title="备注" min-width="120" />
+      </vxe-table>
       <div v-if="!linkedLoading && linkedScrews.length === 0" style="text-align: center; color: #909399; padding: 20px">
         该冲头暂无关联螺丝规格
       </div>
@@ -300,15 +300,15 @@ const usePaginated = computed(() => {
 // 筛选选项
 const materialFilters = computed(() => {
   const types = [...new Set(punchList.value.map(item => item.material).filter(Boolean))]
-  return types.map(t => ({ text: t, value: t }))
+  return types.map(t => ({ label: t, value: t }))
 })
 
 const statusFilters = [
-  { text: '未到货', value: '未到货' },
-  { text: '已到货', value: '已到货' }
+  { label: '未到货', value: '未到货' },
+  { label: '已到货', value: '已到货' }
 ]
 
-function filterHandler(value: string, row: any, column: any) {
+function filterHandler({ value, row, column }: any) {
   const property = column.property
   return row[property] === value
 }

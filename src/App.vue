@@ -263,20 +263,24 @@ onMounted(() => {
   border-radius: 10px;
 }
 
-/* 强制 el-table 水平滚动条可见 */
-.el-table .el-scrollbar__wrap { overflow-x: auto !important; }
-.el-table .el-scrollbar__bar.is-horizontal { display: block !important; opacity: 1 !important; height: 14px !important; }
-.el-table .el-scrollbar__bar.is-horizontal .el-scrollbar__thumb { background-color: #b0b4bc !important; border-radius: 5px; height: 8px !important; }
-.el-table .el-scrollbar__bar.is-horizontal .el-scrollbar__thumb:hover { background-color: #909399 !important; }
+/* DataTable 内部表格无滚动条（滚动由 dt-wrap 承担），这里仅兜底隐藏悬浮条 */
+.el-table .el-scrollbar__bar.is-horizontal { display: none !important; }
 
 /* 全屏模式 */
 .page-container.is-fullscreen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 2000; background: #fff; padding: 0; overflow: auto; }
 .page-container.is-fullscreen > .el-card { height: 100%; display: flex; flex-direction: column; margin: 0; border: none; border-radius: 0; box-shadow: none; }
 .page-container.is-fullscreen > .el-card > .el-card__header { display: none; }
 .page-container.is-fullscreen > .el-card > .el-card__body { flex: 1; overflow: hidden; padding: 12px; }
-.page-container.is-fullscreen .el-table {
-  max-height: 100% !important;
-}
+
+/* 非全屏模式：祖先链 flex 撑开高度，避免 DataTable 撑爆整页被 overflow:hidden 裁掉 */
+.app-main { display: flex; flex-direction: column; }
+.page-container { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.page-container > .el-card { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.page-container > .el-card > .el-card__body { display: flex; flex-direction: column; min-height: 0; flex: 1; padding: 12px; overflow: hidden; }
+/* tabs 页：el-tabs 内容区也要撑满 */
+.page-container > .el-card > .el-card__body > .el-tabs { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.page-container > .el-card > .el-card__body > .el-tabs > .el-tabs__content { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.page-container > .el-card > .el-card__body > .el-tabs > .el-tabs__content > .el-tab-pane { display: flex; flex-direction: column; min-height: 0; flex: 1; }
 
 /* 全屏退出按钮（所有页面共用） */
 .fullscreen-exit-btn {
@@ -285,23 +289,6 @@ onMounted(() => {
   right: 12px;
   z-index: 2001;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
-}
-
-/* 表格水平滚动条始终可见 - 强制覆盖 JS 行为 */
-.el-table .el-scrollbar__bar.is-horizontal {
-  opacity: 1 !important;
-  transition: none !important;
-  transform: none !important;
-}
-
-.el-table .el-scrollbar__bar.is-horizontal .el-scrollbar__thumb {
-  opacity: 1 !important;
-  background: #b0b4bc !important;
-  transition: background 0.2s !important;
-}
-
-.el-table .el-scrollbar__bar.is-horizontal .el-scrollbar__thumb:hover {
-  background: #909399 !important;
 }
 
 /* 菜单隐藏滚动条 */
@@ -405,6 +392,28 @@ onMounted(() => {
   flex: 1;
   overflow: hidden;
   padding: 12px 24px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* tabs 页面：让 tabs 撑满内容区，表格随容器自适应高度 */
+.page-container > .el-card > .el-card__body > .el-tabs {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.page-container > .el-card > .el-card__body > .el-tabs > .el-tabs__content {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.page-container > .el-card > .el-card__body > .el-tabs > .el-tabs__content > .el-tab-pane {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .card-header {

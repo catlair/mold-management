@@ -105,23 +105,23 @@
           <el-button size="small" style="margin-left: auto" @click="loadBackups">刷新</el-button>
         </div>
       </template>
-      <el-table :data="backups" style="width: 100%" max-height="400">
-        <el-table-column prop="backup_time" label="备份时间" width="180" />
-        <el-table-column prop="backup_reason" label="备份原因" width="120" />
-        <el-table-column prop="backup_md5" label="MD5" min-width="200" show-overflow-tooltip />
-        <el-table-column label="锁定" width="80" align="center">
-          <template #default="{ row, $index }">
-            <el-button size="small" :type="row.locked ? 'warning' : 'info'" link @click="handleToggleLock($index)">
+      <vxe-table :data="backups" style="width: 100%" max-height="400">
+        <vxe-column field="backup_time" title="备份时间" width="180" />
+        <vxe-column field="backup_reason" title="备份原因" width="120" />
+        <vxe-column field="backup_md5" title="MD5" min-width="200" show-overflow="tooltip" />
+        <vxe-column title="锁定" width="80" align="center">
+          <template #default="{ row, rowIndex }">
+            <el-button size="small" :type="row.locked ? 'warning' : 'info'" link @click="handleToggleLock(rowIndex)">
               <el-icon><Lock v-if="row.locked" /><Unlock v-else /></el-icon>
             </el-button>
           </template>
-        </el-table-column>
-        <el-table-column label="操作" width="120" fixed="right">
+        </vxe-column>
+        <vxe-column title="操作" width="120">
           <template #default="{ row }">
             <el-button size="small" type="warning" @click="handleRestore(row)">恢复</el-button>
           </template>
-        </el-table-column>
-      </el-table>
+        </vxe-column>
+      </vxe-table>
       <div v-if="backups.length === 0" style="text-align: center; color: #909399; padding: 20px">
         暂无备份记录
       </div>

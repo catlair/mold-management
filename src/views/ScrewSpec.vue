@@ -16,37 +16,37 @@
       </template>
 
         <DataTable :data="tableData" :loading="loading">
-        <el-table-column prop="name" label="螺丝名称" width="160" sortable />
-        <el-table-column prop="headType" label="头型" width="120" sortable :filters="headTypeFilters" :filter-method="filterHandler" />
-        <el-table-column prop="punch" label="冲头" width="120" sortable>
+        <vxe-column field="name" title="螺丝名称" width="160" sortable />
+        <vxe-column field="headType" title="头型" width="120" sortable :filters="headTypeFilters" :filter-method="filterHandler" />
+        <vxe-column field="punch" title="冲头" width="120" sortable>
           <template #default="{ row }">
             <el-link v-if="row.punch" type="primary" :underline="false" @click="showPunchDialog(row)">{{ row.punch }}</el-link>
             <span v-else>-</span>
           </template>
-        </el-table-column>
-        <el-table-column prop="threadType" label="牙型" width="120" sortable :filters="threadTypeFilters" :filter-method="filterHandler" />
-        <el-table-column prop="die" label="牙板" width="120" sortable>
+        </vxe-column>
+        <vxe-column field="threadType" title="牙型" width="120" sortable :filters="threadTypeFilters" :filter-method="filterHandler" />
+        <vxe-column field="die" title="牙板" width="120" sortable>
           <template #default="{ row }">
             <el-link v-if="row.die" type="success" :underline="false" @click="showDieDialog(row)">{{ row.die }}</el-link>
             <span v-else>-</span>
           </template>
-        </el-table-column>
-        <el-table-column prop="headSize" label="头/垫片大小" width="140" sortable />
-        <el-table-column prop="headHeight" label="头高" width="100" sortable />
-        <el-table-column prop="length" label="长度" width="100" sortable />
-        <el-table-column prop="threadDiameter" label="牙径" width="100" sortable />
-        <el-table-column prop="shankLength" label="光钉长度" width="120" sortable />
-        <el-table-column prop="wireMaterial" label="线材" width="100" sortable />
-        <el-table-column prop="plating" label="电镀" width="120" sortable :filters="platingFilters" :filter-method="filterHandler" />
-        <el-table-column prop="customer" label="客户名" width="120" sortable />
-        <el-table-column prop="externalId" label="外部ID" width="120" sortable />
-        <el-table-column prop="remark" label="备注" min-width="140" />
-        <el-table-column label="操作" width="150" fixed="right">
+        </vxe-column>
+        <vxe-column field="headSize" title="头/垫片大小" width="140" sortable />
+        <vxe-column field="headHeight" title="头高" width="100" sortable />
+        <vxe-column field="length" title="长度" width="100" sortable />
+        <vxe-column field="threadDiameter" title="牙径" width="100" sortable />
+        <vxe-column field="shankLength" title="光钉长度" width="120" sortable />
+        <vxe-column field="wireMaterial" title="线材" width="100" sortable />
+        <vxe-column field="plating" title="电镀" width="120" sortable :filters="platingFilters" :filter-method="filterHandler" />
+        <vxe-column field="customer" title="客户名" width="120" sortable />
+        <vxe-column field="externalId" title="外部ID" width="120" sortable />
+        <vxe-column field="remark" title="备注" min-width="140" />
+        <vxe-column title="操作" width="150">
           <template #default="{ row }">
             <el-button size="small" @click="handleEdit(row)">编辑</el-button>
             <el-button size="small" type="danger" v-if="allowDelete" @click="handleDelete(row)">删除</el-button>
           </template>
-        </el-table-column>
+        </vxe-column>
       </DataTable>
       <div v-if="!loading && tableData.length === 0" class="empty-state">
         <el-empty description="暂无数据" />
@@ -153,60 +153,60 @@
 
     <!-- 冲头关联弹窗 -->
     <el-dialog v-model="punchDialogVisible" title="冲头关联" width="700px">
-      <el-table :data="punchDialogItems" border size="small">
-        <el-table-column label="冲头名称" width="120">
+      <vxe-table :data="punchDialogItems" border size="small">
+        <vxe-column title="冲头名称" width="120">
           <template #default="{ row: r }">{{ toShortCode(r.name) || r.name }}</template>
-        </el-table-column>
-        <el-table-column prop="spec" label="规格" width="100" />
-        <el-table-column prop="material" label="材质" width="80" />
-        <el-table-column label="当前库存" width="90" align="center">
+        </vxe-column>
+        <vxe-column field="spec" title="规格" width="100" />
+        <vxe-column field="material" title="材质" width="80" />
+        <vxe-column title="当前库存" width="90" align="center">
           <template #default="{ row: r }">{{ r.currentStock ?? '-' }}</template>
-        </el-table-column>
-        <el-table-column label="安全库存" width="90" align="center">
+        </vxe-column>
+        <vxe-column title="安全库存" width="90" align="center">
           <template #default="{ row: r }">{{ r.safetyStock ?? '-' }}</template>
-        </el-table-column>
-        <el-table-column label="状态" width="90" align="center">
+        </vxe-column>
+        <vxe-column title="状态" width="90" align="center">
           <template #default="{ row: r }">
             <el-tag v-if="r.status" :type="r.status === '需入库' ? 'danger' : 'success'" size="small" round>{{ r.status }}</el-tag>
             <span v-else>-</span>
           </template>
-        </el-table-column>
-        <el-table-column label="外显" width="60" align="center">
+        </vxe-column>
+        <vxe-column title="外显" width="60" align="center">
           <template #default="{ row: item }">
             <el-link :type="matchPunchNames(item.name, punchDialogPrimary) ? 'info' : 'warning'" :underline="false" @click="setPunchPrimary(item)">
               <el-icon><View /></el-icon>
             </el-link>
           </template>
-        </el-table-column>
-      </el-table>
+        </vxe-column>
+      </vxe-table>
     </el-dialog>
 
     <!-- 牙板关联弹窗 -->
     <el-dialog v-model="dieDialogVisible" title="牙板关联" width="700px">
-      <el-table :data="dieDialogItems" border size="small">
-        <el-table-column prop="name" label="牙板名称" width="100" />
-        <el-table-column prop="machineType" label="机型" width="100" />
-        <el-table-column prop="wireDiameter" label="线径" width="80" />
-        <el-table-column label="当前库存" width="90" align="center">
+      <vxe-table :data="dieDialogItems" border size="small">
+        <vxe-column field="name" title="牙板名称" width="100" />
+        <vxe-column field="machineType" title="机型" width="100" />
+        <vxe-column field="wireDiameter" title="线径" width="80" />
+        <vxe-column title="当前库存" width="90" align="center">
           <template #default="{ row: r }">{{ r.currentStock ?? '-' }}</template>
-        </el-table-column>
-        <el-table-column label="安全库存" width="90" align="center">
+        </vxe-column>
+        <vxe-column title="安全库存" width="90" align="center">
           <template #default="{ row: r }">{{ r.safetyStock ?? '-' }}</template>
-        </el-table-column>
-        <el-table-column label="状态" width="90" align="center">
+        </vxe-column>
+        <vxe-column title="状态" width="90" align="center">
           <template #default="{ row: r }">
             <el-tag v-if="r.status" :type="r.status === '需入库' ? 'danger' : 'success'" size="small" round>{{ r.status }}</el-tag>
             <span v-else>-</span>
           </template>
-        </el-table-column>
-        <el-table-column label="外显" width="60" align="center">
+        </vxe-column>
+        <vxe-column title="外显" width="60" align="center">
           <template #default="{ row: item }">
             <el-link :type="item.name === dieDialogPrimary ? 'info' : 'warning'" :underline="false" @click="setDiePrimary(item)">
               <el-icon><View /></el-icon>
             </el-link>
           </template>
-        </el-table-column>
-      </el-table>
+        </vxe-column>
+      </vxe-table>
     </el-dialog>
   </div>
 </template>
@@ -279,10 +279,10 @@ const dieOptions = computed(() => {
   })
 })
 
-const headTypeFilters = computed(() => [...new Set(tableData.value.map(i => i.headType).filter(Boolean))].map(t => ({ text: t, value: t })))
-const threadTypeFilters = computed(() => [...new Set(tableData.value.map(i => i.threadType).filter(Boolean))].map(t => ({ text: t, value: t })))
-const platingFilters = computed(() => [...new Set(tableData.value.map(i => i.plating).filter(Boolean))].map(t => ({ text: t, value: t })))
-function filterHandler(value: string, row: any, column: any) { return row[column.property] === value }
+const headTypeFilters = computed(() => [...new Set(tableData.value.map(i => i.headType).filter(Boolean))].map(t => ({ label: t, value: t })))
+const threadTypeFilters = computed(() => [...new Set(tableData.value.map(i => i.threadType).filter(Boolean))].map(t => ({ label: t, value: t })))
+const platingFilters = computed(() => [...new Set(tableData.value.map(i => i.plating).filter(Boolean))].map(t => ({ label: t, value: t })))
+function filterHandler({ value, row, column }: any) { return row[column.property] === value }
 
 const form = ref<any>({
   id: '', customer: '', externalId: '', name: '', headType: '',
