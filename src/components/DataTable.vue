@@ -16,7 +16,6 @@
       align="center"
       :fit="false"
       :row-config="{ keyField: 'id' }"
-      show-overflow="tooltip"
       show-header-overflow="tooltip"
       :empty-text="loading ? '正在加载数据' : '暂无数据'"
       class="dt-table"
@@ -163,8 +162,33 @@ onUnmounted(() => { observer?.disconnect() })
   transition: background-color 0.14s ease;
 }
 
-.dt-wrap :deep(.vxe-cell) {
+/* 规格字段优先完整显示：允许正文自动换行并由内容撑高行高 */
+.dt-wrap :deep(.vxe-body--column .vxe-cell) {
+  height: auto;
+  min-height: 46px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   line-height: 1.45;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.dt-wrap :deep(.vxe-body--column .vxe-cell--wrapper) {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.dt-wrap :deep(.vxe-body--row) {
+  height: auto !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
