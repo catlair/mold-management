@@ -1,5 +1,9 @@
 node_modules/
 dist/
+dist-opt/
 src-tauri/target/
+.workbuddy/
+data/backups/
+data/*.xlsx
 *.log
 .DS_Store
