@@ -235,8 +235,12 @@
     </el-dialog>
 
     <!-- 关联螺丝对话框 -->
-    <el-dialog v-model="showLinkedScrewsDialog" :title="`关联螺丝 - ${linkedDieName}`" width="700px">
-      <vxe-table :data="linkedScrews" border style="width: 100%" :loading="linkedLoading">
+    <RelatedDataDialog
+      v-model="showLinkedScrewsDialog"
+      :title="`关联螺丝 · ${linkedDieName}`"
+      description="查看当前牙板适用的螺丝规格"
+    >
+      <vxe-table :data="linkedScrews" border round stripe style="width: 100%" :loading="linkedLoading">
         <vxe-column field="name" title="螺丝名称" width="150" sortable />
         <vxe-column field="headType" title="头型" width="100" />
         <vxe-column field="threadType" title="牙型" width="100" />
@@ -247,10 +251,10 @@
         <vxe-column field="wireMaterial" title="线材" width="80" />
         <vxe-column field="remark" title="备注" min-width="120" />
       </vxe-table>
-      <div v-if="!linkedLoading && linkedScrews.length === 0" style="text-align: center; color: #909399; padding: 20px">
+      <div v-if="!linkedLoading && linkedScrews.length === 0" class="related-dialog-empty">
         该牙板暂无关联螺丝规格
       </div>
-    </el-dialog>
+    </RelatedDataDialog>
   </div>
 </template>
 
@@ -262,6 +266,7 @@ import { dieApi, dieOrderApi, dieUseApi, dieLinkApi, screwSpecApi, stockCalcApi 
 import { useAllowDelete } from '../composables/useAllowDelete'
 import { useHighlight } from '../composables/useHighlight'
 import DataTable from '../components/DataTable.vue'
+import RelatedDataDialog from '../components/RelatedDataDialog.vue'
 import FullscreenToggle from '../components/FullscreenToggle.vue'
 
 const { allowDelete } = useAllowDelete()

@@ -152,8 +152,12 @@
     </el-dialog>
 
     <!-- 冲头关联弹窗 -->
-    <el-dialog v-model="punchDialogVisible" title="冲头关联" width="700px">
-      <vxe-table :data="punchDialogItems" border size="small">
+    <RelatedDataDialog
+      v-model="punchDialogVisible"
+      title="冲头关联"
+      description="查看当前螺丝规格关联的冲头与库存状态"
+    >
+      <vxe-table :data="punchDialogItems" border round stripe size="small">
         <vxe-column title="冲头名称" width="120">
           <template #default="{ row: r }">{{ toShortCode(r.name) || r.name }}</template>
         </vxe-column>
@@ -179,11 +183,15 @@
           </template>
         </vxe-column>
       </vxe-table>
-    </el-dialog>
+    </RelatedDataDialog>
 
     <!-- 牙板关联弹窗 -->
-    <el-dialog v-model="dieDialogVisible" title="牙板关联" width="700px">
-      <vxe-table :data="dieDialogItems" border size="small">
+    <RelatedDataDialog
+      v-model="dieDialogVisible"
+      title="牙板关联"
+      description="查看当前螺丝规格关联的牙板与库存状态"
+    >
+      <vxe-table :data="dieDialogItems" border round stripe size="small">
         <vxe-column field="name" title="牙板名称" width="100" />
         <vxe-column field="machineType" title="机型" width="100" />
         <vxe-column field="wireDiameter" title="线径" width="80" />
@@ -207,7 +215,7 @@
           </template>
         </vxe-column>
       </vxe-table>
-    </el-dialog>
+    </RelatedDataDialog>
   </div>
 </template>
 
@@ -221,6 +229,7 @@ import { useAllowDelete } from '../composables/useAllowDelete'
 import { useHighlight } from '../composables/useHighlight'
 import FullscreenToggle from '../components/FullscreenToggle.vue'
 import DataTable from '../components/DataTable.vue'
+import RelatedDataDialog from '../components/RelatedDataDialog.vue'
 import { toShortCode, matchPunchNames } from '../utils/punchName'
 
 const { allowDelete } = useAllowDelete()
