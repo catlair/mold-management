@@ -142,6 +142,109 @@ fn normalize_value(val: String) -> String {
     val
 }
 
+fn normalize_text(value: &str) -> String {
+    value.chars()
+        .flat_map(|ch| {
+            let normalized = match ch {
+                '\u{3000}' => ' ',
+                '、' => ',',
+                '\u{FF01}'..='\u{FF5E}' => char::from_u32(ch as u32 - 0xFEE0).unwrap_or(ch),
+                _ => ch,
+            };
+            normalized.to_lowercase()
+        })
+        .filter(|ch| !ch.is_whitespace())
+        .collect()
+}
+
+fn normalize_dimension(value: &str) -> String {
+    let mut normalized = normalize_text(value)
+        .replace('×', "x")
+        .replace('＊', "x")
+        .replace('*', "x")
+        .replace('φ', "");
+
+    for suffix in ["毫米", "mm"] {
+        if normalized.ends_with(suffix) {
+            normalized.truncate(normalized.len() - suffix.len());
+            break;
+        }
+    }
+
+    if let Ok(number) = normalized.parse::<f64>() {
+        if number.is_finite() {
+            return if number.fract() == 0.0 {
+                format!("{}", number as i64)
+            } else {
+                let formatted = format!("{:.12}", number);
+                formatted.trim_end_matches('0').trim_end_matches('.').to_string()
+            };
+        }
+    }
+
+    normalized
+}
+
+fn normalize_punch_name(value: &str) -> String {
+    let normalized = normalize_text(value);
+    let chars: Vec<char> = normalized.chars().collect();
+    let digit_count = chars.iter().take_while(|ch| ch.is_ascii_digit()).count();
+
+    if digit_count > 0 && digit_count < chars.len() {
+        let letter = chars[digit_count];
+        if matches!(letter, 'p' | 'b' | 't' | 'f' | 'x' | 'r') {
+            let suffix: String = chars[digit_count + 1..].iter().collect();
+            if suffix.is_empty() || suffix == "特" {
+                let number: String = chars[..digit_count].iter().collect();
+                return format!("jm{}m{}{}", letter, number, suffix);
+            }
+        }
+    }
+
+    normalized
+}
+
+fn field<'a>(record: &'a HashMap<String, String>, key: &str) -> &'a str {
+    record.get(key).map(String::as_str).unwrap_or("")
+}
+
+fn business_unique_key(sheet_name: &str, record: &HashMap<String, String>) -> Option<String> {
+    match sheet_name {
+        "冲头信息表" => Some([
+            normalize_punch_name(field(record, "name")),
+            normalize_dimension(field(record, "spec")),
+            normalize_text(field(record, "material")),
+        ].join("|")),
+        "牙板信息表" => Some([
+            normalize_text(field(record, "name")),
+            normalize_text(field(record, "machineType")),
+            normalize_dimension(field(record, "wireDiameter")),
+        ].join("|")),
+        _ => None,
+    }
+}
+
+fn ensure_unique_record(
+    sheet_name: &str,
+    candidate: &HashMap<String, String>,
+    existing_rows: &[HashMap<String, String>],
+    exclude_id: Option<&str>,
+) -> Result<(), String> {
+    let Some(candidate_key) = business_unique_key(sheet_name, candidate) else {
+        return Ok(());
+    };
+
+    if let Some(existing) = existing_rows.iter().find(|row| {
+        let is_current = exclude_id.is_some_and(|id| field(row, "id") == id);
+        !is_current && business_unique_key(sheet_name, row).as_deref() == Some(candidate_key.as_str())
+    }) {
+        let resource = if sheet_name == "冲头信息表" { "冲头" } else { "牙板" };
+        return Err(format!("DUPLICATE_RECORD|{}|{}", resource, field(existing, "id")));
+    }
+
+    Ok(())
+}
+
 pub fn get_all(file_path: &str, sheet_name: &str) -> Result<Vec<HashMap<String, String>>, String> {
     if !Path::new(file_path).exists() {
         create_empty_workbook(file_path)?;
@@ -179,6 +282,7 @@ pub fn add_row(file_path: &str, sheet_name: &str, item: &HashMap<String, String>
         result.insert("id".to_string(), generate_id(prefix));
     }
     let mut all_rows = get_all(file_path, sheet_name)?;
+    ensure_unique_record(sheet_name, &result, &all_rows, None)?;
     all_rows.push(result.clone());
     write_sheet_data(file_path, sheet_name, &all_rows)?;
     Ok(result)
@@ -186,19 +290,28 @@ pub fn add_row(file_path: &str, sheet_name: &str, item: &HashMap<String, String>
 
 pub fn update_row(file_path: &str, sheet_name: &str, id: &str, data: &HashMap<String, String>) -> Result<HashMap<String, String>, String> {
     let mut all_rows = get_all(file_path, sheet_name)?;
-    let mut found = false;
+    let Some(current) = all_rows.iter().find(|row| field(row, "id") == id) else {
+        return Err("记录未找到".to_string());
+    };
+
+    let mut candidate = current.clone();
+    for (key, value) in data {
+        candidate.insert(key.clone(), value.clone());
+    }
+    candidate.insert("id".to_string(), id.to_string());
+    if business_unique_key(sheet_name, current) != business_unique_key(sheet_name, &candidate) {
+        ensure_unique_record(sheet_name, &candidate, &all_rows, Some(id))?;
+    }
+
     for row in &mut all_rows {
-        if row.get("id").map(|v| v == id).unwrap_or(false) {
-            for (key, value) in data {
-                row.insert(key.clone(), value.clone());
-            }
-            found = true;
+        if field(row, "id") == id {
+            *row = candidate.clone();
             break;
         }
     }
-    if !found { return Err("记录未找到".to_string()); }
+
     write_sheet_data(file_path, sheet_name, &all_rows)?;
-    get_by_id(file_path, sheet_name, id)?.ok_or("更新后未找到记录".to_string())
+    Ok(candidate)
 }
 
 pub fn delete_row(file_path: &str, sheet_name: &str, id: &str) -> Result<bool, String> {
@@ -331,6 +444,44 @@ pub fn calculate_stock(file_path: &str, stock_type: &str) -> Result<Vec<HashMap<
     }).collect();
     write_sheet_data(file_path, stock_sheet, &stock_data)?;
     Ok(stock_data)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn record(fields: &[(&str, &str)]) -> HashMap<String, String> {
+        fields.iter().map(|(key, value)| (key.to_string(), value.to_string())).collect()
+    }
+
+    #[test]
+    fn punch_short_and_full_names_share_unique_key() {
+        let short = record(&[("name", "30R"), ("spec", "14.0 mm"), ("material", "SKD11")]);
+        let full = record(&[("name", "JMR M30"), ("spec", "14"), ("material", "skd11")]);
+        assert_eq!(business_unique_key("冲头信息表", &short), business_unique_key("冲头信息表", &full));
+    }
+
+    #[test]
+    fn die_numeric_diameters_share_unique_key() {
+        let left = record(&[("name", "牙板 A"), ("machineType", "M12"), ("wireDiameter", "Φ14.0 mm")]);
+        let right = record(&[("name", "牙板A"), ("machineType", "m12"), ("wireDiameter", "14")]);
+        assert_eq!(business_unique_key("牙板信息表", &left), business_unique_key("牙板信息表", &right));
+    }
+
+    #[test]
+    fn update_excludes_current_record_but_rejects_other_duplicate() {
+        let rows = vec![
+            record(&[("id", "CT1"), ("name", "30R"), ("spec", "14"), ("material", "SKD11")]),
+            record(&[("id", "CT2"), ("name", "31R"), ("spec", "15"), ("material", "SKD11")]),
+        ];
+        assert!(ensure_unique_record("冲头信息表", &rows[0], &rows, Some("CT1")).is_ok());
+
+        let duplicate = record(&[("id", "CT2"), ("name", "JMR M30"), ("spec", "14.0"), ("material", "skd11")]);
+        assert_eq!(
+            ensure_unique_record("冲头信息表", &duplicate, &rows, Some("CT2")),
+            Err("DUPLICATE_RECORD|冲头|CT1".to_string())
+        );
+    }
 }
 
 pub fn get_default_file_path() -> String {

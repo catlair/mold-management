@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
+import { dieUniqueKey, punchUniqueKey } from '../utils/duplicateDetection'
 
 // ========== 浏览器预览模式 ==========
 // 在纯浏览器环境（无 Tauri 后端）提供 mock 数据，便于开发/自测/演示。
@@ -39,14 +40,51 @@ function generateMockRows(sheetName: string): any[] {
   return rows
 }
 
+function getMockUniqueKey(sheetName: string, row: any): string | null {
+  if (sheetName === '冲头信息表') return punchUniqueKey(row)
+  if (sheetName === '牙板信息表') return dieUniqueKey(row)
+  return null
+}
+
 function createMockApi(sheetName: string) {
   const rows = generateMockRows(sheetName)
+
+  function ensureMockUnique(data: any, excludeId = '') {
+    const candidateKey = getMockUniqueKey(sheetName, data)
+    if (!candidateKey) return
+    const existing = rows.find(row => row.id !== excludeId && getMockUniqueKey(sheetName, row) === candidateKey)
+    if (existing) {
+      const resource = sheetName === '冲头信息表' ? '冲头' : '牙板'
+      throw new Error(`DUPLICATE_RECORD|${resource}|${existing.id}`)
+    }
+  }
+
   return {
-    getAll: async () => [...rows],
-    getById: async (id: string) => rows.find(r => r.id === id) || null,
-    add: async (data: any) => ({ id: `mock_new_${Date.now()}`, ...data }),
-    update: async (id: string, data: any) => ({ id, ...data }),
-    remove: async () => true,
+    getAll: async () => rows.map(row => ({ ...row })),
+    getById: async (id: string) => rows.find(row => row.id === id) || null,
+    add: async (data: any) => {
+      ensureMockUnique(data)
+      const created = { ...data, id: `mock_new_${Date.now()}_${rows.length}` }
+      rows.push(created)
+      return { ...created }
+    },
+    update: async (id: string, data: any) => {
+      const currentIndex = rows.findIndex(row => row.id === id)
+      if (currentIndex < 0) throw new Error('记录未找到')
+      const current = rows[currentIndex]
+      const updated = { ...current, ...data, id }
+      if (getMockUniqueKey(sheetName, current) !== getMockUniqueKey(sheetName, updated)) {
+        ensureMockUnique(updated, id)
+      }
+      rows[currentIndex] = updated
+      return { ...updated }
+    },
+    remove: async (id: string) => {
+      const index = rows.findIndex(row => row.id === id)
+      if (index < 0) return false
+      rows.splice(index, 1)
+      return true
+    },
   }
 }
 

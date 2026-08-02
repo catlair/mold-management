@@ -172,10 +172,27 @@
         <el-form-item label="备注">
           <el-input v-model="form.remark" type="textarea" :rows="2" />
         </el-form-item>
+        <el-alert
+          v-if="duplicateMatch"
+          class="duplicate-alert"
+          :type="duplicateMatch.kind === 'exact' ? 'error' : 'warning'"
+          :closable="false"
+          show-icon
+          :title="duplicateMatch.kind === 'exact' ? '已存在完全相同的牙板' : '发现名称相近的牙板，请核对'"
+        >
+          <template #default>
+            <div class="duplicate-record">
+              <strong>{{ getDieName(duplicateMatch.record.id) }}</strong>
+              <span v-if="duplicateMatch.kind === 'similar' && duplicateMatch.differingFields.length">
+                差异字段：{{ duplicateMatch.differingFields.join('、') }}
+              </span>
+            </div>
+          </template>
+        </el-alert>
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleSubmit">确定</el-button>
+        <el-button type="primary" :loading="submitting" :disabled="duplicateMatch?.kind === 'exact'" @click="handleSubmit">确定</el-button>
       </template>
     </el-dialog>
 
@@ -297,6 +314,12 @@ import { useHighlight } from '../composables/useHighlight'
 import DataTable from '../components/DataTable.vue'
 import RelatedDataDialog from '../components/RelatedDataDialog.vue'
 import FullscreenToggle from '../components/FullscreenToggle.vue'
+import {
+  dieUniqueKey,
+  duplicateErrorMessage,
+  findDieDuplicate,
+  isDuplicateError,
+} from '../utils/duplicateDetection'
 
 const { allowDelete } = useAllowDelete()
 // 全屏状态由 App 全局提供（isFullscreen 仅用于页面容器样式）
@@ -381,7 +404,18 @@ function getScrewSpecName(screwSpecId: string) {
 
 const dialogVisible = ref(false)
 const isEdit = ref(false)
+const submitting = ref(false)
+const originalUniqueKey = ref('')
 const form = ref({ id: '', name: '', machineType: '', wireDiameter: '', safetyStock: 0, remark: '' })
+const duplicateMatch = computed(() => {
+  if (!form.value.name.trim() || !form.value.machineType.trim() || !form.value.wireDiameter.trim()) return null
+  if (isEdit.value && dieUniqueKey(form.value) === originalUniqueKey.value) return null
+  return findDieDuplicate(
+    form.value,
+    dieList.value,
+    isEdit.value ? form.value.id : '',
+  )
+})
 
 const showOrderDialog = ref(false)
 const orderForm = ref({ dieId: '', quantity: 1, orderDate: getCurrentDateTime(), remark: '' })
@@ -402,6 +436,7 @@ const linkFormRef = ref<FormInstance>()
 const formRules = {
   name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
   machineType: [{ required: true, message: '请输入机型', trigger: 'blur' }],
+  wireDiameter: [{ required: true, message: '请输入线径', trigger: 'blur' }],
 }
 const orderFormRules = {
   dieId: [{ required: true, message: '请选择牙板', trigger: 'change' }],
@@ -457,12 +492,14 @@ async function loadData() {
 
 function handleAdd() {
   isEdit.value = false
+  originalUniqueKey.value = ''
   form.value = { id: '', name: '', machineType: '', wireDiameter: '', safetyStock: 0, remark: '' }
   dialogVisible.value = true
 }
 
 function handleEdit(row: any) {
   isEdit.value = true
+  originalUniqueKey.value = dieUniqueKey(row)
   form.value = { ...row }
   dialogVisible.value = true
 }
@@ -482,9 +519,15 @@ async function handleDelete(row: any) {
 }
 
 async function handleSubmit() {
-  if (!formRef.value) return
+  if (!formRef.value || submitting.value) return
   await formRef.value.validate(async (valid) => {
     if (!valid) return
+    if (duplicateMatch.value?.kind === 'exact') {
+      ElMessage.error('已存在完全相同的牙板，请勿重复保存')
+      return
+    }
+
+    submitting.value = true
     try {
       if (isEdit.value) {
         await dieApi.update(form.value.id, form.value)
@@ -494,10 +537,14 @@ async function handleSubmit() {
         ElMessage.success('添加成功')
       }
       dialogVisible.value = false
-      loadData()
+      await loadData()
     } catch (error) {
-      ElMessage.error(isEdit.value ? '更新失败' : '添加失败')
+      ElMessage.error(isDuplicateError(error)
+        ? duplicateErrorMessage(error)
+        : (isEdit.value ? '更新失败' : '添加失败'))
       console.error(error)
+    } finally {
+      submitting.value = false
     }
   })
 }
@@ -587,5 +634,16 @@ async function handleDeleteLink(row: any) {
   display: flex;
   gap: 8px;
   margin-left: auto;
+}
+
+.duplicate-alert {
+  margin-top: 4px;
+}
+
+.duplicate-record {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-wrap: anywhere;
 }
 </style>
