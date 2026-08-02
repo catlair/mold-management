@@ -18,7 +18,7 @@
         </div>
       </template>
 
-        <el-table ref="mainTableRef" :data="tableData" border style="width: 100%" :max-height="isFullscreen ? 'calc(100vh - 100px)' : 'calc(100vh - 184px)'" v-loading="loading" :fit="false" @scroll="onTableScroll">
+        <DataTable :data="tableData" :loading="loading">
         <el-table-column prop="name" label="螺丝名称" width="160" sortable />
         <el-table-column prop="headType" label="头型" width="120" sortable :filters="headTypeFilters" :filter-method="filterHandler" />
         <el-table-column prop="punch" label="冲头" width="120" sortable>
@@ -50,14 +50,15 @@
             <el-button size="small" type="danger" v-if="allowDelete" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
-      </el-table>
-      <div class="h-scrollbar-bar" ref="hBarRef" @mousedown="onBarMouseDown">
-        <div class="h-scrollbar-thumb" :style="{ width: hThumbW + 'px', left: hThumbL + 'px' }"></div>
-      </div>
+      </DataTable>
       <div v-if="!loading && tableData.length === 0" class="empty-state">
         <el-empty description="暂无数据" />
       </div>
     </el-card>
+
+    <el-button v-if="isFullscreen" class="fullscreen-exit-btn" type="danger" circle @click="toggleFullscreen">
+      <el-icon :size="20"><Close /></el-icon>
+    </el-button>
 
     <!-- 添加/编辑对话框 -->
     <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑螺丝规格' : '添加螺丝规格'" width="800px">
@@ -225,6 +226,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window'
 import { screwSpecApi, punchApi, dieApi, punchLinkApi, dieLinkApi, stockCalcApi } from '../api'
 import { useAllowDelete } from '../composables/useAllowDelete'
 import { useHighlight } from '../composables/useHighlight'
+import DataTable from '../components/DataTable.vue'
 import { toShortCode, matchPunchNames } from '../utils/punchName'
 
 const { allowDelete } = useAllowDelete()
@@ -236,50 +238,7 @@ const dieList = ref<any[]>([])
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const isFullscreen = ref(false)
-const mainTableRef = ref<any>(null)
 const loading = ref(true)
-
-// 水平滚动条
-const hBarRef = ref<any>(null)
-const hThumbW = ref(100)
-const hThumbL = ref(0)
-let dragLock = false
-
-function onTableScroll({ scrollLeft }: { scrollLeft: number; scrollTop: number }) {
-  if (dragLock) return
-  const wrap = mainTableRef.value?.$el?.querySelector('.el-scrollbar__wrap')
-  if (!wrap) return
-  const maxScroll = wrap.scrollWidth - wrap.clientWidth
-  if (maxScroll <= 0) { hThumbW.value = hBarRef.value?.clientWidth || 100; hThumbL.value = 0; return }
-  const barW = hBarRef.value?.clientWidth || 1
-  hThumbW.value = Math.max(30, (wrap.clientWidth / wrap.scrollWidth) * barW)
-  hThumbL.value = (scrollLeft / maxScroll) * (barW - hThumbW.value)
-}
-
-function onBarMouseDown(e: MouseEvent) {
-  dragLock = true
-  const startX = e.clientX
-  const startLeft = hThumbL.value
-  const barW = hBarRef.value?.clientWidth || 1
-  const wrap = mainTableRef.value?.$el?.querySelector('.el-scrollbar__wrap')
-  const maxScroll = wrap ? wrap.scrollWidth - wrap.clientWidth : 1
-
-  function onMove(ev: MouseEvent) {
-    const dx = ev.clientX - startX
-    const maxL = barW - hThumbW.value
-    const newL = Math.max(0, Math.min(maxL, startLeft + dx))
-    hThumbL.value = newL
-    if (wrap) wrap.scrollLeft = (newL / maxL) * maxScroll
-  }
-  function onUp() {
-    dragLock = false
-    document.removeEventListener('mousemove', onMove)
-    document.removeEventListener('mouseup', onUp)
-  }
-  document.addEventListener('mousemove', onMove)
-  document.addEventListener('mouseup', onUp)
-  e.preventDefault()
-}
 
 // 冲头关联弹窗
 const punchDialogVisible = ref(false)
@@ -297,10 +256,6 @@ async function toggleFullscreen() {
   const next = !isFullscreen.value
   isFullscreen.value = next
   try { await getCurrentWindow().setFullscreen(next) } catch {}
-  setTimeout(() => {
-    mainTableRef.value?.doLayout()
-    onTableScroll({ scrollLeft: 0, scrollTop: 0 })
-  }, 500)
 }
 
 onMounted(async () => {
@@ -542,20 +497,12 @@ async function handleSubmit() {
 </script>
 
 <style scoped>
-.page-container.is-fullscreen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 2000; background: #fff; padding: 0; overflow: auto; }
+.page-container.is-fullscreen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 2000; background: #fff; padding: 0; overflow: visible; }
 .page-container.is-fullscreen .el-card { height: 100%; display: flex; flex-direction: column; margin: 0; border: none; border-radius: 0; box-shadow: none; }
 .page-container.is-fullscreen .el-card__header { display: none; }
 .page-container.is-fullscreen .el-card__body { flex: 1; overflow: hidden; padding: 12px; }
 
-/* 隐藏el-table自带的水平滚动条 */
-:deep(.el-table__body-wrapper)::-webkit-scrollbar { height: 0; }
-:deep(.el-table .el-scrollbar__bar.is-horizontal) { display: none !important; }
-
-/* 自定义水平滚动条 */
-.h-scrollbar-bar { position: relative; height: 8px; background: #e4e7ed; border-radius: 4px; margin-top: 2px; cursor: pointer; }
-.h-scrollbar-thumb { position: absolute; top: 0; height: 8px; background: #b0b4bc; border-radius: 4px; cursor: grab; transition: background 0.15s; }
-.h-scrollbar-thumb:hover { background: #909399; }
-.h-scrollbar-thumb:active { cursor: grabbing; background: #606266; }
+.fullscreen-exit-btn { position: fixed; top: 12px; right: 12px; z-index: 2001; box-shadow: 0 2px 12px rgba(0,0,0,0.15); }
 
 .header-right { display: flex; gap: 8px; margin-left: auto; }
 </style>

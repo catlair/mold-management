@@ -20,7 +20,7 @@
 
       <el-tabs v-model="activeTab">
         <el-tab-pane label="冲头信息" name="info">
-           <el-table ref="mainTableRef" :data="punchList" border style="width: 100%" :max-height="isFullscreen ? 'calc(100vh - 26px)' : 'calc(100vh - 170px)'" v-loading="loading">
+           <DataTable :data="punchList" :loading="loading">
             <el-table-column prop="name" label="名称" width="160" sortable>
               <template #default="{ row }">
                 <el-link type="primary" :underline="false" @click="showLinkedScrews(row)">{{ row.name }}</el-link>
@@ -44,7 +44,7 @@
                 <el-button size="small" type="danger" v-if="allowDelete" @click="handleDelete(row)">删除</el-button>
               </template>
             </el-table-column>
-          </el-table>
+          </DataTable>
         </el-tab-pane>
 
         <el-tab-pane label="入库记录" name="order">
@@ -266,6 +266,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window'
 import { punchApi, punchOrderApi, punchUseApi, punchLinkApi, screwSpecApi, stockCalcApi } from '../api'
 import { useAllowDelete } from '../composables/useAllowDelete'
 import { useHighlight } from '../composables/useHighlight'
+import DataTable from '../components/DataTable.vue'
 import { toFullName } from '../utils/punchName'
 
 const { allowDelete } = useAllowDelete()

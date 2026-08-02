@@ -3,7 +3,6 @@ use rust_xlsxwriter::Workbook;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
-use uuid::Uuid;
 use chrono::Local;
 
 pub const SHEETS: &[(&str, &[(&str, &str)])] = &[
@@ -113,18 +112,6 @@ fn generate_id(prefix: &str) -> String {
     format!("{}{}{}{:03}", prefix, date_part, time_part, seq)
 }
 
-fn format_radix(mut value: i64, base: u32) -> String {
-    if value == 0 { return "0".to_string(); }
-    let mut result = String::new();
-    let digits = "0123456789abcdefghijklmnopqrstuvwxyz";
-    while value > 0 {
-        let remainder = (value % base as i64) as u32;
-        result.push(digits.chars().nth(remainder as usize).unwrap());
-        value /= base as i64;
-    }
-    result.chars().rev().collect()
-}
-
 fn create_empty_workbook(file_path: &str) -> Result<(), String> {
     if let Some(parent) = Path::new(file_path).parent() {
         if !parent.exists() {
@@ -156,7 +143,6 @@ fn normalize_value(val: String) -> String {
 }
 
 pub fn get_all(file_path: &str, sheet_name: &str) -> Result<Vec<HashMap<String, String>>, String> {
-    eprintln!("[DEBUG] get_all: file={}, sheet={}", file_path, sheet_name);
     if !Path::new(file_path).exists() {
         create_empty_workbook(file_path)?;
         return Ok(vec![]);
@@ -225,7 +211,6 @@ pub fn delete_row(file_path: &str, sheet_name: &str, id: &str) -> Result<bool, S
 }
 
 fn write_sheet_data(file_path: &str, sheet_name: &str, rows: &[HashMap<String, String>]) -> Result<(), String> {
-    eprintln!("[DEBUG] write_sheet_data: file={}, sheet={}, rows={}", file_path, sheet_name, rows.len());
     let mut all_sheets_data: Vec<(String, Vec<HashMap<String, String>>)> = Vec::new();
     if Path::new(file_path).exists() {
         let mut wb = open_workbook_auto(file_path).map_err(|e| e.to_string())?;
@@ -317,13 +302,9 @@ pub fn calculate_stock(file_path: &str, stock_type: &str) -> Result<Vec<HashMap<
         "upperPunch" => ("上冲信息表", "上冲入库记录", "上冲使用记录", "上冲库存汇总", "upperPunchId"),
         _ => return Err("未知类型".to_string()),
     };
-    eprintln!("[DEBUG] calculate_stock: type={}, info={}, order={}, use={}", stock_type, info_sheet, order_sheet, use_sheet);
     let info_items = get_all(file_path, info_sheet)?;
-    eprintln!("[DEBUG] info_items count: {}", info_items.len());
     let orders = get_all(file_path, order_sheet)?;
-    eprintln!("[DEBUG] orders count: {}", orders.len());
     let uses = get_all(file_path, use_sheet)?;
-    eprintln!("[DEBUG] uses count: {}", uses.len());
     let stock_data: Vec<HashMap<String, String>> = info_items.iter().map(|item| {
         let item_id = item.get("id").cloned().unwrap_or_default();
         let total_ordered: i64 = orders.iter()
@@ -349,7 +330,6 @@ pub fn calculate_stock(file_path: &str, stock_type: &str) -> Result<Vec<HashMap<
         row
     }).collect();
     write_sheet_data(file_path, stock_sheet, &stock_data)?;
-    eprintln!("[DEBUG] calculate_stock done: {} items", stock_data.len());
     Ok(stock_data)
 }
 

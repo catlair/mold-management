@@ -45,6 +45,10 @@
               <el-icon><Top /></el-icon>
               <template #title>上冲管理</template>
             </el-menu-item>
+            <el-menu-item index="/inventory">
+              <el-icon><DataAnalysis /></el-icon>
+              <template #title>库存汇总</template>
+            </el-menu-item>
           </el-menu-item-group>
           <el-menu-item-group>
             <template #title><span v-show="!isCollapse" class="menu-group-title">系统功能</span></template>
@@ -221,7 +225,11 @@ onMounted(() => {
 .app-main {
   background: var(--bg);
   padding: 24px;
-  overflow: auto;
+  overflow: hidden;
+}
+.app-main.el-main {
+  height: 100vh;
+  overflow: hidden;
 }
 
 /* 过渡动画 */
@@ -245,7 +253,17 @@ onMounted(() => {
   border-radius: 10px;
 }
 
-/* 全屏模式表格高度更大 */
+/* 强制 el-table 水平滚动条可见 */
+.el-table .el-scrollbar__wrap { overflow-x: auto !important; }
+.el-table .el-scrollbar__bar.is-horizontal { display: block !important; opacity: 1 !important; height: 14px !important; }
+.el-table .el-scrollbar__bar.is-horizontal .el-scrollbar__thumb { background-color: #b0b4bc !important; border-radius: 5px; height: 8px !important; }
+.el-table .el-scrollbar__bar.is-horizontal .el-scrollbar__thumb:hover { background-color: #909399 !important; }
+
+/* 全屏模式 */
+.page-container.is-fullscreen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 2000; background: #fff; padding: 0; overflow: auto; }
+.page-container.is-fullscreen > .el-card { height: 100%; display: flex; flex-direction: column; margin: 0; border: none; border-radius: 0; box-shadow: none; }
+.page-container.is-fullscreen > .el-card > .el-card__header { display: none; }
+.page-container.is-fullscreen > .el-card > .el-card__body { flex: 1; overflow: hidden; padding: 12px; }
 .page-container.is-fullscreen .el-table {
   max-height: 100% !important;
 }
@@ -306,7 +324,7 @@ onMounted(() => {
 }
 
 .el-card__body {
-  overflow: visible;
+  overflow: hidden;
   padding: 20px 24px;
 }
 
@@ -356,6 +374,18 @@ onMounted(() => {
 .page-container {
   display: flex;
   flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+.page-container > .el-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.page-container > .el-card > .el-card__body {
+  flex: 1;
+  overflow: hidden;
+  padding: 12px 24px;
 }
 
 .card-header {

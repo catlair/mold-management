@@ -20,7 +20,7 @@
 
       <el-tabs v-model="activeTab">
         <el-tab-pane label="主模具信息" name="info">
-           <el-table ref="mainTableRef" :data="mainMoldList" border style="width: 100%" :max-height="isFullscreen ? 'calc(100vh - 26px)' : 'calc(100vh - 170px)'" v-loading="loading">
+           <DataTable :data="mainMoldList" :loading="loading">
             <el-table-column prop="name" label="名称" width="160" sortable />
             <el-table-column prop="holeDiameter" label="孔径" width="100" sortable />
             <el-table-column prop="wireMaterial" label="对应线材" width="120" sortable />
@@ -40,7 +40,7 @@
                 <el-button size="small" type="danger" v-if="allowDelete" @click="handleDelete(row)">删除</el-button>
               </template>
             </el-table-column>
-          </el-table>
+          </DataTable>
         </el-tab-pane>
 
         <el-tab-pane label="入库记录" name="order">
@@ -234,6 +234,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window'
 import { mainMoldApi, mainMoldOrderApi, mainMoldUseApi, mainMoldLinkApi, stockCalcApi } from '../api'
 import { useAllowDelete } from '../composables/useAllowDelete'
 import { useHighlight } from '../composables/useHighlight'
+import DataTable from '../components/DataTable.vue'
 
 const { allowDelete } = useAllowDelete()
 
