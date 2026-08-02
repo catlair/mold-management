@@ -113,27 +113,42 @@
 
         <el-tab-pane label="螺丝规格关联" name="link" class="association-pane">
           <div class="tab-header">
+            <div class="record-heading">
+              <div class="record-heading__title">螺丝规格关联</div>
+              <div class="record-heading__count">共 {{ linkList.length }} 条</div>
+            </div>
             <el-button type="primary" size="small" @click="showLinkDialog = true">新增关联</el-button>
           </div>
           <div class="record-table-scroll">
-            <vxe-table :data="linkList" border style="width: 100%">
-            <vxe-column title="牙板" width="200">
-              <template #default="{ row }">
-                {{ getDieName(row.dieId) }}
-              </template>
-            </vxe-column>
-            <vxe-column title="螺丝规格" width="200">
-              <template #default="{ row }">
-                {{ getScrewSpecName(row.screwSpecId) }}
-              </template>
-            </vxe-column>
-            <vxe-column field="remark" title="备注" />
-            <vxe-column title="操作" width="100">
-              <template #default="{ row }">
-                <el-button size="small" type="danger" v-if="allowDelete" @click="handleDeleteLink(row)">删除</el-button>
-              </template>
-            </vxe-column>
+            <vxe-table class="record-table" :data="linkPaginated" border round stripe show-header-overflow="tooltip" style="width: 100%">
+              <vxe-column title="牙板" width="28%" min-width="220">
+                <template #default="{ row }">
+                  {{ getDieName(row.dieId) }}
+                </template>
+              </vxe-column>
+              <vxe-column title="螺丝规格" width="30%" min-width="240">
+                <template #default="{ row }">
+                  {{ getScrewSpecName(row.screwSpecId) }}
+                </template>
+              </vxe-column>
+              <vxe-column field="remark" title="备注" width="27%" min-width="200" />
+              <vxe-column title="操作" width="15%" min-width="120">
+                <template #default="{ row }">
+                  <el-button size="small" type="danger" v-if="allowDelete" @click="handleDeleteLink(row)">删除</el-button>
+                </template>
+              </vxe-column>
             </vxe-table>
+          </div>
+          <div class="record-pagination-bar">
+            <el-pagination
+              v-model:current-page="linkCurrentPage"
+              v-model:page-size="linkPageSize"
+              :page-sizes="[10, 20, 50]"
+              :total="linkList.length"
+              layout="total, sizes, prev, pager, next"
+              small
+              class="record-pagination"
+            />
           </div>
         </el-tab-pane>
       </el-tabs>
@@ -334,6 +349,12 @@ const usePaginated = computed(() => {
   const start = (useCurrentPage.value - 1) * usePageSize.value
   return useList.value.slice(start, start + usePageSize.value)
 })
+const linkCurrentPage = ref(1)
+const linkPageSize = ref(10)
+const linkPaginated = computed(() => {
+  const start = (linkCurrentPage.value - 1) * linkPageSize.value
+  return linkList.value.slice(start, start + linkPageSize.value)
+})
 
 // 筛选选项
 const machineTypeFilters = computed(() => {
@@ -424,6 +445,7 @@ async function loadData() {
     useList.value = uses
     useCurrentPage.value = 1
     linkList.value = links
+    linkCurrentPage.value = 1
     screwSpecList.value = screwSpecs
   } catch (error) {
     ElMessage.error('加载数据失败')

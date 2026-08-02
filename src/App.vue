@@ -571,7 +571,8 @@ body {
   flex-shrink: 0;
 }
 
-.record-pane > .tab-header {
+.record-pane > .tab-header,
+.association-pane > .tab-header {
   min-height: 58px;
   margin-bottom: 14px;
   padding: 10px 12px 10px 16px;
