@@ -42,62 +42,70 @@
 
         <el-tab-pane label="入库记录" name="order" class="record-pane">
           <div class="tab-header">
+            <div class="record-heading">
+              <div class="record-heading__title">入库记录</div>
+              <div class="record-heading__count">共 {{ orderList.length }} 条</div>
+            </div>
             <el-button type="primary" size="small" @click="showOrderDialog = true">新增入库</el-button>
           </div>
           <div class="record-table-scroll">
-            <vxe-table :data="orderPaginated" border style="width: 100%">
-
-            <vxe-column title="上冲" width="140" sortable>
-              <template #default="{ row }">
-                {{ getUpperPunchName(row.upperPunchId) }}
-              </template>
-            </vxe-column>
-            <vxe-column field="quantity" title="入库数量" width="120" sortable />
-            <vxe-column field="orderDate" title="入库时间" width="180" sortable />
-            <vxe-column field="status" title="到货状态" width="120" sortable :filters="statusFilters" :filter-method="filterHandler" />
-            <vxe-column field="remark" title="备注" min-width="150" />
-
+            <vxe-table class="record-table" :data="orderPaginated" border round stripe show-header-overflow="tooltip" style="width: 100%">
+              <vxe-column title="上冲" width="26%" min-width="220" sortable>
+                <template #default="{ row }">
+                  {{ getUpperPunchName(row.upperPunchId) }}
+                </template>
+              </vxe-column>
+              <vxe-column field="quantity" title="入库数量" width="14%" min-width="120" sortable />
+              <vxe-column field="orderDate" title="入库时间" width="22%" min-width="180" sortable />
+              <vxe-column field="status" title="到货状态" width="16%" min-width="140" sortable :filters="statusFilters" :filter-method="filterHandler" />
+              <vxe-column field="remark" title="备注" width="22%" min-width="180" />
             </vxe-table>
           </div>
-          <el-pagination
-            v-model:current-page="orderCurrentPage"
-            v-model:page-size="orderPageSize"
-            :page-sizes="[10, 20, 50]"
-            :total="orderList.length"
-            layout="total, sizes, prev, pager, next"
-            small
-            class="record-pagination"
-          />
+          <div class="record-pagination-bar">
+            <el-pagination
+              v-model:current-page="orderCurrentPage"
+              v-model:page-size="orderPageSize"
+              :page-sizes="[10, 20, 50]"
+              :total="orderList.length"
+              layout="total, sizes, prev, pager, next"
+              small
+              class="record-pagination"
+            />
+          </div>
         </el-tab-pane>
 
         <el-tab-pane label="使用记录" name="use" class="record-pane">
           <div class="tab-header">
+            <div class="record-heading">
+              <div class="record-heading__title">使用记录</div>
+              <div class="record-heading__count">共 {{ useList.length }} 条</div>
+            </div>
             <el-button type="primary" size="small" @click="showUseDialog = true">新增使用</el-button>
           </div>
           <div class="record-table-scroll">
-            <vxe-table :data="usePaginated" border style="width: 100%">
-
-            <vxe-column title="上冲" width="140" sortable>
-              <template #default="{ row }">
-                {{ getUpperPunchName(row.upperPunchId) }}
-              </template>
-            </vxe-column>
-            <vxe-column field="user" title="使用人" width="120" sortable />
-            <vxe-column field="quantity" title="使用数量" width="120" sortable />
-            <vxe-column field="useDate" title="使用时间" width="180" sortable />
-            <vxe-column field="remark" title="备注" min-width="120" />
-
+            <vxe-table class="record-table" :data="usePaginated" border round stripe show-header-overflow="tooltip" style="width: 100%">
+              <vxe-column title="上冲" width="26%" min-width="220" sortable>
+                <template #default="{ row }">
+                  {{ getUpperPunchName(row.upperPunchId) }}
+                </template>
+              </vxe-column>
+              <vxe-column field="user" title="使用人" width="16%" min-width="140" sortable />
+              <vxe-column field="quantity" title="使用数量" width="14%" min-width="120" sortable />
+              <vxe-column field="useDate" title="使用时间" width="22%" min-width="180" sortable />
+              <vxe-column field="remark" title="备注" width="22%" min-width="180" />
             </vxe-table>
           </div>
-          <el-pagination
-            v-model:current-page="useCurrentPage"
-            v-model:page-size="usePageSize"
-            :page-sizes="[10, 20, 50]"
-            :total="useList.length"
-            layout="total, sizes, prev, pager, next"
-            small
-            class="record-pagination"
-          />
+          <div class="record-pagination-bar">
+            <el-pagination
+              v-model:current-page="useCurrentPage"
+              v-model:page-size="usePageSize"
+              :page-sizes="[10, 20, 50]"
+              :total="useList.length"
+              layout="total, sizes, prev, pager, next"
+              small
+              class="record-pagination"
+            />
+          </div>
         </el-tab-pane>
 
         <el-tab-pane label="线材关联" name="link" class="association-pane">

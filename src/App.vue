@@ -571,6 +571,46 @@ body {
   flex-shrink: 0;
 }
 
+.record-pane > .tab-header {
+  min-height: 58px;
+  margin-bottom: 14px;
+  padding: 10px 12px 10px 16px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-muted);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--card-bg) 85%, transparent);
+}
+
+.record-heading {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.record-heading__title {
+  color: var(--text-primary);
+  font-size: 16px;
+  font-weight: 650;
+  line-height: 1.35;
+  letter-spacing: 0.01em;
+}
+
+.record-heading__count {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.tab-header > .el-button {
+  flex-shrink: 0;
+}
+
 /* 记录/关联 tabs：仅中间表格区滚动，工具栏与分页始终留在可视区 */
 .record-pane,
 .association-pane {
@@ -581,21 +621,63 @@ body {
   flex: 1;
   min-height: 0;
   width: 100%;
+  padding: 8px;
   overflow: auto;
+  box-sizing: border-box;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-muted) 70%, var(--card-bg));
+  box-shadow: inset 0 1px 2px rgba(23, 34, 51, 0.04);
 }
 
-.record-table-scroll > .vxe-table {
+.record-table-scroll > .record-table {
   min-width: 100%;
+  background: var(--card-bg);
+}
+
+.record-table .vxe-table--body-wrapper .vxe-body--column .vxe-cell,
+.record-table .vxe-table--body-wrapper .vxe-body--column .vxe-cell--wrapper {
+  height: auto;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.55;
+}
+
+.record-table .vxe-table--body-wrapper .vxe-body--column .vxe-cell {
+  padding-top: 11px;
+  padding-bottom: 11px;
+}
+
+.record-table .vxe-table--header-wrapper .vxe-header--column {
+  font-weight: 600;
+}
+
+.record-pagination-bar {
+  min-height: 48px;
+  margin-top: 12px;
+  padding: 12px 4px 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-shrink: 0;
+  border-top: 1px solid var(--border);
 }
 
 .record-pagination {
   flex-shrink: 0;
-  margin-top: 12px;
   justify-content: flex-end;
+}
+
+.record-pagination :is(button, .el-select__wrapper):focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .record-table-scroll::-webkit-scrollbar {
