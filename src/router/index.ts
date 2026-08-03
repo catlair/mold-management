@@ -48,6 +48,11 @@ const router = createRouter({
       component: () => import('../views/Inventory.vue')
     },
     {
+      path: '/page-management',
+      name: 'PageManagement',
+      component: () => import('../views/PageManagement.vue')
+    },
+    {
       path: '/settings',
       name: 'Settings',
       component: () => import('../views/Settings.vue')

@@ -1,12 +1,50 @@
 import { invoke } from '@tauri-apps/api/core'
 import { dieUniqueKey, punchUniqueKey } from '../utils/duplicateDetection'
 
+export type AttachmentKind = 'image' | 'pdf'
+export type AnnotationTool = 'pen' | 'rectangle' | 'arrow' | 'text'
+
+export interface AttachmentAnnotation {
+  id: string
+  page: number
+  tool: AnnotationTool
+  color: string
+  strokeWidth: number
+  x: number
+  y: number
+  endX?: number
+  endY?: number
+  text?: string
+  points?: Array<{ x: number; y: number }>
+}
+
+export interface ScrewAttachment {
+  id: string
+  screwSpecId: string
+  displayName: string
+  fileName: string
+  mimeType: string
+  size: number
+  relativePath: string
+  annotations: AttachmentAnnotation[]
+  sortOrder: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface AttachmentContent {
+  attachment: ScrewAttachment
+  data: string
+}
+
 // ========== 浏览器预览模式 ==========
 // 在纯浏览器环境（无 Tauri 后端）提供 mock 数据，便于开发/自测/演示。
 // Tauri 桌面应用内走真实 invoke，不受影响。
-const isTauri = () =>
+export const isTauriEnvironment = () =>
   typeof window !== 'undefined' &&
   '__TAURI_INTERNALS__' in (window as any)
+
+const isTauri = isTauriEnvironment
 
 function generateMockRows(sheetName: string): any[] {
   const count = sheetName.includes('信息') ? 60 : 25
@@ -138,6 +176,190 @@ export const SHEETS = {
 
 // 各模块 API
 export const screwSpecApi = createApi(SHEETS.SCREW_SPEC)
+
+const mockAttachments = new Map<string, ScrewAttachment[]>()
+const mockAttachmentData = new Map<string, string>()
+const MOCK_ATTACHMENT_STORAGE_KEY = 'mold-management-mock-attachments'
+let mockAttachmentsInitialized = false
+
+function persistMockAttachments() {
+  if (typeof localStorage === 'undefined') return
+  localStorage.setItem(
+    MOCK_ATTACHMENT_STORAGE_KEY,
+    JSON.stringify(Object.fromEntries(mockAttachments.entries()))
+  )
+}
+
+function bytesToBase64(bytes: Uint8Array) {
+  let binary = ''
+  for (const byte of bytes) binary += String.fromCharCode(byte)
+  return btoa(binary)
+}
+
+function createMockImageData() {
+  const canvas = document.createElement('canvas')
+  canvas.width = 1200
+  canvas.height = 760
+  const context = canvas.getContext('2d')!
+  context.fillStyle = '#f8fafc'
+  context.fillRect(0, 0, canvas.width, canvas.height)
+  context.fillStyle = '#0f172a'
+  context.font = '700 46px "Microsoft YaHei", sans-serif'
+  context.fillText('螺丝规格附件示意图', 72, 92)
+  context.strokeStyle = '#2563eb'
+  context.lineWidth = 8
+  context.strokeRect(160, 210, 880, 300)
+  context.beginPath()
+  context.moveTo(230, 360)
+  context.lineTo(970, 360)
+  context.stroke()
+  context.fillStyle = '#475569'
+  context.font = '30px "Microsoft YaHei", sans-serif'
+  context.fillText('浏览器演示附件，可直接添加标注并保存', 250, 600)
+  return canvas.toDataURL('image/png').split(',')[1]
+}
+
+function createMockPdfData() {
+  const objects = [
+    '1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n',
+    '2 0 obj\n<< /Type /Pages /Kids [3 0 R 5 0 R] /Count 2 >>\nendobj\n',
+    '3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 6 0 R >>\nendobj\n',
+    '4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n',
+    '5 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 7 0 R >>\nendobj\n',
+    '6 0 obj\n<< /Length 68 >>\nstream\nBT /F1 24 Tf 72 700 Td (Screw Specification - Page 1) Tj ET\nendstream\nendobj\n',
+    '7 0 obj\n<< /Length 68 >>\nstream\nBT /F1 24 Tf 72 700 Td (Screw Specification - Page 2) Tj ET\nendstream\nendobj\n',
+  ]
+  let pdf = '%PDF-1.4\n'
+  const offsets = [0]
+  for (const object of objects) {
+    offsets.push(new TextEncoder().encode(pdf).length)
+    pdf += object
+  }
+  const xrefOffset = new TextEncoder().encode(pdf).length
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`
+  for (let index = 1; index <= objects.length; index++) {
+    pdf += `${String(offsets[index]).padStart(10, '0')} 00000 n \n`
+  }
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`
+  return bytesToBase64(new TextEncoder().encode(pdf))
+}
+
+function initializeMockAttachments() {
+  if (mockAttachmentsInitialized || typeof document === 'undefined') return
+  mockAttachmentsInitialized = true
+  const now = new Date().toISOString()
+  const items: ScrewAttachment[] = [
+    {
+      id: 'mock_attachment_image', screwSpecId: 'mock_1', displayName: '头部尺寸示意图.png',
+      fileName: '头部尺寸示意图.png', mimeType: 'image/png', size: 18420,
+      relativePath: 'mock/diagram.png', annotations: [], sortOrder: 0,
+      createdAt: now, updatedAt: now,
+    },
+    {
+      id: 'mock_attachment_pdf', screwSpecId: 'mock_1', displayName: '客户规格确认书.pdf',
+      fileName: '客户规格确认书.pdf', mimeType: 'application/pdf', size: 2048,
+      relativePath: 'mock/specification.pdf', annotations: [], sortOrder: 1,
+      createdAt: now, updatedAt: now,
+    },
+  ]
+  const stored = localStorage.getItem(MOCK_ATTACHMENT_STORAGE_KEY)
+  if (stored) {
+    try {
+      const parsed = JSON.parse(stored) as Record<string, ScrewAttachment[]>
+      for (const [screwSpecId, storedItems] of Object.entries(parsed)) {
+        mockAttachments.set(screwSpecId, storedItems)
+      }
+    } catch {
+      localStorage.removeItem(MOCK_ATTACHMENT_STORAGE_KEY)
+    }
+  }
+  if (!mockAttachments.has('mock_1')) mockAttachments.set('mock_1', items)
+  mockAttachmentData.set(items[0].id, createMockImageData())
+  mockAttachmentData.set(items[1].id, createMockPdfData())
+  persistMockAttachments()
+}
+
+export const screwAttachmentApi = isTauri()
+  ? {
+      list: (screwSpecId: string) => invoke<ScrewAttachment[]>('list_screw_attachments', { screwSpecId }),
+      counts: () => invoke<Record<string, number>>('get_screw_attachment_counts'),
+      import: (screwSpecId: string, sourcePath: string) => invoke<ScrewAttachment>('import_screw_attachment', { screwSpecId, sourcePath }),
+      importFile: async (_screwSpecId: string, _file: File): Promise<ScrewAttachment> => {
+        throw new Error('桌面应用请通过系统文件选择器导入附件')
+      },
+      read: (attachmentId: string) => invoke<AttachmentContent>('read_screw_attachment', { attachmentId }),
+      update: (attachmentId: string, data: { displayName?: string; annotations?: AttachmentAnnotation[]; sortOrder?: number }) =>
+        invoke<ScrewAttachment>('update_screw_attachment', { attachmentId, ...data }),
+      remove: (attachmentId: string) => invoke<boolean>('delete_screw_attachment', { attachmentId }),
+    }
+  : {
+      list: async (screwSpecId: string) => {
+        initializeMockAttachments()
+        return (mockAttachments.get(screwSpecId) || []).map(item => ({ ...item, annotations: item.annotations.map(annotation => ({ ...annotation })) }))
+      },
+      counts: async () => {
+        initializeMockAttachments()
+        return Object.fromEntries([...mockAttachments.entries()].map(([id, items]) => [id, items.length]))
+      },
+      import: async (_screwSpecId: string, _sourcePath: string): Promise<ScrewAttachment> => {
+        throw new Error('浏览器模式不支持文件路径导入')
+      },
+      importFile: async (screwSpecId: string, file: File): Promise<ScrewAttachment> => {
+        initializeMockAttachments()
+        if (!/^(image\/(png|jpeg|webp|gif)|application\/pdf)$/.test(file.type)) {
+          throw new Error('仅支持 PNG、JPG、WEBP、GIF 和 PDF 文件')
+        }
+        if (file.size > 50 * 1024 * 1024) throw new Error('单个附件不能超过 50MB')
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = () => resolve(String(reader.result || '').split(',')[1] || '')
+          reader.onerror = () => reject(new Error('读取附件失败'))
+          reader.readAsDataURL(file)
+        })
+        const now = new Date().toISOString()
+        const items = mockAttachments.get(screwSpecId) || []
+        const attachment: ScrewAttachment = {
+          id: crypto.randomUUID(), screwSpecId, displayName: file.name, fileName: file.name,
+          mimeType: file.type, size: file.size, relativePath: `mock/${file.name}`,
+          annotations: [], sortOrder: items.length, createdAt: now, updatedAt: now,
+        }
+        items.push(attachment)
+        mockAttachments.set(screwSpecId, items)
+        mockAttachmentData.set(attachment.id, dataUrl)
+        persistMockAttachments()
+        return { ...attachment }
+      },
+      read: async (attachmentId: string): Promise<AttachmentContent> => {
+        for (const items of mockAttachments.values()) {
+          const attachment = items.find(item => item.id === attachmentId)
+          if (attachment) return { attachment: { ...attachment }, data: mockAttachmentData.get(attachmentId) || '' }
+        }
+        throw new Error('附件不存在')
+      },
+      update: async (attachmentId: string, data: { displayName?: string; annotations?: AttachmentAnnotation[]; sortOrder?: number }) => {
+        for (const items of mockAttachments.values()) {
+          const item = items.find(current => current.id === attachmentId)
+          if (item) {
+            Object.assign(item, data, { updatedAt: new Date().toISOString() })
+            persistMockAttachments()
+            return { ...item }
+          }
+        }
+        throw new Error('附件不存在')
+      },
+      remove: async (attachmentId: string) => {
+        for (const items of mockAttachments.values()) {
+          const index = items.findIndex(item => item.id === attachmentId)
+          if (index >= 0) {
+            items.splice(index, 1)
+            mockAttachmentData.delete(attachmentId)
+            persistMockAttachments()
+            return true
+          }
+        }
+        return false
+      },
+    }
 
 export const punchApi = createApi(SHEETS.PUNCH_INFO)
 export const punchOrderApi = createApi(SHEETS.PUNCH_ORDER)

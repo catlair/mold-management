@@ -15,38 +15,47 @@
         </div>
       </template>
 
-        <DataTable :data="tableData" :loading="loading">
-        <vxe-column field="name" title="螺丝名称" width="160" sortable />
-        <vxe-column field="headType" title="头型" width="120" sortable :filters="headTypeFilters" :filter-method="filterHandler" />
-        <vxe-column field="punch" title="冲头" width="120" sortable>
+        <DataTable table-id="screw-spec.info" :data="tableData" :loading="loading">
+        <ConfigurableTable field="name" title="螺丝名称" width="160" sortable />
+        <ConfigurableTable field="headType" title="头型" width="120" sortable :filters="headTypeFilters" :filter-method="filterHandler" />
+        <ConfigurableTable field="punch" title="冲头" width="120" sortable>
           <template #default="{ row }">
             <el-link v-if="row.punch" type="primary" :underline="false" @click="showPunchDialog(row)">{{ row.punch }}</el-link>
             <span v-else>-</span>
           </template>
-        </vxe-column>
-        <vxe-column field="threadType" title="牙型" width="120" sortable :filters="threadTypeFilters" :filter-method="filterHandler" />
-        <vxe-column field="die" title="牙板" width="120" sortable>
+        </ConfigurableTable>
+        <ConfigurableTable field="threadType" title="牙型" width="120" sortable :filters="threadTypeFilters" :filter-method="filterHandler" />
+        <ConfigurableTable field="die" title="牙板" width="120" sortable>
           <template #default="{ row }">
             <el-link v-if="row.die" type="success" :underline="false" @click="showDieDialog(row)">{{ row.die }}</el-link>
             <span v-else>-</span>
           </template>
-        </vxe-column>
-        <vxe-column field="headSize" title="头/垫片大小" width="140" sortable />
-        <vxe-column field="headHeight" title="头高" width="100" sortable />
-        <vxe-column field="length" title="长度" width="100" sortable />
-        <vxe-column field="threadDiameter" title="牙径" width="100" sortable />
-        <vxe-column field="shankLength" title="光钉长度" width="120" sortable />
-        <vxe-column field="wireMaterial" title="线材" width="100" sortable />
-        <vxe-column field="plating" title="电镀" width="120" sortable :filters="platingFilters" :filter-method="filterHandler" />
-        <vxe-column field="customer" title="客户名" width="120" sortable />
-        <vxe-column field="externalId" title="外部ID" width="120" sortable />
-        <vxe-column field="remark" title="备注" min-width="140" />
-        <vxe-column title="操作" width="150">
+        </ConfigurableTable>
+        <ConfigurableTable field="headSize" title="头/垫片大小" width="140" sortable />
+        <ConfigurableTable field="headHeight" title="头高" width="100" sortable />
+        <ConfigurableTable field="length" title="长度" width="100" sortable />
+        <ConfigurableTable field="threadDiameter" title="牙径" width="100" sortable />
+        <ConfigurableTable field="shankLength" title="光钉长度" width="120" sortable />
+        <ConfigurableTable field="wireMaterial" title="线材" width="100" sortable />
+        <ConfigurableTable field="plating" title="电镀" width="120" sortable :filters="platingFilters" :filter-method="filterHandler" />
+        <ConfigurableTable field="customer" title="客户名" width="120" sortable />
+        <ConfigurableTable field="externalId" title="外部ID" width="120" sortable />
+        <ConfigurableTable field="remark" title="备注" min-width="140" />
+        <ConfigurableTable title="附件" width="100" align="center">
           <template #default="{ row }">
+            <el-button class="attachment-count-button" size="small" :type="row._attachmentCount ? 'primary' : 'info'" link @click="openAttachmentPreview(row)">
+              <el-icon><Paperclip /></el-icon>
+              {{ row._attachmentCount || 0 }}
+            </el-button>
+          </template>
+        </ConfigurableTable>
+        <ConfigurableTable title="操作" width="200" class-name="operation-column" header-class-name="operation-column">
+          <template #default="{ row }">
+            <el-button size="small" @click="openAttachmentPreview(row)">预览</el-button>
             <el-button size="small" @click="handleEdit(row)">编辑</el-button>
             <el-button size="small" type="danger" v-if="allowDelete" @click="handleDelete(row)">删除</el-button>
           </template>
-        </vxe-column>
+        </ConfigurableTable>
       </DataTable>
       <div v-if="!loading && tableData.length === 0" class="empty-state">
         <el-empty description="暂无数据" />
@@ -143,6 +152,21 @@
               <el-input v-model="form.remark" type="textarea" />
             </el-form-item>
           </el-col>
+          <el-col :span="24">
+            <el-form-item label="附件">
+              <div class="form-attachment-panel">
+                <div>
+                  <span class="form-attachment-icon"><el-icon><Paperclip /></el-icon></span>
+                  <div>
+                    <strong>{{ isEdit ? `${editingAttachmentCount} 个附件` : '保存后可添加附件' }}</strong>
+                    <span>支持多张图片与 PDF，可添加图形标注</span>
+                  </div>
+                </div>
+                <el-button v-if="isEdit" type="primary" plain @click="openAttachmentEditor(form)">管理与标注</el-button>
+                <el-tag v-else type="info" effect="plain">先保存规格</el-tag>
+              </div>
+            </el-form-item>
+          </el-col>
         </el-row>
       </el-form>
       <template #footer>
@@ -157,32 +181,32 @@
       title="冲头关联"
       description="查看当前螺丝规格关联的冲头与库存状态"
     >
-      <vxe-table :data="punchDialogItems" border round stripe size="small">
-        <vxe-column title="冲头名称" width="120">
+      <ConfigurableVxeTable table-id="screw-spec.punch-dialog" :data="punchDialogItems" border round stripe size="small">
+        <ConfigurableTable title="冲头名称" width="120">
           <template #default="{ row: r }">{{ toShortCode(r.name) || r.name }}</template>
-        </vxe-column>
-        <vxe-column field="spec" title="规格" width="100" />
-        <vxe-column field="material" title="材质" width="80" />
-        <vxe-column title="当前库存" width="90" align="center">
+        </ConfigurableTable>
+        <ConfigurableTable field="spec" title="规格" width="100" />
+        <ConfigurableTable field="material" title="材质" width="80" />
+        <ConfigurableTable title="当前库存" width="90" align="center">
           <template #default="{ row: r }">{{ r.currentStock ?? '-' }}</template>
-        </vxe-column>
-        <vxe-column title="安全库存" width="90" align="center">
+        </ConfigurableTable>
+        <ConfigurableTable title="安全库存" width="90" align="center">
           <template #default="{ row: r }">{{ r.safetyStock ?? '-' }}</template>
-        </vxe-column>
-        <vxe-column title="状态" width="90" align="center">
+        </ConfigurableTable>
+        <ConfigurableTable title="状态" width="90" align="center">
           <template #default="{ row: r }">
             <el-tag v-if="r.status" :type="r.status === '需入库' ? 'danger' : 'success'" size="small" round>{{ r.status }}</el-tag>
             <span v-else>-</span>
           </template>
-        </vxe-column>
-        <vxe-column title="外显" width="60" align="center">
+        </ConfigurableTable>
+        <ConfigurableTable title="外显" width="60" align="center">
           <template #default="{ row: item }">
             <el-link :type="matchPunchNames(item.name, punchDialogPrimary) ? 'info' : 'warning'" :underline="false" @click="setPunchPrimary(item)">
               <el-icon><View /></el-icon>
             </el-link>
           </template>
-        </vxe-column>
-      </vxe-table>
+        </ConfigurableTable>
+      </ConfigurableVxeTable>
     </RelatedDataDialog>
 
     <!-- 牙板关联弹窗 -->
@@ -191,45 +215,55 @@
       title="牙板关联"
       description="查看当前螺丝规格关联的牙板与库存状态"
     >
-      <vxe-table :data="dieDialogItems" border round stripe size="small">
-        <vxe-column field="name" title="牙板名称" width="100" />
-        <vxe-column field="machineType" title="机型" width="100" />
-        <vxe-column field="wireDiameter" title="线径" width="80" />
-        <vxe-column title="当前库存" width="90" align="center">
+      <ConfigurableVxeTable table-id="screw-spec.die-dialog" :data="dieDialogItems" border round stripe size="small">
+        <ConfigurableTable field="name" title="牙板名称" width="100" />
+        <ConfigurableTable field="machineType" title="机型" width="100" />
+        <ConfigurableTable field="wireDiameter" title="线径" width="80" />
+        <ConfigurableTable title="当前库存" width="90" align="center">
           <template #default="{ row: r }">{{ r.currentStock ?? '-' }}</template>
-        </vxe-column>
-        <vxe-column title="安全库存" width="90" align="center">
+        </ConfigurableTable>
+        <ConfigurableTable title="安全库存" width="90" align="center">
           <template #default="{ row: r }">{{ r.safetyStock ?? '-' }}</template>
-        </vxe-column>
-        <vxe-column title="状态" width="90" align="center">
+        </ConfigurableTable>
+        <ConfigurableTable title="状态" width="90" align="center">
           <template #default="{ row: r }">
             <el-tag v-if="r.status" :type="r.status === '需入库' ? 'danger' : 'success'" size="small" round>{{ r.status }}</el-tag>
             <span v-else>-</span>
           </template>
-        </vxe-column>
-        <vxe-column title="外显" width="60" align="center">
+        </ConfigurableTable>
+        <ConfigurableTable title="外显" width="60" align="center">
           <template #default="{ row: item }">
             <el-link :type="item.name === dieDialogPrimary ? 'info' : 'warning'" :underline="false" @click="setDiePrimary(item)">
               <el-icon><View /></el-icon>
             </el-link>
           </template>
-        </vxe-column>
-      </vxe-table>
+        </ConfigurableTable>
+      </ConfigurableVxeTable>
     </RelatedDataDialog>
+
+    <ScrewAttachmentWorkspace
+      v-model="attachmentWorkspaceVisible"
+      :screw-spec-id="attachmentWorkspaceRow.id || ''"
+      :screw-name="attachmentWorkspaceRow.name || ''"
+      :mode="attachmentWorkspaceMode"
+      @changed="handleAttachmentChanged"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, inject } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { View } from '@element-plus/icons-vue'
+import { View, Paperclip } from '@element-plus/icons-vue'
 import type { FormInstance } from 'element-plus'
-import { screwSpecApi, punchApi, dieApi, punchLinkApi, dieLinkApi, stockCalcApi } from '../api'
+import { screwSpecApi, screwAttachmentApi, punchApi, dieApi, punchLinkApi, dieLinkApi, stockCalcApi } from '../api'
 import { useAllowDelete } from '../composables/useAllowDelete'
 import { useHighlight } from '../composables/useHighlight'
+import { settleNamedRequests, showBatchErrors, showDetailedError } from '../utils/errorFeedback'
 import FullscreenToggle from '../components/FullscreenToggle.vue'
 import DataTable from '../components/DataTable.vue'
 import RelatedDataDialog from '../components/RelatedDataDialog.vue'
+import ScrewAttachmentWorkspace from '../components/ScrewAttachmentWorkspace.vue'
 import { toShortCode, matchPunchNames } from '../utils/punchName'
 
 const { allowDelete } = useAllowDelete()
@@ -243,6 +277,11 @@ const dieList = ref<any[]>([])
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const loading = ref(true)
+const attachmentCounts = ref<Record<string, number>>({})
+const attachmentWorkspaceVisible = ref(false)
+const attachmentWorkspaceMode = ref<'preview' | 'edit'>('preview')
+const attachmentWorkspaceRow = ref<any>({})
+const editingAttachmentCount = computed(() => attachmentCounts.value[form.value.id] || 0)
 
 // 冲头关联弹窗
 const punchDialogVisible = ref(false)
@@ -345,23 +384,45 @@ function findIdsByNames(names: string[], infoList: any[], isDie = false): string
 async function loadData() {
   loading.value = true
   try {
-    const [screws, punches, dies, punchLinks, dieLinks] = await Promise.all([
-      screwSpecApi.getAll(), punchApi.getAll(), dieApi.getAll(),
-      punchLinkApi.getAll(), dieLinkApi.getAll()
+    const { values, failures } = await settleNamedRequests([
+      { label: '螺丝规格信息', request: screwSpecApi.getAll() },
+      { label: '冲头信息', request: punchApi.getAll() },
+      { label: '牙板信息', request: dieApi.getAll() },
+      { label: '冲头关联', request: punchLinkApi.getAll() },
+      { label: '牙板关联', request: dieLinkApi.getAll() },
+      { label: '附件数量', request: screwAttachmentApi.counts() },
     ])
-    const punchMap = resolveLinks('punchId', punchLinks, punches)
-    const dieMap = resolveLinks('dieId', dieLinks, dies)
-    tableData.value = screws.map((s: any) => ({
-      ...s,
-      _punchIds: punchMap[s.id]?.ids || [],
-      _punchNames: punchMap[s.id]?.names || [],
-      _dieIds: dieMap[s.id]?.ids || [],
-      _dieNames: dieMap[s.id]?.names || []
-    }))
-    punchList.value = punches
-    dieList.value = dies
-  } catch (error) { ElMessage.error('加载数据失败'); console.error(error) }
-  finally { loading.value = false }
+    const [screws, punches, dies, punchLinks, dieLinks, counts] = values as [
+      any[] | undefined,
+      any[] | undefined,
+      any[] | undefined,
+      any[] | undefined,
+      any[] | undefined,
+      Record<string, number> | undefined,
+    ]
+    const availablePunches = punches || punchList.value
+    const availableDies = dies || dieList.value
+    const punchMap = punchLinks ? resolveLinks('punchId', punchLinks, availablePunches) : {}
+    const dieMap = dieLinks ? resolveLinks('dieId', dieLinks, availableDies) : {}
+    const availableCounts = counts || {}
+
+    if (screws) {
+      tableData.value = screws.map((screw: any) => ({
+        ...screw,
+        _punchIds: punchMap[screw.id]?.ids || [],
+        _punchNames: punchMap[screw.id]?.names || [],
+        _dieIds: dieMap[screw.id]?.ids || [],
+        _dieNames: dieMap[screw.id]?.names || [],
+        _attachmentCount: availableCounts[screw.id] || 0,
+      }))
+    }
+    if (counts) attachmentCounts.value = counts
+    if (punches) punchList.value = punches
+    if (dies) dieList.value = dies
+    showBatchErrors('螺丝规格数据加载', failures)
+  } finally {
+    loading.value = false
+  }
 }
 
 // ====== 冲头关联弹窗 ======
@@ -387,7 +448,9 @@ async function setPunchPrimary(item: any) {
     await screwSpecApi.update(punchDialogRow.value.id, { punch: shortName })
     punchDialogVisible.value = false
     loadData()
-  } catch { ElMessage.error('设置失败') }
+  } catch (error) {
+    showDetailedError('设置螺丝规格外显冲头', error)
+  }
 }
 
 // ====== 牙板关联弹窗 ======
@@ -412,7 +475,31 @@ async function setDiePrimary(item: any) {
     await screwSpecApi.update(dieDialogRow.value.id, { die: item.name })
     dieDialogVisible.value = false
     loadData()
-  } catch { ElMessage.error('设置失败') }
+  } catch (error) {
+    showDetailedError('设置螺丝规格外显牙板', error)
+  }
+}
+
+// ====== 附件 ======
+function openAttachmentPreview(row: any) {
+  attachmentWorkspaceRow.value = row
+  attachmentWorkspaceMode.value = 'preview'
+  attachmentWorkspaceVisible.value = true
+}
+
+function openAttachmentEditor(row: any) {
+  attachmentWorkspaceRow.value = row
+  attachmentWorkspaceMode.value = 'edit'
+  attachmentWorkspaceVisible.value = true
+}
+
+function handleAttachmentChanged(count: number) {
+  const id = attachmentWorkspaceRow.value.id
+  if (!id) return
+  attachmentCounts.value[id] = count
+  attachmentWorkspaceRow.value._attachmentCount = count
+  const row = tableData.value.find(item => item.id === id)
+  if (row) row._attachmentCount = count
 }
 
 // ====== CRUD ======
@@ -446,7 +533,9 @@ async function handleDelete(row: any) {
     for (const l of dl) { if (l.screwSpecId === row.id) await dieLinkApi.remove(l.id) }
     ElMessage.success('删除成功')
     loadData()
-  } catch (e) { if (e !== 'cancel') { ElMessage.error('删除失败'); console.error(e) } }
+  } catch (error) {
+    if (error !== 'cancel') showDetailedError('删除螺丝规格及关联', error)
+  }
 }
 
 // 同步关联表：先删旧的，再建新的
@@ -487,7 +576,9 @@ async function handleSubmit() {
       await syncLinks(specId, 'dieId', dieNames, dieLinkApi, dieList.value, true)
       dialogVisible.value = false
       loadData()
-    } catch (error) { ElMessage.error(isEdit.value ? '更新失败' : '添加失败'); console.error(error) }
+    } catch (error) {
+      showDetailedError(isEdit.value ? '更新螺丝规格及关联' : '添加螺丝规格及关联', error)
+    }
   })
 }
 </script>
@@ -499,4 +590,12 @@ async function handleSubmit() {
 .page-container.is-fullscreen .el-card__body { flex: 1; overflow: hidden; padding: 12px; }
 
 .header-right { display: flex; gap: 8px; margin-left: auto; }
+.attachment-count-button { min-width: 46px; font-weight: 600; }
+.form-attachment-panel { width: 100%; min-height: 72px; padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px dashed var(--border-strong); border-radius: 12px; background: var(--surface-muted); }
+.form-attachment-panel > div { min-width: 0; display: flex; align-items: center; gap: 11px; }
+.form-attachment-panel > div > div { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.form-attachment-panel strong { color: var(--text-primary); font-size: 13px; }
+.form-attachment-panel span { color: var(--text-muted); font-size: 11px; }
+.form-attachment-icon { width: 38px; height: 38px; display: grid; place-items: center; flex-shrink: 0; border-radius: 10px; color: var(--primary); background: color-mix(in srgb, var(--primary) 12%, var(--card-bg)); }
+.form-attachment-icon .el-icon { font-size: 18px; }
 </style>

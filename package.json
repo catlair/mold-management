@@ -15,6 +15,7 @@
     "@tauri-apps/plugin-dialog": "^2.7.1",
     "@tauri-apps/plugin-fs": "^2.5.1",
     "element-plus": "^2.14.2",
+    "pdfjs-dist": "^5.4.149",
     "vue": "^3.5.38",
     "vue-router": "^5.1.0",
     "vxe-pc-ui": "^4.16.24",

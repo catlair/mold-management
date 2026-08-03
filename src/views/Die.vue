@@ -17,30 +17,30 @@
 
       <el-tabs v-model="activeTab">
         <el-tab-pane label="牙板信息" name="info">
-           <DataTable :data="dieList" :loading="loading">
-            <vxe-column field="name" title="名称" width="160" sortable>
+           <DataTable table-id="die.info" :data="dieList" :loading="loading">
+            <ConfigurableTable field="name" title="名称" width="160" sortable>
               <template #default="{ row }">
                 <el-link type="primary" :underline="false" @click="showLinkedScrews(row)">{{ row.name }}</el-link>
               </template>
-            </vxe-column>
-            <vxe-column field="machineType" title="机型" width="120" sortable :filters="machineTypeFilters" :filter-method="filterHandler" />
-            <vxe-column field="wireDiameter" title="线径" width="100" sortable />
-            <vxe-column field="safetyStock" title="安全库存" width="100" sortable />
-            <vxe-column field="currentStock" title="当前库存" width="100" sortable />
-            <vxe-column field="status" title="库存状态" width="100" sortable>
+            </ConfigurableTable>
+            <ConfigurableTable field="machineType" title="机型" width="120" sortable :filters="machineTypeFilters" :filter-method="filterHandler" />
+            <ConfigurableTable field="wireDiameter" title="线径" width="100" sortable />
+            <ConfigurableTable field="safetyStock" title="安全库存" width="100" sortable />
+            <ConfigurableTable field="currentStock" title="当前库存" width="100" sortable />
+            <ConfigurableTable field="status" title="库存状态" width="100" sortable>
               <template #default="{ row }">
                 <el-tag v-if="row.status" :type="row.status === '需入库' ? 'danger' : 'success'" effect="dark" round size="small">
                   {{ row.status }}
                 </el-tag>
               </template>
-            </vxe-column>
-            <vxe-column field="remark" title="备注" min-width="120" />
-            <vxe-column title="操作" width="150">
+            </ConfigurableTable>
+            <ConfigurableTable field="remark" title="备注" min-width="120" />
+            <ConfigurableTable title="操作" width="150" class-name="operation-column" header-class-name="operation-column">
               <template #default="{ row }">
                 <el-button size="small" @click="handleEdit(row)">编辑</el-button>
                 <el-button size="small" type="danger" v-if="allowDelete" @click="handleDelete(row)">删除</el-button>
               </template>
-            </vxe-column>
+            </ConfigurableTable>
           </DataTable>
         </el-tab-pane>
 
@@ -53,16 +53,16 @@
             <el-button type="primary" size="small" @click="showOrderDialog = true">新增入库</el-button>
           </div>
           <div class="record-table-scroll">
-            <vxe-table class="record-table" :data="orderPaginated" border round stripe show-header-overflow="tooltip" style="width: 100%">
-              <vxe-column title="牙板名称" width="32%" min-width="220" sortable>
+            <ConfigurableVxeTable table-id="die.order" class="record-table" :data="orderPaginated" border round stripe show-header-overflow="tooltip" style="width: 100%">
+              <ConfigurableTable title="牙板名称" width="32%" min-width="220" sortable>
                 <template #default="{ row }">
                   {{ getDieName(row.dieId) }}
                 </template>
-              </vxe-column>
-              <vxe-column field="quantity" title="入库数量" width="16%" min-width="120" sortable />
-              <vxe-column field="orderDate" title="入库时间" width="24%" min-width="180" sortable />
-              <vxe-column field="remark" title="备注" width="28%" min-width="180" />
-            </vxe-table>
+              </ConfigurableTable>
+              <ConfigurableTable field="quantity" title="入库数量" width="16%" min-width="120" sortable />
+              <ConfigurableTable field="orderDate" title="入库时间" width="24%" min-width="180" sortable />
+              <ConfigurableTable field="remark" title="备注" width="28%" min-width="180" />
+            </ConfigurableVxeTable>
           </div>
           <div class="record-pagination-bar">
             <el-pagination
@@ -86,17 +86,17 @@
             <el-button type="primary" size="small" @click="showUseDialog = true">新增领用</el-button>
           </div>
           <div class="record-table-scroll">
-            <vxe-table class="record-table" :data="usePaginated" border round stripe show-header-overflow="tooltip" style="width: 100%">
-              <vxe-column title="牙板名称" width="26%" min-width="220" sortable>
+            <ConfigurableVxeTable table-id="die.use" class="record-table" :data="usePaginated" border round stripe show-header-overflow="tooltip" style="width: 100%">
+              <ConfigurableTable title="牙板名称" width="26%" min-width="220" sortable>
                 <template #default="{ row }">
                   {{ getDieName(row.dieId) }}
                 </template>
-              </vxe-column>
-              <vxe-column field="user" title="领用人" width="16%" min-width="140" sortable />
-              <vxe-column field="quantity" title="领用数量" width="14%" min-width="120" sortable />
-              <vxe-column field="useDate" title="领用时间" width="22%" min-width="180" sortable />
-              <vxe-column field="remark" title="备注" width="22%" min-width="180" />
-            </vxe-table>
+              </ConfigurableTable>
+              <ConfigurableTable field="user" title="领用人" width="16%" min-width="140" sortable />
+              <ConfigurableTable field="quantity" title="领用数量" width="14%" min-width="120" sortable />
+              <ConfigurableTable field="useDate" title="领用时间" width="22%" min-width="180" sortable />
+              <ConfigurableTable field="remark" title="备注" width="22%" min-width="180" />
+            </ConfigurableVxeTable>
           </div>
           <div class="record-pagination-bar">
             <el-pagination
@@ -120,24 +120,24 @@
             <el-button type="primary" size="small" @click="showLinkDialog = true">新增关联</el-button>
           </div>
           <div class="record-table-scroll">
-            <vxe-table class="record-table" :data="linkPaginated" border round stripe show-header-overflow="tooltip" style="width: 100%">
-              <vxe-column title="牙板" width="28%" min-width="220">
+            <ConfigurableVxeTable table-id="die.link" class="record-table" :data="linkPaginated" border round stripe show-header-overflow="tooltip" style="width: 100%">
+              <ConfigurableTable title="牙板" width="28%" min-width="220">
                 <template #default="{ row }">
                   {{ getDieName(row.dieId) }}
                 </template>
-              </vxe-column>
-              <vxe-column title="螺丝规格" width="30%" min-width="240">
+              </ConfigurableTable>
+              <ConfigurableTable title="螺丝规格" width="30%" min-width="240">
                 <template #default="{ row }">
                   {{ getScrewSpecName(row.screwSpecId) }}
                 </template>
-              </vxe-column>
-              <vxe-column field="remark" title="备注" width="27%" min-width="200" />
-              <vxe-column title="操作" width="15%" min-width="120">
+              </ConfigurableTable>
+              <ConfigurableTable field="remark" title="备注" width="27%" min-width="200" />
+              <ConfigurableTable title="操作" width="15%" min-width="120" class-name="operation-column" header-class-name="operation-column">
                 <template #default="{ row }">
                   <el-button size="small" type="danger" v-if="allowDelete" @click="handleDeleteLink(row)">删除</el-button>
                 </template>
-              </vxe-column>
-            </vxe-table>
+              </ConfigurableTable>
+            </ConfigurableVxeTable>
           </div>
           <div class="record-pagination-bar">
             <el-pagination
@@ -286,17 +286,17 @@
       :title="`关联螺丝 · ${linkedDieName}`"
       description="查看当前牙板适用的螺丝规格"
     >
-      <vxe-table :data="linkedScrews" border round stripe style="width: 100%" :loading="linkedLoading">
-        <vxe-column field="name" title="螺丝名称" width="150" sortable />
-        <vxe-column field="headType" title="头型" width="100" />
-        <vxe-column field="threadType" title="牙型" width="100" />
-        <vxe-column field="headSize" title="头/垫片大小" width="120" />
-        <vxe-column field="headHeight" title="头高" width="80" />
-        <vxe-column field="length" title="长度" width="80" />
-        <vxe-column field="threadDiameter" title="牙径" width="80" />
-        <vxe-column field="wireMaterial" title="线材" width="80" />
-        <vxe-column field="remark" title="备注" min-width="120" />
-      </vxe-table>
+      <ConfigurableVxeTable table-id="die.linked-screws" :data="linkedScrews" border round stripe style="width: 100%" :loading="linkedLoading">
+        <ConfigurableTable field="name" title="螺丝名称" width="150" sortable />
+        <ConfigurableTable field="headType" title="头型" width="100" />
+        <ConfigurableTable field="threadType" title="牙型" width="100" />
+        <ConfigurableTable field="headSize" title="头/垫片大小" width="120" />
+        <ConfigurableTable field="headHeight" title="头高" width="80" />
+        <ConfigurableTable field="length" title="长度" width="80" />
+        <ConfigurableTable field="threadDiameter" title="牙径" width="80" />
+        <ConfigurableTable field="wireMaterial" title="线材" width="80" />
+        <ConfigurableTable field="remark" title="备注" min-width="120" />
+      </ConfigurableVxeTable>
       <div v-if="!linkedLoading && linkedScrews.length === 0" class="related-dialog-empty">
         该牙板暂无关联螺丝规格
       </div>
@@ -311,6 +311,7 @@ import type { FormInstance } from 'element-plus'
 import { dieApi, dieOrderApi, dieUseApi, dieLinkApi, screwSpecApi, stockCalcApi } from '../api'
 import { useAllowDelete } from '../composables/useAllowDelete'
 import { useHighlight } from '../composables/useHighlight'
+import { settleNamedRequests, showBatchErrors, showDetailedError } from '../utils/errorFeedback'
 import DataTable from '../components/DataTable.vue'
 import RelatedDataDialog from '../components/RelatedDataDialog.vue'
 import FullscreenToggle from '../components/FullscreenToggle.vue'
@@ -352,8 +353,8 @@ async function showLinkedScrews(die: any) {
     const links = linkList.value.filter(l => l.dieId === die.id)
     const screwIds = links.map(l => l.screwSpecId)
     linkedScrews.value = screwSpecList.value.filter(s => screwIds.includes(s.id))
-  } catch {
-    ElMessage.error('加载关联数据失败')
+  } catch (error) {
+    showDetailedError('加载牙板关联螺丝', error)
   } finally {
     linkedLoading.value = false
   }
@@ -459,32 +460,40 @@ onMounted(() => {
 async function loadData() {
   loading.value = true
   try {
-    const [dies, orders, uses, links, screwSpecs, stockData] = await Promise.all([
-      dieApi.getAll(),
-      dieOrderApi.getAll(),
-      dieUseApi.getAll(),
-      dieLinkApi.getAll(),
-      screwSpecApi.getAll(),
-      stockCalcApi.calculate('die')
+    const { values, failures } = await settleNamedRequests([
+      { label: '牙板信息', request: dieApi.getAll() },
+      { label: '入库记录', request: dieOrderApi.getAll() },
+      { label: '领用记录', request: dieUseApi.getAll() },
+      { label: '螺丝规格关联', request: dieLinkApi.getAll() },
+      { label: '螺丝规格信息', request: screwSpecApi.getAll() },
+      { label: '库存计算', request: stockCalcApi.calculate('die') },
     ])
-    const stockMap: Record<string, any> = {}
-    stockData.forEach((s: any) => { stockMap[s.dieId] = s })
-    dieList.value = dies.map((d: any) => ({
-      ...d,
-      currentStock: stockMap[d.id]?.currentStock ?? '',
-      safetyStock: stockMap[d.id]?.safetyStock ?? d.safetyStock,
-      status: stockMap[d.id]?.status ?? '',
-    }))
-    orderList.value = orders
-    orderCurrentPage.value = 1
-    useList.value = uses
-    useCurrentPage.value = 1
-    linkList.value = links
-    linkCurrentPage.value = 1
-    screwSpecList.value = screwSpecs
-  } catch (error) {
-    ElMessage.error('加载数据失败')
-    console.error(error)
+    const [dies, orders, uses, links, screwSpecs, stockData] = values as Array<any[] | undefined>
+
+    if (dies) {
+      const stockMap: Record<string, any> = {}
+      stockData?.forEach((item: any) => { stockMap[item.dieId] = item })
+      dieList.value = dies.map((die: any) => ({
+        ...die,
+        currentStock: stockData ? (stockMap[die.id]?.currentStock ?? '') : '',
+        safetyStock: stockMap[die.id]?.safetyStock ?? die.safetyStock,
+        status: stockData ? (stockMap[die.id]?.status ?? '') : '',
+      }))
+    }
+    if (orders) {
+      orderList.value = orders
+      orderCurrentPage.value = 1
+    }
+    if (uses) {
+      useList.value = uses
+      useCurrentPage.value = 1
+    }
+    if (links) {
+      linkList.value = links
+      linkCurrentPage.value = 1
+    }
+    if (screwSpecs) screwSpecList.value = screwSpecs
+    showBatchErrors('牙板数据加载', failures)
   } finally {
     loading.value = false
   }
@@ -512,8 +521,7 @@ async function handleDelete(row: any) {
     loadData()
   } catch (error) {
     if (error !== 'cancel') {
-      ElMessage.error('删除失败')
-      console.error(error)
+      showDetailedError('删除牙板', error)
     }
   }
 }
@@ -539,10 +547,11 @@ async function handleSubmit() {
       dialogVisible.value = false
       await loadData()
     } catch (error) {
-      ElMessage.error(isDuplicateError(error)
-        ? duplicateErrorMessage(error)
-        : (isEdit.value ? '更新失败' : '添加失败'))
-      console.error(error)
+      showDetailedError(
+        isEdit.value ? '更新牙板' : '添加牙板',
+        error,
+        isDuplicateError(error) ? duplicateErrorMessage(error) : undefined,
+      )
     } finally {
       submitting.value = false
     }
@@ -560,8 +569,7 @@ async function handleOrderSubmit() {
       orderForm.value = { dieId: '', quantity: 1, orderDate: '', remark: '' }
       loadData()
     } catch (error) {
-      ElMessage.error('添加失败')
-      console.error(error)
+      showDetailedError('添加牙板入库记录', error)
     }
   })
 }
@@ -577,8 +585,7 @@ async function handleUseSubmit() {
       useForm.value = { dieId: '', user: '', quantity: 1, useDate: '', remark: '' }
       loadData()
     } catch (error) {
-      ElMessage.error('添加失败')
-      console.error(error)
+      showDetailedError('添加牙板领用记录', error)
     }
   })
 }
@@ -594,8 +601,7 @@ async function handleLinkSubmit() {
       linkForm.value = { dieId: '', screwSpecId: '', remark: '' }
       loadData()
     } catch (error) {
-      ElMessage.error('添加失败')
-      console.error(error)
+      showDetailedError('添加牙板螺丝规格关联', error)
     }
   })
 }
@@ -608,8 +614,7 @@ async function handleDeleteLink(row: any) {
     loadData()
   } catch (error) {
     if (error !== 'cancel') {
-      ElMessage.error('删除失败')
-      console.error(error)
+      showDetailedError('删除牙板螺丝规格关联', error)
     }
   }
 }

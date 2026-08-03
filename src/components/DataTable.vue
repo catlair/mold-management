@@ -15,8 +15,10 @@
       stripe
       align="center"
       :fit="false"
-      :row-config="{ keyField: 'id' }"
+      :row-config="{ keyField: 'id', isHover: true }"
+      :column-config="{ resizable: true }"
       show-header-overflow="tooltip"
+      @column-resizable-change="handleColumnResizableChange"
       :empty-text="loading ? '正在加载数据' : '暂无数据'"
       class="dt-table"
     >
@@ -32,16 +34,36 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick, provide, toRef } from 'vue'
 import { DocumentRemove } from '@element-plus/icons-vue'
+import { useTablePreferences } from '../composables/useTablePreferences'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
+  tableId?: string
   data: any[]
   loading?: boolean
-}>()
+}>(), {
+  tableId: '',
+})
+
+provide('tablePreferenceContext', {
+  tableId: toRef(props, 'tableId'),
+  data: toRef(props, 'data'),
+})
 
 const wrapRef = ref<HTMLDivElement | null>(null)
 const tableRef = ref<any>(null)
+const { setColumnPreference } = useTablePreferences()
+
+function handleColumnResizableChange({ column, resizeWidth }: any) {
+  const columnId = String(column?.field || column?.title || '')
+  if (!props.tableId || !columnId || columnId === '操作' || !Number.isFinite(resizeWidth)) return
+  setColumnPreference(props.tableId, columnId, { width: Math.max(60, Math.round(resizeWidth)) })
+  nextTick(() => {
+    tableRef.value?.recalculate?.()
+    window.dispatchEvent(new Event('resize'))
+  })
+}
 
 defineExpose({ tableRef })
 
@@ -108,11 +130,8 @@ onUnmounted(() => { observer?.disconnect() })
 .dt-wrap :deep(.vxe-table .el-table__body-wrapper) {
   overflow-x: visible !important;
 }
-/* 表头吸顶 */
+/* 表头由全局滚动同步器固定，避免 vxe 包装层导致 CSS sticky 在 WebView2 失效 */
 .dt-wrap :deep(.vxe-table--header-wrapper) {
-  position: sticky;
-  top: 0;
-  z-index: 5;
   background: var(--surface-muted);
 }
 .dt-wrap :deep(.vxe-header--column) {

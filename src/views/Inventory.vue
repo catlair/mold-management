@@ -19,22 +19,22 @@
 
         <el-tabs v-model="activeTab" class="inventory-tabs">
           <el-tab-pane label="冲头库存" name="punch">
-            <StockTable :data="punchStock" name-label="冲头名称" :loading="loading" />
+            <StockTable :data="punchStock" table-id="inventory.punch" name-label="冲头名称" :loading="loading" />
           </el-tab-pane>
           <el-tab-pane label="牙板库存" name="die">
-            <StockTable :data="dieStock" name-label="牙板名称" :loading="loading" />
+            <StockTable :data="dieStock" table-id="inventory.die" name-label="牙板名称" :loading="loading" />
           </el-tab-pane>
           <el-tab-pane label="皮带库存" name="belt">
-            <StockTable :data="beltStock" name-label="皮带名称" :loading="loading" />
+            <StockTable :data="beltStock" table-id="inventory.belt" name-label="皮带名称" :loading="loading" />
           </el-tab-pane>
           <el-tab-pane label="主模具库存" name="mainMold">
-            <StockTable :data="mainMoldStock" name-label="主模具名称" :loading="loading" />
+            <StockTable :data="mainMoldStock" table-id="inventory.main-mold" name-label="主模具名称" :loading="loading" />
           </el-tab-pane>
           <el-tab-pane label="剪刀库存" name="scissor">
-            <StockTable :data="scissorStock" name-label="剪刀名称" :loading="loading" />
+            <StockTable :data="scissorStock" table-id="inventory.scissor" name-label="剪刀名称" :loading="loading" />
           </el-tab-pane>
           <el-tab-pane label="上冲库存" name="upperPunch">
-            <StockTable :data="upperPunchStock" name-label="上冲名称" :loading="loading" />
+            <StockTable :data="upperPunchStock" table-id="inventory.upper-punch" name-label="上冲名称" :loading="loading" />
           </el-tab-pane>
         </el-tabs>
       </div>
@@ -44,8 +44,8 @@
 
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
 import { stockCalcApi } from '../api'
+import { showDetailedError } from '../utils/errorFeedback'
 import StockTable from '../components/StockTable.vue'
 
 const activeTab = ref('punch')
@@ -81,8 +81,7 @@ onMounted(async () => {
     scissorStock.value = result.scissor || []
     upperPunchStock.value = result.upperPunch || []
   } catch (error) {
-    ElMessage.error('加载库存数据失败')
-    console.error(error)
+    showDetailedError('加载库存汇总', error)
   } finally {
     loading.value = false
   }

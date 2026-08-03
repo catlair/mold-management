@@ -1,5 +1,6 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { getCurrentWindow } from '@tauri-apps/api/window'
+import { showDetailedError } from '../utils/errorFeedback'
 
 /**
  * 统一全屏逻辑：状态、切换、ESC 退出、退出按钮
@@ -13,7 +14,10 @@ export function useFullscreen() {
     isFullscreen.value = next
     try {
       await getCurrentWindow().setFullscreen(next)
-    } catch {}
+    } catch (error) {
+      isFullscreen.value = !next
+      showDetailedError(next ? '进入全屏' : '退出全屏', error)
+    }
   }
 
   function onKeydown(e: KeyboardEvent) {
@@ -25,7 +29,9 @@ export function useFullscreen() {
   onMounted(async () => {
     try {
       isFullscreen.value = await getCurrentWindow().isFullscreen()
-    } catch {}
+    } catch (error) {
+      showDetailedError('读取全屏状态', error)
+    }
     document.addEventListener('keydown', onKeydown)
   })
 

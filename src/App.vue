@@ -52,6 +52,10 @@
           </el-menu-item-group>
           <el-menu-item-group>
             <template #title><span v-show="!isCollapse" class="menu-group-title">系统功能</span></template>
+            <el-menu-item index="/page-management">
+              <el-icon><Operation /></el-icon>
+              <template #title>页面管理</template>
+            </el-menu-item>
             <el-menu-item index="/settings">
               <el-icon><Setting /></el-icon>
               <template #title>配置</template>
@@ -94,9 +98,11 @@ import { useRoute } from 'vue-router'
 import GlobalSearch from './components/GlobalSearch.vue'
 import ThemeToggle from './components/ThemeToggle.vue'
 import { useFullscreen } from './composables/useFullscreen'
+import { useFixedOperationColumns } from './composables/useFixedOperationColumns'
 
 // 全屏能力全局注入：页面通过 inject 获取，无需各自实现
 const { isFullscreen, toggleFullscreen } = useFullscreen()
+useFixedOperationColumns()
 provide('fullscreen', { isFullscreen, toggleFullscreen })
 
 const route = useRoute()
@@ -127,6 +133,9 @@ onMounted(() => {
   --card-bg: #ffffff;
   --surface-muted: #f8fafc;
   --surface-hover: #eef3f8;
+  --table-stripe-bg: #fbfcfd;
+  --switch-off-bg: #aab3c0;
+  --switch-disabled-bg: #d8dde4;
   --text-primary: #1d2735;
   --text-secondary: #667085;
   --text-muted: #8a94a4;
@@ -173,6 +182,9 @@ onMounted(() => {
   --card-bg: #1a2029;
   --surface-muted: #202731;
   --surface-hover: #27313d;
+  --table-stripe-bg: #1d242d;
+  --switch-off-bg: #4e5a69;
+  --switch-disabled-bg: #343e4b;
   --text-primary: #edf1f7;
   --text-secondary: #b7c0ce;
   --text-muted: #8995a6;
@@ -296,6 +308,10 @@ body {
   width: 180px;
 }
 
+.el-menu-vertical.el-menu--collapse {
+  width: 56px;
+}
+
 .el-menu-vertical .el-menu-item {
   color: var(--sidebar-text);
   height: 40px;
@@ -391,11 +407,100 @@ body {
 
 /* 表格样式 */
 .el-table {
+  --el-table-border-color: var(--border);
+  --el-table-border: 1px solid var(--border);
+  --el-table-bg-color: var(--card-bg);
+  --el-table-tr-bg-color: var(--card-bg);
+  --el-table-expanded-cell-bg-color: var(--card-bg);
+  --el-table-header-bg-color: var(--surface-muted);
+  --el-table-fixed-box-shadow: var(--shadow-card);
+  --el-table-row-hover-bg-color: var(--surface-hover);
+  --el-table-current-row-bg-color: var(--surface-hover);
+  --el-table-header-text-color: var(--text-primary);
+  --el-table-text-color: var(--text-secondary);
   border-radius: 10px;
+  background: var(--card-bg);
 }
 
 /* DataTable 内部表格无滚动条（滚动由 dt-wrap 承担），这里仅兜底隐藏悬浮条 */
 .el-table .el-scrollbar__bar.is-horizontal { display: none !important; }
+
+/* 表头固定在滚动容器顶部：滚动同步器写入纵向偏移，兼容 vxe 包装层和 WebView2 */
+:is(.dt-wrap, .record-table-scroll, .backup-table-scroll, .stock-table-shell) .vxe-table--header-wrapper {
+  position: relative !important;
+  z-index: 10;
+  transform: translateY(var(--table-header-offset, 0));
+  background: var(--surface-muted);
+  box-shadow: 0 1px 0 var(--border-strong), 0 8px 14px -14px rgba(23, 34, 51, 0.5);
+  will-change: transform;
+}
+
+:is(.dt-wrap, .record-table-scroll, .backup-table-scroll, .stock-table-shell) .vxe-header--column {
+  background: var(--surface-muted) !important;
+}
+
+/* 列宽拖动：放大表头边界热区，并用主题主色提供明确反馈。 */
+.vxe-table .vxe-header--column > .vxe-cell--col-resizable {
+  right: -5px;
+  width: 10px;
+}
+
+.vxe-table .vxe-header--column > .vxe-cell--col-resizable::after {
+  position: absolute;
+  top: 22%;
+  right: 4px;
+  bottom: 22%;
+  width: 2px;
+  background: var(--el-color-primary);
+  border-radius: 2px;
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+
+.vxe-table .vxe-header--column:hover > .vxe-cell--col-resizable::after,
+.vxe-table .vxe-header--column > .vxe-cell--col-resizable:hover::after {
+  opacity: 0.72;
+}
+
+.vxe-table .vxe-table--resizable-col-bar::before {
+  background-color: var(--el-color-primary);
+}
+
+/* 操作列固定在右侧：滚动同步器写入偏移，兼容 DataTable 外层滚动和记录表滚动容器 */
+.vxe-table .vxe-header--column.operation-column,
+.vxe-table .vxe-body--column.operation-column {
+  position: relative;
+  z-index: 4;
+  transform: translateX(var(--operation-column-offset, 0));
+  border-left: 1px solid var(--border-strong);
+  background: var(--card-bg) !important;
+  will-change: transform;
+}
+
+.has-horizontal-overflow .vxe-table .vxe-header--column.operation-column,
+.has-horizontal-overflow .vxe-table .vxe-body--column.operation-column {
+  box-shadow: -8px 0 14px -12px rgba(23, 34, 51, 0.42);
+}
+
+.vxe-table .vxe-header--column.operation-column {
+  z-index: 12;
+  background: var(--surface-muted) !important;
+}
+
+.vxe-table .vxe-body--row.row--stripe .vxe-body--column.operation-column {
+  background: var(--vxe-ui-table-row-striped-background-color, var(--surface-muted)) !important;
+}
+
+/* vxe-table 以 row--hover 表示当前悬停行；同时保留 :hover 兜底，兼容 WebView2 */
+.vxe-table .vxe-body--row.row--hover > .vxe-body--column,
+.vxe-table .vxe-body--row:hover > .vxe-body--column {
+  background: var(--surface-hover) !important;
+}
+
+.vxe-table .vxe-body--row.row--hover > .vxe-body--column.operation-column,
+.vxe-table .vxe-body--row:hover > .vxe-body--column.operation-column {
+  background: var(--surface-hover) !important;
+}
 
 /* 全屏模式 */
 .page-container.is-fullscreen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 2000; background: var(--bg); padding: 0; overflow: auto; }
@@ -433,19 +538,33 @@ body {
 }
 
 .el-table th.el-table__cell {
-  background: #fafbfc !important;
-  color: #303133 !important;
+  background: var(--surface-muted) !important;
+  color: var(--text-primary) !important;
   font-weight: 600;
   font-size: 13px;
   border-bottom: 2px solid var(--border) !important;
 }
 
 .el-table .el-table__body tr:nth-child(even) td.el-table__cell {
-  background: #fafbfc !important;
+  background: var(--table-stripe-bg) !important;
 }
 
-.el-table .el-table__body tr:hover td.el-table__cell {
-  background: #f0f5ff !important;
+.el-table .el-table__body tr:hover td.el-table__cell,
+.el-table .el-table__body tr.hover-row td.el-table__cell {
+  background: var(--surface-hover) !important;
+}
+
+/* 详细错误通知：保留换行并显示后端原因与处理建议 */
+.detailed-error-notification {
+  width: min(480px, calc(100vw - 32px));
+}
+
+.detailed-error-notification .el-notification__content {
+  color: var(--text-secondary);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+  text-align: left;
 }
 
 /* 卡片样式 */

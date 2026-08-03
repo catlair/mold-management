@@ -33,7 +33,9 @@
       <div class="path-config">
         <div class="current-path">
           <span class="label">当前数据文件：</span>
-          <el-tag type="info" class="path-tag">{{ dataPath || '加载中...' }}</el-tag>
+          <el-tag type="info" class="path-tag" :title="dataPath || '加载中...'">
+            <span class="path-text">{{ dataPath || '加载中...' }}</span>
+          </el-tag>
         </div>
         <div class="path-actions">
           <el-button type="primary" @click="handleSelectPath">
@@ -78,7 +80,13 @@
           </el-form-item>
           <el-form-item label="备份目录">
             <div class="backup-path-row">
-              <el-tag type="info" class="path-tag">{{ backupConfig.effectiveBackupDir || '加载中...' }}</el-tag>
+              <el-tag
+                type="info"
+                class="path-tag"
+                :title="backupConfig.effectiveBackupDir || '加载中...'"
+              >
+                <span class="path-text">{{ backupConfig.effectiveBackupDir || '加载中...' }}</span>
+              </el-tag>
               <el-button size="small" @click="handleSelectBackupDir">更改</el-button>
               <el-button size="small" type="info" @click="resetBackupDir">恢复默认</el-button>
             </div>
@@ -105,23 +113,25 @@
           <el-button size="small" class="refresh-button" @click="loadBackups">刷新</el-button>
         </div>
       </template>
-      <vxe-table :data="backups" style="width: 100%" max-height="400">
-        <vxe-column field="backup_time" title="备份时间" width="180" />
-        <vxe-column field="backup_reason" title="备份原因" width="120" />
-        <vxe-column field="backup_md5" title="MD5" min-width="200" show-overflow="tooltip" />
-        <vxe-column title="锁定" width="80" align="center">
-          <template #default="{ row, rowIndex }">
-            <el-button size="small" :type="row.locked ? 'warning' : 'info'" link @click="handleToggleLock(rowIndex)">
-              <el-icon><Lock v-if="row.locked" /><Unlock v-else /></el-icon>
-            </el-button>
-          </template>
-        </vxe-column>
-        <vxe-column title="操作" width="120">
-          <template #default="{ row }">
-            <el-button size="small" type="warning" @click="handleRestore(row)">恢复</el-button>
-          </template>
-        </vxe-column>
-      </vxe-table>
+      <div class="backup-table-scroll">
+        <ConfigurableVxeTable table-id="settings.backups" :data="backups" :fit="true" class="backup-table" max-height="400">
+          <ConfigurableTable field="backup_time" title="备份时间" width="24%" min-width="140" show-overflow="tooltip" />
+          <ConfigurableTable field="backup_reason" title="备份原因" width="18%" min-width="100" show-overflow="tooltip" />
+          <ConfigurableTable field="backup_md5" title="MD5" width="34%" min-width="200" show-overflow="tooltip" />
+          <ConfigurableTable title="锁定" width="10%" min-width="64" align="center">
+            <template #default="{ row, rowIndex }">
+              <el-button size="small" :type="row.locked ? 'warning' : 'info'" link @click="handleToggleLock(rowIndex)">
+                <el-icon><Lock v-if="row.locked" /><Unlock v-else /></el-icon>
+              </el-button>
+            </template>
+          </ConfigurableTable>
+          <ConfigurableTable title="操作" width="14%" min-width="96" class-name="operation-column backup-operation-column" header-class-name="operation-column backup-operation-column">
+            <template #default="{ row }">
+              <el-button size="small" type="warning" @click="handleRestore(row)">恢复</el-button>
+            </template>
+          </ConfigurableTable>
+        </ConfigurableVxeTable>
+      </div>
       <div v-if="backups.length === 0" class="backup-empty">
         暂无备份记录
       </div>
@@ -135,6 +145,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { save, open } from '@tauri-apps/plugin-dialog'
 import { readFile, writeFile } from '@tauri-apps/plugin-fs'
 import { dataApi, settingsApi, backupApi, allowDeleteApi } from '../api'
+import { isUserCancellation, showDetailedError } from '../utils/errorFeedback'
 
 const exporting = ref(false)
 const importing = ref(false)
@@ -146,20 +157,29 @@ const backups = ref<any[]>([])
 const allowDeleteVal = ref(false)
 
 async function handleAllowDeleteChange(val: boolean) {
-  await allowDeleteApi.set(val)
-  ElMessage.success(val ? '已开启删除功能' : '已关闭删除功能')
+  try {
+    await allowDeleteApi.set(val)
+    ElMessage.success(val ? '已开启删除功能' : '已关闭删除功能')
+  } catch (error) {
+    allowDeleteVal.value = !val
+    showDetailedError('更新删除功能设置', error)
+  }
 }
 
 onMounted(async () => {
   try {
     const result = await settingsApi.getDataPath()
     dataPath.value = result as string
-  } catch (error: any) {
-    console.error('获取数据路径失败:', error)
+  } catch (error) {
+    showDetailedError('加载数据文件路径', error)
   }
   await loadBackupConfig()
   await loadBackups()
-  try { allowDeleteVal.value = await allowDeleteApi.get() } catch {}
+  try {
+    allowDeleteVal.value = await allowDeleteApi.get()
+  } catch (error) {
+    showDetailedError('加载删除功能设置', error)
+  }
 })
 
 async function loadBackupConfig() {
@@ -167,8 +187,8 @@ async function loadBackupConfig() {
     const config = await backupApi.getConfig()
     backupConfig.value = config
     backupCount.value = config.backupCount || 10
-  } catch (error: any) {
-    console.error('获取备份配置失败:', error)
+  } catch (error) {
+    showDetailedError('加载备份配置', error)
   }
 }
 
@@ -176,8 +196,8 @@ async function loadBackups() {
   try {
     const result = await backupApi.list()
     backups.value = Array.isArray(result) ? result : []
-  } catch (error: any) {
-    console.error('获取备份列表失败:', error)
+  } catch (error) {
+    showDetailedError('加载备份记录', error)
   }
 }
 
@@ -188,8 +208,8 @@ async function handleToggleLock(index: number) {
       backups.value[index].locked = result.locked
       ElMessage.success(result.locked ? '已锁定' : '已解锁')
     }
-  } catch (error: any) {
-    ElMessage.error('操作失败: ' + (error.message || error))
+  } catch (error) {
+    showDetailedError('切换备份锁定状态', error)
   }
 }
 
@@ -197,8 +217,8 @@ async function saveBackupConfig() {
   try {
     await backupApi.setConfig(backupCount.value, backupConfig.value.backupPath || null)
     ElMessage.success('备份配置已保存')
-  } catch (error: any) {
-    ElMessage.error('保存失败: ' + (error.message || error))
+  } catch (error) {
+    showDetailedError('保存备份配置', error)
   }
 }
 
@@ -221,8 +241,8 @@ async function handleBackupNow() {
       ElMessage.success('备份成功')
     }
     await loadBackups()
-  } catch (error: any) {
-    ElMessage.error('备份失败: ' + (error.message || error))
+  } catch (error) {
+    showDetailedError('立即备份数据', error)
   } finally {
     backingUp.value = false
   }
@@ -237,10 +257,8 @@ async function handleRestore(backup: any) {
     )
     await backupApi.restore(backup.file_path)
     ElMessage.success('恢复成功，请重启应用')
-  } catch (error: any) {
-    if (error !== 'cancel') {
-      ElMessage.error('恢复失败: ' + (error.message || error))
-    }
+  } catch (error) {
+    if (!isUserCancellation(error)) showDetailedError('恢复数据备份', error)
   }
 }
 
@@ -252,22 +270,36 @@ async function handleSelectBackupDir() {
       title: '选择备份目录'
     })
     if (!selected) return
-    backupConfig.value.backupPath = selected as string
-    backupConfig.value.effectiveBackupDir = selected as string
-    await backupApi.setConfig(backupCount.value, selected as string)
-    ElMessage.success('备份目录已更新')
-  } catch (error: any) {
-    if (error !== 'cancel') {
-      ElMessage.error('设置失败: ' + (error.message || error))
+    const previousPath = backupConfig.value.backupPath
+    const previousEffectiveDir = backupConfig.value.effectiveBackupDir
+    try {
+      await backupApi.setConfig(backupCount.value, selected as string)
+      backupConfig.value.backupPath = selected as string
+      backupConfig.value.effectiveBackupDir = selected as string
+      ElMessage.success('备份目录已更新')
+    } catch (error) {
+      backupConfig.value.backupPath = previousPath
+      backupConfig.value.effectiveBackupDir = previousEffectiveDir
+      throw error
     }
+  } catch (error) {
+    if (!isUserCancellation(error)) showDetailedError('设置备份目录', error)
   }
 }
 
 async function resetBackupDir() {
-  backupConfig.value.backupPath = null
-  backupConfig.value.effectiveBackupDir = backupConfig.value.defaultBackupDir
-  await backupApi.setConfig(backupCount.value, null)
-  ElMessage.success('已恢复默认备份目录')
+  const previousPath = backupConfig.value.backupPath
+  const previousEffectiveDir = backupConfig.value.effectiveBackupDir
+  try {
+    await backupApi.setConfig(backupCount.value, null)
+    backupConfig.value.backupPath = null
+    backupConfig.value.effectiveBackupDir = backupConfig.value.defaultBackupDir
+    ElMessage.success('已恢复默认备份目录')
+  } catch (error) {
+    backupConfig.value.backupPath = previousPath
+    backupConfig.value.effectiveBackupDir = previousEffectiveDir
+    showDetailedError('恢复默认备份目录', error)
+  }
 }
 
 async function handleExport() {
@@ -284,10 +316,8 @@ async function handleExport() {
 
     await writeFile(filePath, bytes)
     ElMessage.success('导出成功')
-  } catch (error: any) {
-    if (error !== 'cancel') {
-      ElMessage.error('导出失败: ' + (error.message || error))
-    }
+  } catch (error) {
+    if (!isUserCancellation(error)) showDetailedError('导出全部数据', error)
   } finally {
     exporting.value = false
   }
@@ -322,10 +352,8 @@ async function handleImport() {
     )
 
     window.location.reload()
-  } catch (error: any) {
-    if (error !== 'cancel') {
-      ElMessage.error('导入失败: ' + (error.message || error))
-    }
+  } catch (error) {
+    if (!isUserCancellation(error)) showDetailedError('导入并替换全部数据', error)
   } finally {
     importing.value = false
   }
@@ -361,10 +389,8 @@ async function handleSelectPath() {
       dataPath.value = result.filePath
       ElMessage.success('数据文件已更新，请重启应用')
     }
-  } catch (error: any) {
-    if (error !== 'cancel') {
-      ElMessage.error('设置失败: ' + (error.message || error))
-    }
+  } catch (error) {
+    if (!isUserCancellation(error)) showDetailedError('切换数据文件', error)
   }
 }
 </script>
@@ -459,8 +485,16 @@ async function handleSelectPath() {
   min-width: 0;
   max-width: min(400px, 100%);
   overflow: hidden;
+  justify-content: flex-start;
   font-family: "Cascadia Mono", "Segoe UI Mono", monospace;
   font-size: 12px;
+}
+
+.path-text {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -505,6 +539,37 @@ async function handleSelectPath() {
 
 .refresh-button {
   margin-left: auto;
+}
+
+.backup-table-scroll {
+  width: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+.backup-table {
+  width: 100%;
+  min-width: 600px;
+}
+
+.backup-table-scroll :deep(.vxe-table) {
+  width: 100%;
+  min-width: 600px;
+}
+
+.backup-table-scroll :deep(.vxe-table--body-wrapper) {
+  overflow-x: visible !important;
+}
+
+.backup-table-scroll :deep(.backup-operation-column) {
+  border-left-color: var(--border);
+}
+
+.backup-table-scroll.has-horizontal-overflow :deep(.backup-operation-column) {
+  border-left-color: var(--border-strong);
 }
 
 .backup-empty {

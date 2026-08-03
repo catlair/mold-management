@@ -1,5 +1,6 @@
 import { ref, computed, onMounted, type Ref } from 'vue'
 import { getCurrentWindow } from '@tauri-apps/api/window'
+import { showDetailedError } from '../utils/errorFeedback'
 
 export function useDataPage() {
   const isFullscreen = ref(false)
@@ -11,13 +12,18 @@ export function useDataPage() {
     isFullscreen.value = next
     try {
       await getCurrentWindow().setFullscreen(next)
-    } catch {}
+    } catch (error) {
+      isFullscreen.value = !next
+      showDetailedError(next ? '进入全屏' : '退出全屏', error)
+    }
   }
 
   onMounted(async () => {
     try {
       isFullscreen.value = await getCurrentWindow().isFullscreen()
-    } catch {}
+    } catch (error) {
+      showDetailedError('读取全屏状态', error)
+    }
   })
 
   function usePagination<T>(list: Ref<T[]>) {

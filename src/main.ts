@@ -10,6 +10,8 @@ import VxeUITable from 'vxe-table'
 import 'vxe-table/lib/style.css'
 import App from './App.vue'
 import router from './router'
+import ConfigurableTable from './components/ConfigurableTable.vue'
+import ConfigurableVxeTable from './components/ConfigurableVxeTable.vue'
 import { initializeTheme } from './composables/useTheme'
 
 // 在应用挂载前同步主题，避免启动时出现浅色闪烁
@@ -25,5 +27,7 @@ for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
 app.use(ElementPlus, { locale: zhCn })
 app.use(VxeUI)
 app.use(VxeUITable)
+app.component('ConfigurableTable', ConfigurableTable)
+app.component('ConfigurableVxeTable', ConfigurableVxeTable)
 app.use(router)
 app.mount('#app')

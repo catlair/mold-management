@@ -127,7 +127,8 @@ fn create_empty_workbook(file_path: &str) -> Result<(), String> {
             sheet.write_string(0, i as u16, header).map_err(|e| e.to_string())?;
         }
     }
-    workbook.save(file_path).map_err(|e| e.to_string())?;
+    workbook.save(file_path)
+        .map_err(|e| format!("保存数据文件失败「{}」: {}", file_path, e))?;
     Ok(())
 }
 
@@ -250,8 +251,10 @@ pub fn get_all(file_path: &str, sheet_name: &str) -> Result<Vec<HashMap<String, 
         create_empty_workbook(file_path)?;
         return Ok(vec![]);
     }
-    let mut workbook = open_workbook_auto(file_path).map_err(|e| e.to_string())?;
-    let range = workbook.worksheet_range(sheet_name).map_err(|e| e.to_string())?;
+    let mut workbook = open_workbook_auto(file_path)
+        .map_err(|e| format!("打开数据文件失败「{}」: {}", file_path, e))?;
+    let range = workbook.worksheet_range(sheet_name)
+        .map_err(|e| format!("读取工作表「{}」失败: {}", sheet_name, e))?;
     let keys = get_column_keys(sheet_name);
     let mut items = Vec::new();
     for (row_idx, row) in range.rows().enumerate() {
@@ -372,7 +375,8 @@ fn write_sheet_data(file_path: &str, sheet_name: &str, rows: &[HashMap<String, S
             }
         }
     }
-    workbook.save(file_path).map_err(|e| e.to_string())?;
+    workbook.save(file_path)
+        .map_err(|e| format!("保存数据文件失败「{}」: {}", file_path, e))?;
     Ok(())
 }
 

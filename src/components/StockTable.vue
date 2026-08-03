@@ -5,7 +5,8 @@
     :aria-label="`${nameLabel}库存汇总表格`"
     tabindex="0"
   >
-    <vxe-table
+    <ConfigurableVxeTable
+      :table-id="tableId"
       :data="data"
       :loading="loading"
       :fit="true"
@@ -15,25 +16,26 @@
       show-header-overflow="tooltip"
       class="stock-table"
     >
-      <vxe-column field="name" :title="nameLabel" width="44%" min-width="260" sortable />
-      <vxe-column field="currentStock" title="当前库存" width="18%" min-width="140" sortable />
-      <vxe-column field="safetyStock" title="安全库存" width="18%" min-width="140" sortable />
-      <vxe-column field="status" title="库存状态" width="20%" min-width="160" sortable>
+      <ConfigurableTable field="name" :title="nameLabel" width="44%" min-width="260" sortable />
+      <ConfigurableTable field="currentStock" title="当前库存" width="18%" min-width="140" sortable />
+      <ConfigurableTable field="safetyStock" title="安全库存" width="18%" min-width="140" sortable />
+      <ConfigurableTable field="status" title="库存状态" width="20%" min-width="160" sortable>
         <template #default="{ row }">
           <el-tag :type="row.status === '需订购' ? 'danger' : 'success'" effect="dark" round>
             {{ row.status }}
           </el-tag>
         </template>
-      </vxe-column>
+      </ConfigurableTable>
       <template #empty>
         <el-empty description="暂无库存数据" />
       </template>
-    </vxe-table>
+    </ConfigurableVxeTable>
   </div>
 </template>
 
 <script setup lang="ts">
 defineProps<{
+  tableId: string
   data: any[]
   nameLabel: string
   loading?: boolean

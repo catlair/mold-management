@@ -17,25 +17,25 @@
 
       <el-tabs v-model="activeTab">
         <el-tab-pane label="皮带信息" name="info">
-           <DataTable :data="beltList" :loading="loading">
-            <vxe-column field="name" title="名称" width="160" sortable />
-            <vxe-column field="machine" title="适用机器" width="120" sortable :filters="machineFilters" :filter-method="filterHandler" />
-            <vxe-column field="safetyStock" title="安全库存" width="100" sortable />
-            <vxe-column field="currentStock" title="当前库存" width="100" sortable />
-            <vxe-column field="status" title="库存状态" width="100" sortable>
+           <DataTable table-id="belt.info" :data="beltList" :loading="loading">
+            <ConfigurableTable field="name" title="名称" width="160" sortable />
+            <ConfigurableTable field="machine" title="适用机器" width="120" sortable :filters="machineFilters" :filter-method="filterHandler" />
+            <ConfigurableTable field="safetyStock" title="安全库存" width="100" sortable />
+            <ConfigurableTable field="currentStock" title="当前库存" width="100" sortable />
+            <ConfigurableTable field="status" title="库存状态" width="100" sortable>
               <template #default="{ row }">
                 <el-tag v-if="row.status" :type="row.status === '需入库' ? 'danger' : 'success'" effect="dark" round size="small">
                   {{ row.status }}
                 </el-tag>
               </template>
-            </vxe-column>
-            <vxe-column field="remark" title="备注" min-width="120" />
-            <vxe-column title="操作" width="150">
+            </ConfigurableTable>
+            <ConfigurableTable field="remark" title="备注" min-width="120" />
+            <ConfigurableTable title="操作" width="150" class-name="operation-column" header-class-name="operation-column">
               <template #default="{ row }">
                 <el-button size="small" @click="handleEdit(row)">编辑</el-button>
                 <el-button size="small" type="danger" v-if="allowDelete" @click="handleDelete(row)">删除</el-button>
               </template>
-            </vxe-column>
+            </ConfigurableTable>
           </DataTable>
         </el-tab-pane>
 
@@ -48,17 +48,17 @@
             <el-button type="primary" size="small" @click="showOrderDialog = true">新增入库</el-button>
           </div>
           <div class="record-table-scroll">
-            <vxe-table class="record-table" :data="orderPaginated" border round stripe show-header-overflow="tooltip" style="width: 100%">
-              <vxe-column title="皮带" width="26%" min-width="220" sortable>
+            <ConfigurableVxeTable table-id="belt.order" class="record-table" :data="orderPaginated" border round stripe show-header-overflow="tooltip" style="width: 100%">
+              <ConfigurableTable title="皮带" width="26%" min-width="220" sortable>
                 <template #default="{ row }">
                   {{ getBeltName(row.beltId) }}
                 </template>
-              </vxe-column>
-              <vxe-column field="quantity" title="入库数量" width="14%" min-width="120" sortable />
-              <vxe-column field="orderDate" title="入库时间" width="22%" min-width="180" sortable />
-              <vxe-column field="status" title="到货状态" width="16%" min-width="140" sortable :filters="statusFilters" :filter-method="filterHandler" />
-              <vxe-column field="remark" title="备注" width="22%" min-width="180" />
-            </vxe-table>
+              </ConfigurableTable>
+              <ConfigurableTable field="quantity" title="入库数量" width="14%" min-width="120" sortable />
+              <ConfigurableTable field="orderDate" title="入库时间" width="22%" min-width="180" sortable />
+              <ConfigurableTable field="status" title="到货状态" width="16%" min-width="140" sortable :filters="statusFilters" :filter-method="filterHandler" />
+              <ConfigurableTable field="remark" title="备注" width="22%" min-width="180" />
+            </ConfigurableVxeTable>
           </div>
           <div class="record-pagination-bar">
             <el-pagination
@@ -82,17 +82,17 @@
             <el-button type="primary" size="small" @click="showUseDialog = true">新增使用</el-button>
           </div>
           <div class="record-table-scroll">
-            <vxe-table class="record-table" :data="usePaginated" border round stripe show-header-overflow="tooltip" style="width: 100%">
-              <vxe-column title="皮带" width="26%" min-width="220" sortable>
+            <ConfigurableVxeTable table-id="belt.use" class="record-table" :data="usePaginated" border round stripe show-header-overflow="tooltip" style="width: 100%">
+              <ConfigurableTable title="皮带" width="26%" min-width="220" sortable>
                 <template #default="{ row }">
                   {{ getBeltName(row.beltId) }}
                 </template>
-              </vxe-column>
-              <vxe-column field="user" title="使用人" width="16%" min-width="140" sortable />
-              <vxe-column field="quantity" title="使用数量" width="14%" min-width="120" sortable />
-              <vxe-column field="useDate" title="使用时间" width="22%" min-width="180" sortable />
-              <vxe-column field="remark" title="备注" width="22%" min-width="180" />
-            </vxe-table>
+              </ConfigurableTable>
+              <ConfigurableTable field="user" title="使用人" width="16%" min-width="140" sortable />
+              <ConfigurableTable field="quantity" title="使用数量" width="14%" min-width="120" sortable />
+              <ConfigurableTable field="useDate" title="使用时间" width="22%" min-width="180" sortable />
+              <ConfigurableTable field="remark" title="备注" width="22%" min-width="180" />
+            </ConfigurableVxeTable>
           </div>
           <div class="record-pagination-bar">
             <el-pagination
@@ -197,6 +197,7 @@ import type { FormInstance } from 'element-plus'
 import { beltApi, beltOrderApi, beltUseApi, stockCalcApi } from '../api'
 import { useAllowDelete } from '../composables/useAllowDelete'
 import { useHighlight } from '../composables/useHighlight'
+import { showBatchErrors, showDetailedError, type NamedError } from '../utils/errorFeedback'
 import DataTable from '../components/DataTable.vue'
 import FullscreenToggle from '../components/FullscreenToggle.vue'
 
@@ -288,27 +289,42 @@ onMounted(() => {
 async function loadData() {
   loading.value = true
   try {
-    const [belts, orders, uses, stockData] = await Promise.all([
-      beltApi.getAll(),
-      beltOrderApi.getAll(),
-      beltUseApi.getAll(),
-      stockCalcApi.calculate('belt')
-    ])
-    const stockMap: Record<string, any> = {}
-    stockData.forEach((s: any) => { stockMap[s.beltId] = s })
-    beltList.value = belts.map((b: any) => ({
-      ...b,
-      currentStock: stockMap[b.id]?.currentStock ?? '',
-      safetyStock: stockMap[b.id]?.safetyStock ?? b.safetyStock,
-      status: stockMap[b.id]?.status ?? '',
-    }))
-    orderList.value = orders
-    orderCurrentPage.value = 1
-    useList.value = uses
-    useCurrentPage.value = 1
-  } catch (error) {
-    ElMessage.error('加载数据失败')
-    console.error(error)
+    const requests = [
+      { label: '皮带信息', request: beltApi.getAll() },
+      { label: '入库记录', request: beltOrderApi.getAll() },
+      { label: '使用记录', request: beltUseApi.getAll() },
+      { label: '库存计算', request: stockCalcApi.calculate('belt') },
+    ]
+    const results = await Promise.allSettled(requests.map(item => item.request))
+    const failures: NamedError[] = []
+    results.forEach((result, index) => {
+      if (result.status === 'rejected') failures.push({ label: requests[index].label, error: result.reason })
+    })
+
+    const belts = results[0].status === 'fulfilled' ? results[0].value : null
+    const orders = results[1].status === 'fulfilled' ? results[1].value : null
+    const uses = results[2].status === 'fulfilled' ? results[2].value : null
+    const stockData = results[3].status === 'fulfilled' ? results[3].value : null
+
+    if (belts) {
+      const stockMap: Record<string, any> = {}
+      stockData?.forEach((item: any) => { stockMap[item.beltId] = item })
+      beltList.value = belts.map((belt: any) => ({
+        ...belt,
+        currentStock: stockData ? (stockMap[belt.id]?.currentStock ?? '') : '',
+        safetyStock: stockMap[belt.id]?.safetyStock ?? belt.safetyStock,
+        status: stockData ? (stockMap[belt.id]?.status ?? '') : '',
+      }))
+    }
+    if (orders) {
+      orderList.value = orders
+      orderCurrentPage.value = 1
+    }
+    if (uses) {
+      useList.value = uses
+      useCurrentPage.value = 1
+    }
+    showBatchErrors('皮带数据加载', failures)
   } finally {
     loading.value = false
   }
@@ -334,8 +350,7 @@ async function handleDelete(row: any) {
     loadData()
   } catch (error) {
     if (error !== 'cancel') {
-      ElMessage.error('删除失败')
-      console.error(error)
+      showDetailedError('删除皮带', error)
     }
   }
 }
@@ -355,8 +370,7 @@ async function handleSubmit() {
       dialogVisible.value = false
       loadData()
     } catch (error) {
-      ElMessage.error(isEdit.value ? '更新失败' : '添加失败')
-      console.error(error)
+      showDetailedError(isEdit.value ? '更新皮带' : '添加皮带', error)
     }
   })
 }
@@ -372,8 +386,7 @@ async function handleOrderSubmit() {
       orderForm.value = { beltId: '', quantity: 1, orderDate: '', status: '未到货', remark: '' }
       loadData()
     } catch (error) {
-      ElMessage.error('添加失败')
-      console.error(error)
+      showDetailedError('添加皮带入库记录', error)
     }
   })
 }
@@ -389,8 +402,7 @@ async function handleUseSubmit() {
       useForm.value = { beltId: '', user: '', quantity: 1, useDate: '', remark: '' }
       loadData()
     } catch (error) {
-      ElMessage.error('添加失败')
-      console.error(error)
+      showDetailedError('添加皮带使用记录', error)
     }
   })
 }

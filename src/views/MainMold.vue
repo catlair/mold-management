@@ -17,26 +17,26 @@
 
       <el-tabs v-model="activeTab">
         <el-tab-pane label="主模具信息" name="info">
-           <DataTable :data="mainMoldList" :loading="loading">
-            <vxe-column field="name" title="名称" width="160" sortable />
-            <vxe-column field="holeDiameter" title="孔径" width="100" sortable />
-            <vxe-column field="wireMaterial" title="对应线材" width="120" sortable />
-            <vxe-column field="safetyStock" title="安全库存" width="100" sortable />
-            <vxe-column field="currentStock" title="当前库存" width="100" sortable />
-            <vxe-column field="status" title="库存状态" width="100" sortable>
+           <DataTable table-id="main-mold.info" :data="mainMoldList" :loading="loading">
+            <ConfigurableTable field="name" title="名称" width="160" sortable />
+            <ConfigurableTable field="holeDiameter" title="孔径" width="100" sortable />
+            <ConfigurableTable field="wireMaterial" title="对应线材" width="120" sortable />
+            <ConfigurableTable field="safetyStock" title="安全库存" width="100" sortable />
+            <ConfigurableTable field="currentStock" title="当前库存" width="100" sortable />
+            <ConfigurableTable field="status" title="库存状态" width="100" sortable>
               <template #default="{ row }">
                 <el-tag v-if="row.status" :type="row.status === '需入库' ? 'danger' : 'success'" effect="dark" round size="small">
                   {{ row.status }}
                 </el-tag>
               </template>
-            </vxe-column>
-            <vxe-column field="remark" title="备注" min-width="120" />
-            <vxe-column title="操作" width="150">
+            </ConfigurableTable>
+            <ConfigurableTable field="remark" title="备注" min-width="120" />
+            <ConfigurableTable title="操作" width="150" class-name="operation-column" header-class-name="operation-column">
               <template #default="{ row }">
                 <el-button size="small" @click="handleEdit(row)">编辑</el-button>
                 <el-button size="small" type="danger" v-if="allowDelete" @click="handleDelete(row)">删除</el-button>
               </template>
-            </vxe-column>
+            </ConfigurableTable>
           </DataTable>
         </el-tab-pane>
 
@@ -49,17 +49,17 @@
             <el-button type="primary" size="small" @click="showOrderDialog = true">新增入库</el-button>
           </div>
           <div class="record-table-scroll">
-            <vxe-table class="record-table" :data="orderPaginated" border round stripe show-header-overflow="tooltip" style="width: 100%">
-              <vxe-column title="主模具" width="26%" min-width="220" sortable>
+            <ConfigurableVxeTable table-id="main-mold.order" class="record-table" :data="orderPaginated" border round stripe show-header-overflow="tooltip" style="width: 100%">
+              <ConfigurableTable title="主模具" width="26%" min-width="220" sortable>
                 <template #default="{ row }">
                   {{ getMainMoldName(row.mainMoldId) }}
                 </template>
-              </vxe-column>
-              <vxe-column field="quantity" title="入库数量" width="14%" min-width="120" sortable />
-              <vxe-column field="orderDate" title="入库时间" width="22%" min-width="180" sortable />
-              <vxe-column field="status" title="到货状态" width="16%" min-width="140" sortable :filters="statusFilters" :filter-method="filterHandler" />
-              <vxe-column field="remark" title="备注" width="22%" min-width="180" />
-            </vxe-table>
+              </ConfigurableTable>
+              <ConfigurableTable field="quantity" title="入库数量" width="14%" min-width="120" sortable />
+              <ConfigurableTable field="orderDate" title="入库时间" width="22%" min-width="180" sortable />
+              <ConfigurableTable field="status" title="到货状态" width="16%" min-width="140" sortable :filters="statusFilters" :filter-method="filterHandler" />
+              <ConfigurableTable field="remark" title="备注" width="22%" min-width="180" />
+            </ConfigurableVxeTable>
           </div>
           <div class="record-pagination-bar">
             <el-pagination
@@ -83,17 +83,17 @@
             <el-button type="primary" size="small" @click="showUseDialog = true">新增使用</el-button>
           </div>
           <div class="record-table-scroll">
-            <vxe-table class="record-table" :data="usePaginated" border round stripe show-header-overflow="tooltip" style="width: 100%">
-              <vxe-column title="主模具" width="26%" min-width="220" sortable>
+            <ConfigurableVxeTable table-id="main-mold.use" class="record-table" :data="usePaginated" border round stripe show-header-overflow="tooltip" style="width: 100%">
+              <ConfigurableTable title="主模具" width="26%" min-width="220" sortable>
                 <template #default="{ row }">
                   {{ getMainMoldName(row.mainMoldId) }}
                 </template>
-              </vxe-column>
-              <vxe-column field="user" title="使用人" width="16%" min-width="140" sortable />
-              <vxe-column field="quantity" title="使用数量" width="14%" min-width="120" sortable />
-              <vxe-column field="useDate" title="使用时间" width="22%" min-width="180" sortable />
-              <vxe-column field="remark" title="备注" width="22%" min-width="180" />
-            </vxe-table>
+              </ConfigurableTable>
+              <ConfigurableTable field="user" title="使用人" width="16%" min-width="140" sortable />
+              <ConfigurableTable field="quantity" title="使用数量" width="14%" min-width="120" sortable />
+              <ConfigurableTable field="useDate" title="使用时间" width="22%" min-width="180" sortable />
+              <ConfigurableTable field="remark" title="备注" width="22%" min-width="180" />
+            </ConfigurableVxeTable>
           </div>
           <div class="record-pagination-bar">
             <el-pagination
@@ -117,20 +117,20 @@
             <el-button type="primary" size="small" @click="showLinkDialog = true">新增关联</el-button>
           </div>
           <div class="record-table-scroll">
-            <vxe-table class="record-table" :data="linkPaginated" border round stripe show-header-overflow="tooltip" style="width: 100%">
-              <vxe-column title="主模具" width="28%" min-width="220" sortable>
+            <ConfigurableVxeTable table-id="main-mold.link" class="record-table" :data="linkPaginated" border round stripe show-header-overflow="tooltip" style="width: 100%">
+              <ConfigurableTable title="主模具" width="28%" min-width="220" sortable>
                 <template #default="{ row }">
                   {{ getMainMoldName(row.mainMoldId) }}
                 </template>
-              </vxe-column>
-              <vxe-column field="wireMaterial" title="线材规格" width="30%" min-width="220" sortable />
-              <vxe-column field="remark" title="备注" width="27%" min-width="200" />
-              <vxe-column title="操作" width="15%" min-width="120">
+              </ConfigurableTable>
+              <ConfigurableTable field="wireMaterial" title="线材规格" width="30%" min-width="220" sortable />
+              <ConfigurableTable field="remark" title="备注" width="27%" min-width="200" />
+              <ConfigurableTable title="操作" width="15%" min-width="120" class-name="operation-column" header-class-name="operation-column">
                 <template #default="{ row }">
                   <el-button size="small" type="danger" v-if="allowDelete" @click="handleDeleteLink(row)">删除</el-button>
                 </template>
-              </vxe-column>
-            </vxe-table>
+              </ConfigurableTable>
+            </ConfigurableVxeTable>
           </div>
           <div class="record-pagination-bar">
             <el-pagination
@@ -259,6 +259,7 @@ import type { FormInstance } from 'element-plus'
 import { mainMoldApi, mainMoldOrderApi, mainMoldUseApi, mainMoldLinkApi, stockCalcApi } from '../api'
 import { useAllowDelete } from '../composables/useAllowDelete'
 import { useHighlight } from '../composables/useHighlight'
+import { settleNamedRequests, showBatchErrors, showDetailedError } from '../utils/errorFeedback'
 import DataTable from '../components/DataTable.vue'
 import FullscreenToggle from '../components/FullscreenToggle.vue'
 
@@ -359,30 +360,38 @@ onMounted(() => {
 async function loadData() {
   loading.value = true
   try {
-    const [molds, orders, uses, links, stockData] = await Promise.all([
-      mainMoldApi.getAll(),
-      mainMoldOrderApi.getAll(),
-      mainMoldUseApi.getAll(),
-      mainMoldLinkApi.getAll(),
-      stockCalcApi.calculate('mainMold')
+    const { values, failures } = await settleNamedRequests([
+      { label: '主模具信息', request: mainMoldApi.getAll() },
+      { label: '入库记录', request: mainMoldOrderApi.getAll() },
+      { label: '使用记录', request: mainMoldUseApi.getAll() },
+      { label: '线材关联', request: mainMoldLinkApi.getAll() },
+      { label: '库存计算', request: stockCalcApi.calculate('mainMold') },
     ])
-    const stockMap: Record<string, any> = {}
-    stockData.forEach((s: any) => { stockMap[s.mainMoldId] = s })
-    mainMoldList.value = molds.map((m: any) => ({
-      ...m,
-      currentStock: stockMap[m.id]?.currentStock ?? '',
-      safetyStock: stockMap[m.id]?.safetyStock ?? m.safetyStock,
-      status: stockMap[m.id]?.status ?? '',
-    }))
-    orderList.value = orders
-    orderCurrentPage.value = 1
-    useList.value = uses
-    useCurrentPage.value = 1
-    linkList.value = links
-    linkCurrentPage.value = 1
-  } catch (error) {
-    ElMessage.error('加载数据失败')
-    console.error(error)
+    const [molds, orders, uses, links, stockData] = values as Array<any[] | undefined>
+
+    if (molds) {
+      const stockMap: Record<string, any> = {}
+      stockData?.forEach((item: any) => { stockMap[item.mainMoldId] = item })
+      mainMoldList.value = molds.map((mold: any) => ({
+        ...mold,
+        currentStock: stockData ? (stockMap[mold.id]?.currentStock ?? '') : '',
+        safetyStock: stockMap[mold.id]?.safetyStock ?? mold.safetyStock,
+        status: stockData ? (stockMap[mold.id]?.status ?? '') : '',
+      }))
+    }
+    if (orders) {
+      orderList.value = orders
+      orderCurrentPage.value = 1
+    }
+    if (uses) {
+      useList.value = uses
+      useCurrentPage.value = 1
+    }
+    if (links) {
+      linkList.value = links
+      linkCurrentPage.value = 1
+    }
+    showBatchErrors('主模具数据加载', failures)
   } finally {
     loading.value = false
   }
@@ -408,8 +417,7 @@ async function handleDelete(row: any) {
     loadData()
   } catch (error) {
     if (error !== 'cancel') {
-      ElMessage.error('删除失败')
-      console.error(error)
+      showDetailedError('删除主模具', error)
     }
   }
 }
@@ -429,8 +437,7 @@ async function handleSubmit() {
       dialogVisible.value = false
       loadData()
     } catch (error) {
-      ElMessage.error(isEdit.value ? '更新失败' : '添加失败')
-      console.error(error)
+      showDetailedError(isEdit.value ? '更新主模具' : '添加主模具', error)
     }
   })
 }
@@ -446,8 +453,7 @@ async function handleOrderSubmit() {
       orderForm.value = { mainMoldId: '', quantity: 1, orderDate: '', status: '未到货', remark: '' }
       loadData()
     } catch (error) {
-      ElMessage.error('添加失败')
-      console.error(error)
+      showDetailedError('添加主模具入库记录', error)
     }
   })
 }
@@ -463,8 +469,7 @@ async function handleUseSubmit() {
       useForm.value = { mainMoldId: '', user: '', quantity: 1, useDate: '', remark: '' }
       loadData()
     } catch (error) {
-      ElMessage.error('添加失败')
-      console.error(error)
+      showDetailedError('添加主模具使用记录', error)
     }
   })
 }
@@ -480,8 +485,7 @@ async function handleLinkSubmit() {
       linkForm.value = { mainMoldId: '', wireMaterial: '', remark: '' }
       loadData()
     } catch (error) {
-      ElMessage.error('添加失败')
-      console.error(error)
+      showDetailedError('添加主模具线材关联', error)
     }
   })
 }
@@ -494,8 +498,7 @@ async function handleDeleteLink(row: any) {
     loadData()
   } catch (error) {
     if (error !== 'cancel') {
-      ElMessage.error('删除失败')
-      console.error(error)
+      showDetailedError('删除主模具线材关联', error)
     }
   }
 }

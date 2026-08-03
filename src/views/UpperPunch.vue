@@ -17,26 +17,26 @@
 
       <el-tabs v-model="activeTab">
         <el-tab-pane label="上冲信息" name="info">
-           <DataTable :data="upperPunchList" :loading="loading">
-            <vxe-column field="name" title="名称" width="160" sortable />
-            <vxe-column field="diameter" title="口径" width="100" sortable />
-            <vxe-column field="wireMaterial" title="对应线材" width="120" sortable />
-            <vxe-column field="safetyStock" title="安全库存" width="100" sortable />
-            <vxe-column field="currentStock" title="当前库存" width="100" sortable />
-            <vxe-column field="status" title="库存状态" width="100" sortable>
+           <DataTable table-id="upper-punch.info" :data="upperPunchList" :loading="loading">
+            <ConfigurableTable field="name" title="名称" width="160" sortable />
+            <ConfigurableTable field="diameter" title="口径" width="100" sortable />
+            <ConfigurableTable field="wireMaterial" title="对应线材" width="120" sortable />
+            <ConfigurableTable field="safetyStock" title="安全库存" width="100" sortable />
+            <ConfigurableTable field="currentStock" title="当前库存" width="100" sortable />
+            <ConfigurableTable field="status" title="库存状态" width="100" sortable>
               <template #default="{ row }">
                 <el-tag v-if="row.status" :type="row.status === '需入库' ? 'danger' : 'success'" effect="dark" round size="small">
                   {{ row.status }}
                 </el-tag>
               </template>
-            </vxe-column>
-            <vxe-column field="remark" title="备注" min-width="120" />
-            <vxe-column title="操作" width="150">
+            </ConfigurableTable>
+            <ConfigurableTable field="remark" title="备注" min-width="120" />
+            <ConfigurableTable title="操作" width="150" class-name="operation-column" header-class-name="operation-column">
               <template #default="{ row }">
                 <el-button size="small" @click="handleEdit(row)">编辑</el-button>
                 <el-button size="small" type="danger" v-if="allowDelete" @click="handleDelete(row)">删除</el-button>
               </template>
-            </vxe-column>
+            </ConfigurableTable>
           </DataTable>
         </el-tab-pane>
 
@@ -49,17 +49,17 @@
             <el-button type="primary" size="small" @click="showOrderDialog = true">新增入库</el-button>
           </div>
           <div class="record-table-scroll">
-            <vxe-table class="record-table" :data="orderPaginated" border round stripe show-header-overflow="tooltip" style="width: 100%">
-              <vxe-column title="上冲" width="26%" min-width="220" sortable>
+            <ConfigurableVxeTable table-id="upper-punch.order" class="record-table" :data="orderPaginated" border round stripe show-header-overflow="tooltip" style="width: 100%">
+              <ConfigurableTable title="上冲" width="26%" min-width="220" sortable>
                 <template #default="{ row }">
                   {{ getUpperPunchName(row.upperPunchId) }}
                 </template>
-              </vxe-column>
-              <vxe-column field="quantity" title="入库数量" width="14%" min-width="120" sortable />
-              <vxe-column field="orderDate" title="入库时间" width="22%" min-width="180" sortable />
-              <vxe-column field="status" title="到货状态" width="16%" min-width="140" sortable :filters="statusFilters" :filter-method="filterHandler" />
-              <vxe-column field="remark" title="备注" width="22%" min-width="180" />
-            </vxe-table>
+              </ConfigurableTable>
+              <ConfigurableTable field="quantity" title="入库数量" width="14%" min-width="120" sortable />
+              <ConfigurableTable field="orderDate" title="入库时间" width="22%" min-width="180" sortable />
+              <ConfigurableTable field="status" title="到货状态" width="16%" min-width="140" sortable :filters="statusFilters" :filter-method="filterHandler" />
+              <ConfigurableTable field="remark" title="备注" width="22%" min-width="180" />
+            </ConfigurableVxeTable>
           </div>
           <div class="record-pagination-bar">
             <el-pagination
@@ -83,17 +83,17 @@
             <el-button type="primary" size="small" @click="showUseDialog = true">新增使用</el-button>
           </div>
           <div class="record-table-scroll">
-            <vxe-table class="record-table" :data="usePaginated" border round stripe show-header-overflow="tooltip" style="width: 100%">
-              <vxe-column title="上冲" width="26%" min-width="220" sortable>
+            <ConfigurableVxeTable table-id="upper-punch.use" class="record-table" :data="usePaginated" border round stripe show-header-overflow="tooltip" style="width: 100%">
+              <ConfigurableTable title="上冲" width="26%" min-width="220" sortable>
                 <template #default="{ row }">
                   {{ getUpperPunchName(row.upperPunchId) }}
                 </template>
-              </vxe-column>
-              <vxe-column field="user" title="使用人" width="16%" min-width="140" sortable />
-              <vxe-column field="quantity" title="使用数量" width="14%" min-width="120" sortable />
-              <vxe-column field="useDate" title="使用时间" width="22%" min-width="180" sortable />
-              <vxe-column field="remark" title="备注" width="22%" min-width="180" />
-            </vxe-table>
+              </ConfigurableTable>
+              <ConfigurableTable field="user" title="使用人" width="16%" min-width="140" sortable />
+              <ConfigurableTable field="quantity" title="使用数量" width="14%" min-width="120" sortable />
+              <ConfigurableTable field="useDate" title="使用时间" width="22%" min-width="180" sortable />
+              <ConfigurableTable field="remark" title="备注" width="22%" min-width="180" />
+            </ConfigurableVxeTable>
           </div>
           <div class="record-pagination-bar">
             <el-pagination
@@ -117,20 +117,20 @@
             <el-button type="primary" size="small" @click="showLinkDialog = true">新增关联</el-button>
           </div>
           <div class="record-table-scroll">
-            <vxe-table class="record-table" :data="linkPaginated" border round stripe show-header-overflow="tooltip" style="width: 100%">
-              <vxe-column title="上冲" width="28%" min-width="220" sortable>
+            <ConfigurableVxeTable table-id="upper-punch.link" class="record-table" :data="linkPaginated" border round stripe show-header-overflow="tooltip" style="width: 100%">
+              <ConfigurableTable title="上冲" width="28%" min-width="220" sortable>
                 <template #default="{ row }">
                   {{ getUpperPunchName(row.upperPunchId) }}
                 </template>
-              </vxe-column>
-              <vxe-column field="wireMaterial" title="线材规格" width="30%" min-width="220" sortable />
-              <vxe-column field="remark" title="备注" width="27%" min-width="200" />
-              <vxe-column title="操作" width="15%" min-width="120">
+              </ConfigurableTable>
+              <ConfigurableTable field="wireMaterial" title="线材规格" width="30%" min-width="220" sortable />
+              <ConfigurableTable field="remark" title="备注" width="27%" min-width="200" />
+              <ConfigurableTable title="操作" width="15%" min-width="120" class-name="operation-column" header-class-name="operation-column">
                 <template #default="{ row }">
                   <el-button size="small" type="danger" v-if="allowDelete" @click="handleDeleteLink(row)">删除</el-button>
                 </template>
-              </vxe-column>
-            </vxe-table>
+              </ConfigurableTable>
+            </ConfigurableVxeTable>
           </div>
           <div class="record-pagination-bar">
             <el-pagination
@@ -259,6 +259,7 @@ import type { FormInstance } from 'element-plus'
 import { upperPunchApi, upperPunchOrderApi, upperPunchUseApi, upperPunchLinkApi, stockCalcApi } from '../api'
 import { useAllowDelete } from '../composables/useAllowDelete'
 import { useHighlight } from '../composables/useHighlight'
+import { settleNamedRequests, showBatchErrors, showDetailedError } from '../utils/errorFeedback'
 import DataTable from '../components/DataTable.vue'
 import FullscreenToggle from '../components/FullscreenToggle.vue'
 
@@ -359,30 +360,38 @@ onMounted(() => {
 async function loadData() {
   loading.value = true
   try {
-    const [uppers, orders, uses, links, stockData] = await Promise.all([
-      upperPunchApi.getAll(),
-      upperPunchOrderApi.getAll(),
-      upperPunchUseApi.getAll(),
-      upperPunchLinkApi.getAll(),
-      stockCalcApi.calculate('upperPunch')
+    const { values, failures } = await settleNamedRequests([
+      { label: '上冲信息', request: upperPunchApi.getAll() },
+      { label: '入库记录', request: upperPunchOrderApi.getAll() },
+      { label: '使用记录', request: upperPunchUseApi.getAll() },
+      { label: '线材关联', request: upperPunchLinkApi.getAll() },
+      { label: '库存计算', request: stockCalcApi.calculate('upperPunch') },
     ])
-    const stockMap: Record<string, any> = {}
-    stockData.forEach((s: any) => { stockMap[s.upperPunchId] = s })
-    upperPunchList.value = uppers.map((u: any) => ({
-      ...u,
-      currentStock: stockMap[u.id]?.currentStock ?? '',
-      safetyStock: stockMap[u.id]?.safetyStock ?? u.safetyStock,
-      status: stockMap[u.id]?.status ?? '',
-    }))
-    orderList.value = orders
-    orderCurrentPage.value = 1
-    useList.value = uses
-    useCurrentPage.value = 1
-    linkList.value = links
-    linkCurrentPage.value = 1
-  } catch (error) {
-    ElMessage.error('加载数据失败')
-    console.error(error)
+    const [uppers, orders, uses, links, stockData] = values as Array<any[] | undefined>
+
+    if (uppers) {
+      const stockMap: Record<string, any> = {}
+      stockData?.forEach((item: any) => { stockMap[item.upperPunchId] = item })
+      upperPunchList.value = uppers.map((upper: any) => ({
+        ...upper,
+        currentStock: stockData ? (stockMap[upper.id]?.currentStock ?? '') : '',
+        safetyStock: stockMap[upper.id]?.safetyStock ?? upper.safetyStock,
+        status: stockData ? (stockMap[upper.id]?.status ?? '') : '',
+      }))
+    }
+    if (orders) {
+      orderList.value = orders
+      orderCurrentPage.value = 1
+    }
+    if (uses) {
+      useList.value = uses
+      useCurrentPage.value = 1
+    }
+    if (links) {
+      linkList.value = links
+      linkCurrentPage.value = 1
+    }
+    showBatchErrors('上冲数据加载', failures)
   } finally {
     loading.value = false
   }
@@ -408,8 +417,7 @@ async function handleDelete(row: any) {
     loadData()
   } catch (error) {
     if (error !== 'cancel') {
-      ElMessage.error('删除失败')
-      console.error(error)
+      showDetailedError('删除上冲', error)
     }
   }
 }
@@ -429,8 +437,7 @@ async function handleSubmit() {
       dialogVisible.value = false
       loadData()
     } catch (error) {
-      ElMessage.error(isEdit.value ? '更新失败' : '添加失败')
-      console.error(error)
+      showDetailedError(isEdit.value ? '更新上冲' : '添加上冲', error)
     }
   })
 }
@@ -446,8 +453,7 @@ async function handleOrderSubmit() {
       orderForm.value = { upperPunchId: '', quantity: 1, orderDate: '', status: '未到货', remark: '' }
       loadData()
     } catch (error) {
-      ElMessage.error('添加失败')
-      console.error(error)
+      showDetailedError('添加上冲入库记录', error)
     }
   })
 }
@@ -463,8 +469,7 @@ async function handleUseSubmit() {
       useForm.value = { upperPunchId: '', user: '', quantity: 1, useDate: '', remark: '' }
       loadData()
     } catch (error) {
-      ElMessage.error('添加失败')
-      console.error(error)
+      showDetailedError('添加上冲使用记录', error)
     }
   })
 }
@@ -480,8 +485,7 @@ async function handleLinkSubmit() {
       linkForm.value = { upperPunchId: '', wireMaterial: '', remark: '' }
       loadData()
     } catch (error) {
-      ElMessage.error('添加失败')
-      console.error(error)
+      showDetailedError('添加上冲线材关联', error)
     }
   })
 }
@@ -494,8 +498,7 @@ async function handleDeleteLink(row: any) {
     loadData()
   } catch (error) {
     if (error !== 'cancel') {
-      ElMessage.error('删除失败')
-      console.error(error)
+      showDetailedError('删除上冲线材关联', error)
     }
   }
 }

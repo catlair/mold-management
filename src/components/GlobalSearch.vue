@@ -67,6 +67,7 @@ import { ArrowRight, Document, SetUp, Grid, Connection, Box, Scissor, Top } from
 import {
   screwSpecApi, punchApi, dieApi, beltApi, mainMoldApi, scissorApi, upperPunchApi
 } from '../api'
+import { settleNamedRequests, showBatchErrors } from '../utils/errorFeedback'
 
 const router = useRouter()
 const visible = ref(false)
@@ -118,15 +119,18 @@ async function doSearch() {
   if (!kw) return
   loading.value = true
   try {
-    const [screws, punches, dies, belts, molds, scissors, upperPunches] = await Promise.all([
-      screwSpecApi.getAll(),
-      punchApi.getAll(),
-      dieApi.getAll(),
-      beltApi.getAll(),
-      mainMoldApi.getAll(),
-      scissorApi.getAll(),
-      upperPunchApi.getAll()
+    const { values, failures } = await settleNamedRequests([
+      { label: '螺丝规格', request: screwSpecApi.getAll() },
+      { label: '冲头', request: punchApi.getAll() },
+      { label: '牙板', request: dieApi.getAll() },
+      { label: '皮带', request: beltApi.getAll() },
+      { label: '主模具', request: mainMoldApi.getAll() },
+      { label: '剪刀', request: scissorApi.getAll() },
+      { label: '上冲', request: upperPunchApi.getAll() },
     ])
+    const [screws, punches, dies, belts, molds, scissors, upperPunches] = values.map(
+      value => Array.isArray(value) ? value : [],
+    )
 
     const result: SearchGroup[] = []
 
@@ -236,8 +240,7 @@ async function doSearch() {
     }
 
     groups.value = result
-  } catch (e) {
-    console.error(e)
+    showBatchErrors('全局搜索数据加载', failures)
   } finally {
     loading.value = false
   }
