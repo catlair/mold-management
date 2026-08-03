@@ -1,3 +1,4 @@
+use crate::storage;
 use base64::Engine;
 use chrono::Local;
 use serde::{Deserialize, Serialize};
@@ -34,6 +35,10 @@ fn attachment_root(data_file_path: &str) -> Result<PathBuf, String> {
     Ok(parent.join("attachments"))
 }
 
+pub fn root_path(data_file_path: &str) -> Result<PathBuf, String> {
+    attachment_root(data_file_path)
+}
+
 fn index_path(root: &Path) -> PathBuf {
     root.join("index.json")
 }
@@ -47,27 +52,48 @@ fn load_index(root: &Path) -> Result<Vec<ScrewAttachment>, String> {
     serde_json::from_str(&content).map_err(|e| format!("解析附件索引失败: {e}"))
 }
 
+pub fn validate_root(root: &Path) -> Result<(), String> {
+    if !root.exists() {
+        return Ok(());
+    }
+    if !root.is_dir() {
+        return Err(format!("附件路径不是目录「{}」", root.display()));
+    }
+    let attachments = load_index(root)?;
+    for attachment in &attachments {
+        resolve_stored_path(root, &attachment.relative_path).map_err(|error| {
+            format!("附件索引记录无效「{}」: {}", attachment.display_name, error)
+        })?;
+    }
+    Ok(())
+}
+
+pub fn count_index_entries(root: &Path) -> Result<usize, String> {
+    Ok(load_index(root)?.len())
+}
+
 fn save_index(root: &Path, attachments: &[ScrewAttachment]) -> Result<(), String> {
     fs::create_dir_all(root).map_err(|e| format!("创建附件目录失败: {e}"))?;
-    let target = index_path(root);
-    let temporary = root.join("index.json.tmp");
-    let content = serde_json::to_string_pretty(attachments)
-        .map_err(|e| format!("序列化附件索引失败: {e}"))?;
-    fs::write(&temporary, content).map_err(|e| format!("写入附件索引失败: {e}"))?;
-    fs::rename(&temporary, &target).or_else(|_| {
-        if target.exists() {
-            fs::remove_file(&target)?;
-        }
-        fs::rename(&temporary, &target)
-    }).map_err(|e| format!("保存附件索引失败: {e}"))
+    storage::atomic_write_json(&index_path(root), attachments)
+        .map_err(|e| format!("保存附件索引失败: {e}"))
 }
 
 fn safe_segment(value: &str) -> String {
     let sanitized: String = value
         .chars()
-        .map(|ch| if ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' { ch } else { '_' })
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' {
+                ch
+            } else {
+                '_'
+            }
+        })
         .collect();
-    if sanitized.is_empty() { "unknown".to_string() } else { sanitized }
+    if sanitized.is_empty() {
+        "unknown".to_string()
+    } else {
+        sanitized
+    }
 }
 
 fn mime_type(extension: &str) -> &'static str {
@@ -84,7 +110,9 @@ fn mime_type(extension: &str) -> &'static str {
 fn resolve_stored_path(root: &Path, relative_path: &str) -> Result<PathBuf, String> {
     let candidate = root.join(relative_path);
     let canonical_root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
-    let canonical_candidate = candidate.canonicalize().map_err(|_| "附件文件不存在".to_string())?;
+    let canonical_candidate = candidate
+        .canonicalize()
+        .map_err(|_| "附件文件不存在".to_string())?;
     if !canonical_candidate.starts_with(canonical_root) {
         return Err("附件路径无效".to_string());
     }
@@ -110,7 +138,11 @@ pub fn counts(data_file_path: &str) -> Result<std::collections::HashMap<String, 
     Ok(result)
 }
 
-pub fn import(data_file_path: &str, screw_spec_id: &str, source_path: &str) -> Result<ScrewAttachment, String> {
+pub fn import(
+    data_file_path: &str,
+    screw_spec_id: &str,
+    source_path: &str,
+) -> Result<ScrewAttachment, String> {
     if screw_spec_id.trim().is_empty() {
         return Err("请先保存螺丝规格，再添加附件".to_string());
     }
@@ -119,7 +151,8 @@ pub fn import(data_file_path: &str, screw_spec_id: &str, source_path: &str) -> R
     if !source.is_file() {
         return Err("所选附件不存在".to_string());
     }
-    let extension = source.extension()
+    let extension = source
+        .extension()
         .and_then(|value| value.to_str())
         .map(|value| value.to_ascii_lowercase())
         .ok_or_else(|| "无法识别附件类型".to_string())?;
@@ -141,13 +174,17 @@ pub fn import(data_file_path: &str, screw_spec_id: &str, source_path: &str) -> R
     let target = screw_dir.join(&stored_name);
     fs::copy(source, &target).map_err(|e| format!("复制附件失败: {e}"))?;
 
-    let file_name = source.file_name()
+    let file_name = source
+        .file_name()
         .and_then(|value| value.to_str())
         .unwrap_or("附件")
         .to_string();
     let now = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let mut index = load_index(&root)?;
-    let sort_order = index.iter().filter(|item| item.screw_spec_id == screw_spec_id).count();
+    let sort_order = index
+        .iter()
+        .filter(|item| item.screw_spec_id == screw_spec_id)
+        .count();
     let attachment = ScrewAttachment {
         id,
         screw_spec_id: screw_spec_id.to_string(),
@@ -169,7 +206,8 @@ pub fn import(data_file_path: &str, screw_spec_id: &str, source_path: &str) -> R
 pub fn read_content(data_file_path: &str, attachment_id: &str) -> Result<Value, String> {
     let root = attachment_root(data_file_path)?;
     let index = load_index(&root)?;
-    let attachment = index.into_iter()
+    let attachment = index
+        .into_iter()
         .find(|item| item.id == attachment_id)
         .ok_or_else(|| "附件记录不存在".to_string())?;
     let path = resolve_stored_path(&root, &attachment.relative_path)?;
@@ -187,7 +225,8 @@ pub fn update(
 ) -> Result<ScrewAttachment, String> {
     let root = attachment_root(data_file_path)?;
     let mut index = load_index(&root)?;
-    let item = index.iter_mut()
+    let item = index
+        .iter_mut()
         .find(|item| item.id == attachment_id)
         .ok_or_else(|| "附件记录不存在".to_string())?;
     if let Some(name) = display_name {
@@ -226,7 +265,8 @@ pub fn delete(data_file_path: &str, attachment_id: &str) -> Result<bool, String>
 pub fn delete_for_screw(data_file_path: &str, screw_spec_id: &str) -> Result<(), String> {
     let root = attachment_root(data_file_path)?;
     let mut index = load_index(&root)?;
-    let removed: Vec<_> = index.iter()
+    let removed: Vec<_> = index
+        .iter()
         .filter(|item| item.screw_spec_id == screw_spec_id)
         .cloned()
         .collect();
@@ -246,11 +286,8 @@ mod tests {
     use serde_json::json;
 
     fn test_paths(label: &str) -> (PathBuf, PathBuf) {
-        let root = std::env::temp_dir().join(format!(
-            "mold-attachment-test-{}-{}",
-            label,
-            Uuid::new_v4()
-        ));
+        let root =
+            std::env::temp_dir().join(format!("mold-attachment-test-{}-{}", label, Uuid::new_v4()));
         fs::create_dir_all(&root).unwrap();
         (root.join("mold-data.xlsx"), root)
     }
@@ -267,14 +304,20 @@ mod tests {
             data_file.to_str().unwrap(),
             "screw-1",
             source.to_str().unwrap(),
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(counts(data_file.to_str().unwrap()).unwrap()["screw-1"], 1);
-        assert_eq!(list(data_file.to_str().unwrap(), "screw-1").unwrap().len(), 1);
+        assert_eq!(
+            list(data_file.to_str().unwrap(), "screw-1").unwrap().len(),
+            1
+        );
 
         let content = read_content(data_file.to_str().unwrap(), &imported.id).unwrap();
         let encoded = content.get("data").and_then(Value::as_str).unwrap();
         assert_eq!(
-            base64::engine::general_purpose::STANDARD.decode(encoded).unwrap(),
+            base64::engine::general_purpose::STANDARD
+                .decode(encoded)
+                .unwrap(),
             original
         );
 
@@ -295,12 +338,15 @@ mod tests {
             Some("已标注图纸".to_string()),
             Some(annotations),
             None,
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(updated.display_name, "已标注图纸");
         assert_eq!(updated.annotations.len(), 1);
 
         assert!(delete(data_file.to_str().unwrap(), &imported.id).unwrap());
-        assert!(list(data_file.to_str().unwrap(), "screw-1").unwrap().is_empty());
+        assert!(list(data_file.to_str().unwrap(), "screw-1")
+            .unwrap()
+            .is_empty());
         fs::remove_dir_all(root).unwrap();
     }
 
@@ -311,12 +357,27 @@ mod tests {
         let source = root.join("source.pdf");
         fs::write(&source, b"%PDF-1.4 test").unwrap();
 
-        import(data_file.to_str().unwrap(), "screw-a", source.to_str().unwrap()).unwrap();
-        import(data_file.to_str().unwrap(), "screw-b", source.to_str().unwrap()).unwrap();
+        import(
+            data_file.to_str().unwrap(),
+            "screw-a",
+            source.to_str().unwrap(),
+        )
+        .unwrap();
+        import(
+            data_file.to_str().unwrap(),
+            "screw-b",
+            source.to_str().unwrap(),
+        )
+        .unwrap();
         delete_for_screw(data_file.to_str().unwrap(), "screw-a").unwrap();
 
-        assert!(list(data_file.to_str().unwrap(), "screw-a").unwrap().is_empty());
-        assert_eq!(list(data_file.to_str().unwrap(), "screw-b").unwrap().len(), 1);
+        assert!(list(data_file.to_str().unwrap(), "screw-a")
+            .unwrap()
+            .is_empty());
+        assert_eq!(
+            list(data_file.to_str().unwrap(), "screw-b").unwrap().len(),
+            1
+        );
         fs::remove_dir_all(root).unwrap();
     }
 }

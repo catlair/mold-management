@@ -245,7 +245,7 @@ dependencies = [
  "log",
  "quick-xml 0.31.0",
  "serde",
- "zip",
+ "zip 2.4.2",
 ]
 
 [[package]]
@@ -812,6 +812,7 @@ checksum = "843fba2746e448b37e26a819579957415c8cef339bf08564fe8b7ddbd959573c"
 dependencies = [
  "crc32fast",
  "miniz_oxide",
+ "zlib-rs",
 ]
 
 [[package]]
@@ -1802,6 +1803,8 @@ dependencies = [
  "tauri-plugin-dialog",
  "tauri-plugin-fs",
  "uuid",
+ "windows-sys 0.61.2",
+ "zip 4.6.1",
 ]
 
 [[package]]
@@ -2520,7 +2523,7 @@ version = "0.79.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c743cb9f2a4524676020e26ee5f298445a82d882b09956811b1e78ca7e42b440"
 dependencies = [
- "zip",
+ "zip 2.4.2",
 ]
 
 [[package]]
@@ -4648,6 +4651,26 @@ dependencies = [
  "thiserror 2.0.18",
  "zopfli",
 ]
+
+[[package]]
+name = "zip"
+version = "4.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "caa8cd6af31c3b31c6631b8f483848b91589021b28fffe50adada48d4f4d2ed1"
+dependencies = [
+ "arbitrary",
+ "crc32fast",
+ "flate2",
+ "indexmap 2.14.0",
+ "memchr",
+ "zopfli",
+]
+
+[[package]]
+name = "zlib-rs"
+version = "0.6.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b142a20ec14a91d5bc708c1dc21b080c550113d8aa77afa29635673a65dd02c5"
 
 [[package]]
 name = "zmij"

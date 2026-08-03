@@ -1,7 +1,9 @@
 node_modules/
 dist/
 dist-opt/
+dist-validation/
 src-tauri/target/
+src-tauri/target-*/
 .workbuddy/
 data/backups/
 data/*.xlsx

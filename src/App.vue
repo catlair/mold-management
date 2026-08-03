@@ -5,8 +5,8 @@
         <img v-if="!isCollapse" src="./assets/logo.svg" alt="" class="logo-icon" />
         <span v-show="!isCollapse" class="logo-text">模具管理</span>
       </div>
-      <div v-show="!isCollapse" class="search-wrapper">
-        <GlobalSearch />
+      <div class="search-wrapper" :class="{ 'search-collapsed': isCollapse }">
+        <GlobalSearch :collapsed="isCollapse" />
       </div>
       <el-scrollbar class="menu-scrollbar">
         <el-menu
@@ -108,6 +108,8 @@ provide('fullscreen', { isFullscreen, toggleFullscreen })
 const route = useRoute()
 const activeMenu = computed(() => route.path)
 const isCollapse = ref(false)
+// 侧栏宽度提供给应用内覆盖层（如附件预览），使其精确铺满主内容区域
+provide('appSidebarWidth', computed(() => isCollapse.value ? 56 : 180))
 
 onMounted(() => {
   const loading = document.getElementById('app-loading')
@@ -265,21 +267,27 @@ body {
 
 .logo {
   height: 56px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
+  padding: 0 16px;
   gap: 10px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
 
 .logo-collapse {
+  padding: 0;
   justify-content: center;
 }
 
 .logo-icon {
-  width: 32px;
-  height: 32px;
+  width: 32px !important;
+  height: 32px !important;
+  flex-shrink: 0;
 }
 
 .logo-text {
@@ -296,6 +304,10 @@ body {
 .search-wrapper {
   padding: 0 10px 8px;
   flex-shrink: 0;
+}
+
+.search-wrapper.search-collapsed {
+  padding: 0 8px 8px;
 }
 
 .el-menu-vertical {
@@ -326,6 +338,14 @@ body {
   text-align: center;
 }
 
+/* 折叠态图标居中：Element Plus 通过 .el-menu-tooltip__trigger 渲染折叠菜单项，
+   其默认 padding:0 20px + 左对齐会与自定义 56px 侧栏宽度错位，导致图标偏右。
+   折叠时取消 padding 并让内容居中；展开态不受影响。 */
+.el-menu-vertical.el-menu--collapse .el-menu-item .el-menu-tooltip__trigger {
+  padding: 0;
+  justify-content: center;
+}
+
 .el-menu-vertical .el-menu-item:hover {
   background: var(--sidebar-hover);
   color: var(--sidebar-text-active);
@@ -346,6 +366,15 @@ body {
   color: var(--text-muted);
   letter-spacing: 1.5px;
   font-weight: 600;
+}
+
+/* 折叠态隐藏分组标题占位（标题文字已隐藏，但容器默认 padding 会留出空白） */
+.el-menu-vertical.el-menu--collapse .el-menu-item-group__title {
+  height: 0;
+  padding: 0;
+  font-size: 0;
+  line-height: 0;
+  overflow: hidden;
 }
 
 .collapse-btn {
@@ -445,19 +474,23 @@ body {
   width: 10px;
 }
 
+.vxe-table .vxe-header--column > .vxe-cell--col-resizable::before {
+  opacity: 0;
+}
+
 .vxe-table .vxe-header--column > .vxe-cell--col-resizable::after {
   position: absolute;
   top: 22%;
   right: 4px;
   bottom: 22%;
   width: 2px;
+  height: auto;
   background: var(--el-color-primary);
   border-radius: 2px;
   opacity: 0;
   transition: opacity 140ms ease;
 }
 
-.vxe-table .vxe-header--column:hover > .vxe-cell--col-resizable::after,
 .vxe-table .vxe-header--column > .vxe-cell--col-resizable:hover::after {
   opacity: 0.72;
 }

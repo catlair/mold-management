@@ -1,115 +1,119 @@
 <template>
-  <el-dialog
-    v-model="visible"
-    class="attachment-workspace-dialog"
-    :width="mode === 'edit' ? 'min(96vw, 1480px)' : 'min(94vw, 1320px)'"
-    top="3vh"
-    destroy-on-close
-    append-to-body
-    :before-close="handleBeforeClose"
-    @closed="resetWorkspace"
-  >
-    <template #header>
-      <div class="workspace-header">
-        <div class="workspace-title-mark"><el-icon><Paperclip /></el-icon></div>
-        <div class="workspace-heading">
-          <strong>{{ mode === 'edit' ? '附件编辑与标注' : '附件预览' }}</strong>
-          <span>{{ screwName || '螺丝规格' }} · {{ attachments.length }} 个附件</span>
-        </div>
-        <el-tag v-if="currentAttachment" :type="isPdf ? 'danger' : 'success'" effect="plain" round>
-          {{ isPdf ? 'PDF 文档' : '图片' }}
-        </el-tag>
-      </div>
-    </template>
-
-    <div class="workspace-layout" :class="{ 'is-preview': mode === 'preview' }">
-      <aside class="attachment-sidebar">
-        <div class="sidebar-header">
-          <div><strong>附件</strong><span>图片或 PDF，单个不超过 50MB</span></div>
-          <el-button v-if="mode === 'edit'" type="primary" size="small" :loading="importing" @click="selectFiles">
-            <el-icon><Plus /></el-icon>添加
-          </el-button>
-          <input
-            ref="browserFileInputRef"
-            class="browser-file-input"
-            type="file"
-            multiple
-            accept=".png,.jpg,.jpeg,.webp,.gif,.pdf,image/png,image/jpeg,image/webp,image/gif,application/pdf"
-            @change="handleBrowserFiles"
-          />
-        </div>
-
-        <div v-if="loadingList" class="attachment-loading"><el-skeleton :rows="5" animated /></div>
-        <el-empty v-else-if="!attachments.length" :description="mode === 'edit' ? '暂无附件，点击右上角添加' : '这条规格暂无附件'" :image-size="72" />
-        <div v-else class="attachment-list">
-          <button
-            v-for="item in attachments"
-            :key="item.id"
-            type="button"
-            class="attachment-item"
-            :class="{ 'is-active': item.id === currentAttachment?.id }"
-            @click="selectAttachment(item)"
-          >
-            <span class="attachment-type" :class="item.mimeType === 'application/pdf' ? 'is-pdf' : 'is-image'">
-              <el-icon><Document v-if="item.mimeType === 'application/pdf'" /><Picture v-else /></el-icon>
-            </span>
-            <span class="attachment-meta">
-              <strong>{{ item.displayName }}</strong>
-              <span>{{ formatBytes(item.size) }} · {{ item.annotations.length }} 个标注</span>
-            </span>
-            <el-icon><ArrowRight /></el-icon>
+  <Teleport to="body">
+    <Transition name="workspace-fade" @after-leave="resetWorkspace">
+      <div
+        v-if="visible"
+        class="attachment-workspace-overlay"
+        :style="{ left: `${sidebarWidth}px` }"
+        role="dialog"
+        aria-modal="true"
+        :aria-label="mode === 'edit' ? '附件编辑与标注' : '附件预览'"
+      >
+        <header class="workspace-header">
+          <div class="workspace-title-mark"><el-icon><Paperclip /></el-icon></div>
+          <div class="workspace-heading">
+            <strong>{{ mode === 'edit' ? '附件编辑与标注' : '附件预览' }}</strong>
+            <span>{{ screwName || '螺丝规格' }} · {{ attachments.length }} 个附件</span>
+          </div>
+          <el-tag v-if="currentAttachment" :type="isPdf ? 'danger' : 'success'" effect="plain" round>
+            {{ isPdf ? 'PDF 文档' : '图片' }}
+          </el-tag>
+          <button type="button" class="workspace-close" aria-label="关闭" @click="requestClose">
+            <el-icon><Close /></el-icon>
           </button>
+        </header>
+
+        <div class="workspace-layout" :class="{ 'is-preview': mode === 'preview' }">
+          <aside class="attachment-sidebar">
+            <div class="sidebar-header">
+              <div><strong>附件</strong><span>{{ attachments.length }} 个文件</span></div>
+              <el-button v-if="mode === 'edit'" type="primary" size="small" :loading="importing" @click="selectFiles">
+                <el-icon><Plus /></el-icon>添加
+              </el-button>
+              <input
+                ref="browserFileInputRef"
+                class="browser-file-input"
+                type="file"
+                multiple
+                accept=".png,.jpg,.jpeg,.webp,.gif,.pdf,image/png,image/jpeg,image/webp,image/gif,application/pdf"
+                @change="handleBrowserFiles"
+              />
+            </div>
+
+            <div v-if="loadingList" class="attachment-loading"><el-skeleton :rows="5" animated /></div>
+            <el-empty v-else-if="!attachments.length" :description="mode === 'edit' ? '暂无附件，点击右上角添加' : '这条规格暂无附件'" :image-size="72" />
+            <div v-else class="attachment-list">
+              <button
+                v-for="item in attachments"
+                :key="item.id"
+                type="button"
+                class="attachment-item"
+                :class="{ 'is-active': item.id === currentAttachment?.id }"
+                @click="selectAttachment(item)"
+              >
+                <span class="attachment-type" :class="item.mimeType === 'application/pdf' ? 'is-pdf' : 'is-image'">
+                  <el-icon><Document v-if="item.mimeType === 'application/pdf'" /><Picture v-else /></el-icon>
+                </span>
+                <span class="attachment-meta">
+                  <strong>{{ item.displayName }}</strong>
+                  <span>{{ formatBytes(item.size) }} · {{ item.annotations.length }} 个标注</span>
+                </span>
+                <el-icon><ArrowRight /></el-icon>
+              </button>
+            </div>
+
+            <div v-if="mode === 'edit' && currentAttachment" class="attachment-properties">
+              <span class="section-label">附件信息</span>
+              <el-input v-model="displayName" placeholder="附件名称" @change="saveDisplayName" />
+              <div class="property-row"><span>原文件名</span><strong :title="currentAttachment.fileName">{{ currentAttachment.fileName }}</strong></div>
+              <div class="property-row"><span>添加时间</span><strong>{{ currentAttachment.createdAt }}</strong></div>
+              <el-button type="danger" plain :disabled="saving" @click="removeCurrent"><el-icon><Delete /></el-icon>删除附件</el-button>
+            </div>
+          </aside>
+
+          <main class="attachment-main">
+            <div v-if="!currentAttachment" class="workspace-empty">
+              <div class="empty-mark"><el-icon><Files /></el-icon></div>
+              <strong>选择附件开始{{ mode === 'edit' ? '标注' : '查看' }}</strong>
+              <span>支持 PNG、JPG、WEBP、GIF 和 PDF</span>
+            </div>
+            <AttachmentCanvas
+              v-else
+              ref="attachmentCanvasRef"
+              v-model="annotations"
+              :content="currentContent"
+              :readonly="mode === 'preview'"
+              @change="markDirty"
+            />
+          </main>
         </div>
 
-        <div v-if="mode === 'edit' && currentAttachment" class="attachment-properties">
-          <span class="section-label">附件信息</span>
-          <el-input v-model="displayName" placeholder="附件名称" @change="saveDisplayName" />
-          <div class="property-row"><span>原文件名</span><strong :title="currentAttachment.fileName">{{ currentAttachment.fileName }}</strong></div>
-          <div class="property-row"><span>添加时间</span><strong>{{ currentAttachment.createdAt }}</strong></div>
-          <el-button type="danger" plain :disabled="saving" @click="removeCurrent"><el-icon><Delete /></el-icon>删除附件</el-button>
-        </div>
-      </aside>
-
-      <main class="attachment-main">
-        <div v-if="!currentAttachment" class="workspace-empty">
-          <div class="empty-mark"><el-icon><Files /></el-icon></div>
-          <strong>选择附件开始{{ mode === 'edit' ? '标注' : '查看' }}</strong>
-          <span>支持 PNG、JPG、WEBP、GIF 和 PDF</span>
-        </div>
-        <AttachmentCanvas
-          v-else
-          ref="attachmentCanvasRef"
-          v-model="annotations"
-          :content="currentContent"
-          :readonly="mode === 'preview'"
-          @change="markDirty"
-        />
-      </main>
-    </div>
-
-    <template #footer>
-      <div class="workspace-footer">
-        <span v-if="mode === 'edit'" class="save-state" :class="{ 'is-dirty': annotationsDirty }">
-          <el-icon><CircleCheck v-if="!annotationsDirty" /><EditPen v-else /></el-icon>
-          {{ annotationsDirty ? '标注有未保存修改' : '所有修改已保存' }}
-        </span>
-        <span v-else class="preview-tip">预览模式不会修改原附件</span>
-        <div class="footer-actions">
-          <el-button v-if="currentAttachment" :loading="exporting" @click="exportAnnotatedCopy">
-            <el-icon><Download /></el-icon>导出标注副本
-          </el-button>
-          <el-button @click="visible = false">关闭</el-button>
-          <el-button v-if="mode === 'edit'" type="primary" :loading="saving" :disabled="!annotationsDirty" @click="saveAnnotations">
-            保存标注
-          </el-button>
-        </div>
+        <footer class="workspace-footer">
+          <span v-if="mode === 'edit'" class="save-state" :class="{ 'is-dirty': annotationsDirty }">
+            <el-icon><CircleCheck v-if="!annotationsDirty" /><EditPen v-else /></el-icon>
+            {{ annotationsDirty ? '标注有未保存修改' : '所有修改已保存' }}
+          </span>
+          <span v-else class="preview-tip">预览模式不会修改原附件</span>
+          <div class="footer-actions">
+            <el-button v-if="mode === 'edit' && currentAttachment" :loading="exporting" @click="exportAnnotatedCopy">
+              <el-icon><Download /></el-icon>导出标注副本
+            </el-button>
+            <el-button v-else-if="currentAttachment" :loading="exporting" @click="exportAnnotatedCopy">
+              <el-icon><Download /></el-icon>导出标注
+            </el-button>
+            <el-button @click="requestClose">关闭</el-button>
+            <el-button v-if="mode === 'edit'" type="primary" :loading="saving" :disabled="!annotationsDirty" @click="saveAnnotations">
+              保存标注
+            </el-button>
+          </div>
+        </footer>
       </div>
-    </template>
-  </el-dialog>
+    </Transition>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, inject, onMounted, onUnmounted, ref, watch, type Ref } from 'vue'
 import { open, save } from '@tauri-apps/plugin-dialog'
 import { writeFile } from '@tauri-apps/plugin-fs'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -128,6 +132,9 @@ const emit = defineEmits<{
   'update:modelValue': [value: boolean]
   changed: [count: number]
 }>()
+
+// 应用侧栏宽度：覆盖层从侧栏右侧开始铺满主内容区
+const sidebarWidth = inject<Ref<number>>('appSidebarWidth', ref(180))
 
 const visible = computed({ get: () => props.modelValue, set: value => emit('update:modelValue', value) })
 const attachments = ref<ScrewAttachment[]>([])
@@ -348,38 +355,81 @@ function resetWorkspace() {
   resetSelection()
 }
 
+// 关闭请求统一走确认逻辑（编辑模式存在未保存标注时先询问）
+function requestClose() {
+  handleBeforeClose(() => { visible.value = false })
+}
+
+function handleKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape' && props.modelValue) {
+    event.preventDefault()
+    requestClose()
+  }
+}
+
+watch(() => props.modelValue, (opened) => {
+  if (opened) {
+    window.addEventListener('keydown', handleKeydown)
+  } else {
+    window.removeEventListener('keydown', handleKeydown)
+  }
+})
+
+onMounted(() => {
+  if (props.modelValue) window.addEventListener('keydown', handleKeydown)
+})
+onUnmounted(() => window.removeEventListener('keydown', handleKeydown))
+
 watch(() => [props.modelValue, props.screwSpecId] as const, ([opened, id]) => {
   if (opened && id) loadList()
 }, { immediate: true })
 </script>
 
 <style scoped>
-.workspace-header { display: flex; align-items: center; gap: 12px; padding-right: 36px; }
+.attachment-workspace-overlay {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3000;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--card-bg);
+  border-left: 1px solid var(--border);
+  box-shadow: -10px 0 32px rgba(15, 23, 42, 0.16);
+  transition: border-color 180ms ease, background-color 180ms ease;
+}
+.workspace-header { display: flex; align-items: center; gap: 12px; padding: 12px 18px; flex-shrink: 0; border-bottom: 1px solid var(--border); }
 .workspace-title-mark { width: 40px; height: 40px; display: grid; place-items: center; flex-shrink: 0; border-radius: 12px; color: white; background: var(--primary); box-shadow: 0 8px 18px color-mix(in srgb, var(--primary) 26%, transparent); }
 .workspace-title-mark .el-icon { font-size: 20px; }
 .workspace-heading { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .workspace-heading strong { color: var(--text-primary); font-size: 17px; }
 .workspace-heading span { overflow: hidden; color: var(--text-muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .workspace-header > .el-tag { margin-left: auto; }
-.workspace-layout { height: calc(88vh - 132px); min-height: 560px; display: grid; grid-template-columns: 300px minmax(0, 1fr); overflow: hidden; border: 1px solid var(--border); border-radius: 14px; background: var(--card-bg); }
-.workspace-layout.is-preview { grid-template-columns: 260px minmax(0, 1fr); }
+.workspace-close { width: 34px; height: 34px; display: grid; place-items: center; flex-shrink: 0; margin-left: 4px; border: 1px solid transparent; border-radius: 9px; color: var(--text-secondary); background: transparent; cursor: pointer; transition: 160ms ease; }
+.workspace-close:hover { color: var(--text-primary); border-color: var(--border); background: var(--surface-hover); }
+.workspace-close:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.workspace-layout { flex: 1; min-height: 0; display: grid; grid-template-columns: 300px minmax(0, 1fr); overflow: hidden; background: var(--bg); }
+.workspace-layout.is-preview { grid-template-columns: 200px minmax(0, 1fr); }
 .attachment-sidebar { min-height: 0; display: flex; flex-direction: column; border-right: 1px solid var(--border); background: var(--surface-muted); }
-.sidebar-header { min-height: 68px; padding: 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--border); }
+.sidebar-header { min-height: 48px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; border-bottom: 1px solid var(--border); }
 .sidebar-header > div { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .sidebar-header strong { color: var(--text-primary); font-size: 14px; }
 .sidebar-header span { color: var(--text-muted); font-size: 11px; }
 .browser-file-input { display: none; }
-.attachment-loading, .attachment-list { flex: 1; min-height: 0; padding: 10px; overflow: auto; }
-.attachment-list { display: flex; flex-direction: column; gap: 6px; }
-.attachment-item { width: 100%; padding: 10px; display: grid; grid-template-columns: 38px minmax(0, 1fr) 16px; align-items: center; gap: 9px; border: 1px solid transparent; border-radius: 10px; color: var(--text-secondary); background: transparent; text-align: left; cursor: pointer; transition: 160ms ease; }
+.attachment-loading, .attachment-list { flex: 1; min-height: 0; padding: 8px; overflow: auto; }
+.attachment-list { display: flex; flex-direction: column; gap: 4px; }
+.attachment-item { width: 100%; padding: 7px 9px; display: grid; grid-template-columns: 28px minmax(0, 1fr) 14px; align-items: center; gap: 8px; border: 1px solid transparent; border-radius: 8px; color: var(--text-secondary); background: transparent; text-align: left; cursor: pointer; transition: 160ms ease; }
 .attachment-item:hover { border-color: var(--border); background: var(--card-bg); }
 .attachment-item.is-active { border-color: color-mix(in srgb, var(--primary) 35%, var(--border)); background: var(--card-bg); box-shadow: 0 6px 14px rgba(15, 23, 42, 0.06); }
-.attachment-type { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 9px; }
+.attachment-type { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 7px; }
 .attachment-type.is-image { color: #2f855a; background: color-mix(in srgb, #48bb78 13%, var(--card-bg)); }
 .attachment-type.is-pdf { color: #c53030; background: color-mix(in srgb, #e53e3e 12%, var(--card-bg)); }
 .attachment-meta { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .attachment-meta strong { overflow: hidden; color: var(--text-primary); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .attachment-meta span { color: var(--text-muted); font-size: 10px; }
+.workspace-layout.is-preview .attachment-properties { display: none; }
 .attachment-properties { padding: 14px; display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--border); background: var(--card-bg); }
 .section-label { color: var(--text-muted); font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
 .property-row { display: grid; grid-template-columns: 66px minmax(0, 1fr); gap: 8px; color: var(--text-muted); font-size: 11px; }
@@ -390,16 +440,30 @@ watch(() => [props.modelValue, props.screwSpecId] as const, ([opened, id]) => {
 .workspace-empty span { font-size: 12px; }
 .empty-mark { width: 72px; height: 72px; margin-bottom: 4px; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 22px; background: var(--card-bg); box-shadow: var(--shadow-card); }
 .empty-mark .el-icon { color: var(--primary); font-size: 30px; }
-.workspace-footer { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.workspace-footer { width: 100%; padding: 10px 18px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-shrink: 0; border-top: 1px solid var(--border); background: var(--card-bg); }
 .save-state, .preview-tip { display: flex; align-items: center; gap: 6px; color: var(--text-muted); font-size: 12px; }
 .save-state.is-dirty { color: var(--el-color-warning); }
 .footer-actions { display: flex; gap: 8px; }
 @media (max-width: 900px) { .workspace-layout, .workspace-layout.is-preview { grid-template-columns: 220px minmax(600px, 1fr); overflow: auto; } }
+@media (prefers-reduced-motion: reduce) {
+  .attachment-workspace-overlay { transition: none; }
+}
 </style>
 
 <style>
-.attachment-workspace-dialog { border-radius: 18px; overflow: hidden; background: var(--card-bg); }
-.attachment-workspace-dialog .el-dialog__header { margin: 0; padding: 16px 20px; border-bottom: 1px solid var(--border); }
-.attachment-workspace-dialog .el-dialog__body { padding: 14px 18px; }
-.attachment-workspace-dialog .el-dialog__footer { padding: 12px 18px; border-top: 1px solid var(--border); }
+.workspace-fade-enter-active,
+.workspace-fade-leave-active {
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+.workspace-fade-enter-from,
+.workspace-fade-leave-to {
+  opacity: 0;
+  transform: translateX(24px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .workspace-fade-enter-active,
+  .workspace-fade-leave-active {
+    transition: none;
+  }
+}
 </style>

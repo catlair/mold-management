@@ -49,9 +49,8 @@
             </el-button>
           </template>
         </ConfigurableTable>
-        <ConfigurableTable title="操作" width="200" class-name="operation-column" header-class-name="operation-column">
+        <ConfigurableTable title="操作" :width="allowDelete ? 160 : 90" class-name="operation-column" header-class-name="operation-column">
           <template #default="{ row }">
-            <el-button size="small" @click="openAttachmentPreview(row)">预览</el-button>
             <el-button size="small" @click="handleEdit(row)">编辑</el-button>
             <el-button size="small" type="danger" v-if="allowDelete" @click="handleDelete(row)">删除</el-button>
           </template>

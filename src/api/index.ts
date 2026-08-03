@@ -412,10 +412,14 @@ export const dataApi = isTauri()
   ? {
       exportData: () => invoke<any>('export_data'),
       importData: (base64: string) => invoke<{ success: boolean; stats: Record<string, number> }>('import_data', { data: base64 }),
+      exportPackage: (destinationPath: string) => invoke<{ success: boolean; filePath: string }>('export_data_package', { destinationPath }),
+      importPackage: (sourcePath: string) => invoke<{ success: boolean; stats: Record<string, number>; attachmentCount: number }>('import_data_package', { sourcePath }),
     }
   : {
       exportData: async () => ({ filename: 'mold-data.xlsx', data: '' }),
       importData: async () => ({ success: true, stats: {} }),
+      exportPackage: async (destinationPath: string) => ({ success: true, filePath: destinationPath }),
+      importPackage: async (_sourcePath: string) => ({ success: true, stats: {}, attachmentCount: 0 }),
     }
 
 // 配置 API（浏览器预览模式返回 mock）
@@ -457,4 +461,24 @@ export const allowDeleteApi = isTauri()
   : {
       get: async () => true,
       set: async () => ({ success: true }),
+    }
+
+export const dieMachineTypeApi = isTauri()
+  ? {
+      get: () => invoke<string[]>('get_die_machine_types'),
+      set: (machineTypes: string[]) => invoke<{ success: boolean; machineTypes: string[] }>('set_die_machine_types', { machineTypes }),
+    }
+  : {
+      get: async () => ['003', '3/16', '1/4', '6R'],
+      set: async (machineTypes: string[]) => ({ success: true, machineTypes }),
+    }
+
+export const punchSpecApi = isTauri()
+  ? {
+      get: () => invoke<string[]>('get_punch_specs'),
+      set: (specs: string[]) => invoke<{ success: boolean; specs: string[] }>('set_punch_specs', { specs }),
+    }
+  : {
+      get: async () => ['12*15', '14*15', '18*18'],
+      set: async (specs: string[]) => ({ success: true, specs }),
     }

@@ -15,8 +15,10 @@
       stripe
       align="center"
       :fit="false"
+      :id="tableId"
       :row-config="{ keyField: 'id', isHover: true }"
       :column-config="{ resizable: true }"
+      :custom-config="customConfig"
       show-header-overflow="tooltip"
       @column-resizable-change="handleColumnResizableChange"
       :empty-text="loading ? '正在加载数据' : '暂无数据'"
@@ -36,7 +38,12 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, nextTick, provide, toRef } from 'vue'
 import { DocumentRemove } from '@element-plus/icons-vue'
-import { useTablePreferences } from '../composables/useTablePreferences'
+import {
+  createVxeCustomConfig,
+  resolveColumnResize,
+  useTablePreferences,
+  type ColumnResizeEventParams,
+} from '../composables/useTablePreferences'
 
 const props = withDefaults(defineProps<{
   tableId?: string
@@ -53,12 +60,15 @@ provide('tablePreferenceContext', {
 
 const wrapRef = ref<HTMLDivElement | null>(null)
 const tableRef = ref<any>(null)
+const customConfig = createVxeCustomConfig()
 const { setColumnPreference } = useTablePreferences()
 
-function handleColumnResizableChange({ column, resizeWidth }: any) {
-  const columnId = String(column?.field || column?.title || '')
-  if (!props.tableId || !columnId || columnId === '操作' || !Number.isFinite(resizeWidth)) return
-  setColumnPreference(props.tableId, columnId, { width: Math.max(60, Math.round(resizeWidth)) })
+function handleColumnResizableChange(params: ColumnResizeEventParams) {
+  if (!props.tableId) return
+  const resized = resolveColumnResize(params)
+  if (!resized) return
+
+  setColumnPreference(props.tableId, resized.columnId, { width: resized.width })
   nextTick(() => {
     tableRef.value?.recalculate?.()
     window.dispatchEvent(new Event('resize'))

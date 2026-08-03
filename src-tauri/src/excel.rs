@@ -1,48 +1,335 @@
-use calamine::{open_workbook_auto, Reader, Data};
+use crate::storage;
+use calamine::{open_workbook_auto, Data, Reader};
+use chrono::Local;
 use rust_xlsxwriter::Workbook;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
-use chrono::Local;
 
 pub const SHEETS: &[(&str, &[(&str, &str)])] = &[
-    ("螺丝规格表", &[
-        ("内部ID", "id"), ("客户名", "customer"), ("外部ID", "externalId"),
-        ("螺丝名称", "name"), ("螺丝头型", "headType"), ("冲头", "punch"),
-        ("牙型", "threadType"), ("牙板", "die"), ("头/垫片大小", "headSize"),
-        ("头高", "headHeight"), ("长度", "length"), ("牙径", "threadDiameter"),
-        ("光钉长度", "shankLength"), ("线材", "wireMaterial"), ("电镀", "plating"),
-        ("其他备注", "remark"),
-    ]),
-    ("冲头信息表", &[("内部ID", "id"), ("名称", "name"), ("规格", "spec"), ("材质", "material"), ("安全库存", "safetyStock"), ("备注", "remark")]),
-    ("冲头入库记录", &[("入库ID", "id"), ("冲头ID", "punchId"), ("入库数量", "quantity"), ("入库时间", "orderDate"), ("到货状态", "status"), ("备注", "remark")]),
-    ("冲头领用记录", &[("领用ID", "id"), ("冲头ID", "punchId"), ("领用人", "user"), ("领用数量", "quantity"), ("领用时间", "useDate"), ("备注", "remark")]),
-    ("冲头-螺丝规格关联", &[("关联ID", "id"), ("冲头ID", "punchId"), ("螺丝规格ID", "screwSpecId"), ("备注", "remark")]),
-    ("冲头库存汇总", &[("冲头ID", "punchId"), ("名称", "name"), ("当前库存", "currentStock"), ("安全库存", "safetyStock"), ("库存状态", "status")]),
-    ("牙板信息表", &[("内部ID", "id"), ("名称", "name"), ("机型", "machineType"), ("线径", "wireDiameter"), ("安全库存", "safetyStock"), ("备注", "remark")]),
-    ("牙板入库记录", &[("入库ID", "id"), ("牙板ID", "dieId"), ("入库数量", "quantity"), ("入库时间", "orderDate"), ("到货状态", "status"), ("备注", "remark")]),
-    ("牙板领用记录", &[("领用ID", "id"), ("牙板ID", "dieId"), ("领用人", "user"), ("领用数量", "quantity"), ("领用时间", "useDate"), ("备注", "remark")]),
-    ("牙板-螺丝规格关联", &[("关联ID", "id"), ("牙板ID", "dieId"), ("螺丝规格ID", "screwSpecId"), ("备注", "remark")]),
-    ("牙板库存汇总", &[("牙板ID", "dieId"), ("名称", "name"), ("当前库存", "currentStock"), ("安全库存", "safetyStock"), ("库存状态", "status")]),
-    ("皮带信息表", &[("内部ID", "id"), ("名称", "name"), ("适用机器", "machine"), ("安全库存", "safetyStock"), ("备注", "remark")]),
-    ("皮带入库记录", &[("入库ID", "id"), ("皮带ID", "beltId"), ("入库数量", "quantity"), ("入库时间", "orderDate"), ("到货状态", "status"), ("备注", "remark")]),
-    ("皮带使用记录", &[("使用ID", "id"), ("皮带ID", "beltId"), ("使用人", "user"), ("使用数量", "quantity"), ("使用时间", "useDate"), ("备注", "remark")]),
-    ("皮带库存汇总", &[("皮带ID", "beltId"), ("名称", "name"), ("当前库存", "currentStock"), ("安全库存", "safetyStock"), ("库存状态", "status")]),
-    ("主模具信息表", &[("内部ID", "id"), ("名称", "name"), ("孔径", "holeDiameter"), ("对应线材", "wireMaterial"), ("安全库存", "safetyStock"), ("备注", "remark")]),
-    ("主模具入库记录", &[("入库ID", "id"), ("主模具ID", "mainMoldId"), ("入库数量", "quantity"), ("入库时间", "orderDate"), ("到货状态", "status"), ("备注", "remark")]),
-    ("主模具使用记录", &[("使用ID", "id"), ("主模具ID", "mainMoldId"), ("使用人", "user"), ("使用数量", "quantity"), ("使用时间", "useDate"), ("备注", "remark")]),
-    ("主模具-线材关联", &[("关联ID", "id"), ("主模具ID", "mainMoldId"), ("线材规格", "wireMaterial"), ("备注", "remark")]),
-    ("主模具库存汇总", &[("主模具ID", "mainMoldId"), ("名称", "name"), ("当前库存", "currentStock"), ("安全库存", "safetyStock"), ("库存状态", "status")]),
-    ("剪刀信息表", &[("内部ID", "id"), ("名称", "name"), ("口径", "diameter"), ("对应线材", "wireMaterial"), ("安全库存", "safetyStock"), ("备注", "remark")]),
-    ("剪刀入库记录", &[("入库ID", "id"), ("剪刀ID", "scissorId"), ("入库数量", "quantity"), ("入库时间", "orderDate"), ("到货状态", "status"), ("备注", "remark")]),
-    ("剪刀使用记录", &[("使用ID", "id"), ("剪刀ID", "scissorId"), ("使用人", "user"), ("使用数量", "quantity"), ("使用时间", "useDate"), ("备注", "remark")]),
-    ("剪刀-线材关联", &[("关联ID", "id"), ("剪刀ID", "scissorId"), ("线材规格", "wireMaterial"), ("备注", "remark")]),
-    ("剪刀库存汇总", &[("剪刀ID", "scissorId"), ("名称", "name"), ("当前库存", "currentStock"), ("安全库存", "safetyStock"), ("库存状态", "status")]),
-    ("上冲信息表", &[("内部ID", "id"), ("名称", "name"), ("口径", "diameter"), ("对应线材", "wireMaterial"), ("安全库存", "safetyStock"), ("备注", "remark")]),
-    ("上冲入库记录", &[("入库ID", "id"), ("上冲ID", "upperPunchId"), ("入库数量", "quantity"), ("入库时间", "orderDate"), ("到货状态", "status"), ("备注", "remark")]),
-    ("上冲使用记录", &[("使用ID", "id"), ("上冲ID", "upperPunchId"), ("使用人", "user"), ("使用数量", "quantity"), ("使用时间", "useDate"), ("备注", "remark")]),
-    ("上冲-线材关联", &[("关联ID", "id"), ("上冲ID", "upperPunchId"), ("线材规格", "wireMaterial"), ("备注", "remark")]),
-    ("上冲库存汇总", &[("上冲ID", "upperPunchId"), ("名称", "name"), ("当前库存", "currentStock"), ("安全库存", "safetyStock"), ("库存状态", "status")]),
+    (
+        "螺丝规格表",
+        &[
+            ("内部ID", "id"),
+            ("客户名", "customer"),
+            ("外部ID", "externalId"),
+            ("螺丝名称", "name"),
+            ("螺丝头型", "headType"),
+            ("冲头", "punch"),
+            ("牙型", "threadType"),
+            ("牙板", "die"),
+            ("头/垫片大小", "headSize"),
+            ("头高", "headHeight"),
+            ("长度", "length"),
+            ("牙径", "threadDiameter"),
+            ("光钉长度", "shankLength"),
+            ("线材", "wireMaterial"),
+            ("电镀", "plating"),
+            ("其他备注", "remark"),
+        ],
+    ),
+    (
+        "冲头信息表",
+        &[
+            ("内部ID", "id"),
+            ("名称", "name"),
+            ("规格", "spec"),
+            ("材质", "material"),
+            ("安全库存", "safetyStock"),
+            ("备注", "remark"),
+        ],
+    ),
+    (
+        "冲头入库记录",
+        &[
+            ("入库ID", "id"),
+            ("冲头ID", "punchId"),
+            ("入库数量", "quantity"),
+            ("入库时间", "orderDate"),
+            ("到货状态", "status"),
+            ("备注", "remark"),
+        ],
+    ),
+    (
+        "冲头领用记录",
+        &[
+            ("领用ID", "id"),
+            ("冲头ID", "punchId"),
+            ("领用人", "user"),
+            ("领用数量", "quantity"),
+            ("领用时间", "useDate"),
+            ("备注", "remark"),
+        ],
+    ),
+    (
+        "冲头-螺丝规格关联",
+        &[
+            ("关联ID", "id"),
+            ("冲头ID", "punchId"),
+            ("螺丝规格ID", "screwSpecId"),
+            ("备注", "remark"),
+        ],
+    ),
+    (
+        "冲头库存汇总",
+        &[
+            ("冲头ID", "punchId"),
+            ("名称", "name"),
+            ("当前库存", "currentStock"),
+            ("安全库存", "safetyStock"),
+            ("库存状态", "status"),
+        ],
+    ),
+    (
+        "牙板信息表",
+        &[
+            ("内部ID", "id"),
+            ("名称", "name"),
+            ("机型", "machineType"),
+            ("线径", "wireDiameter"),
+            ("安全库存", "safetyStock"),
+            ("备注", "remark"),
+        ],
+    ),
+    (
+        "牙板入库记录",
+        &[
+            ("入库ID", "id"),
+            ("牙板ID", "dieId"),
+            ("入库数量", "quantity"),
+            ("入库时间", "orderDate"),
+            ("到货状态", "status"),
+            ("备注", "remark"),
+        ],
+    ),
+    (
+        "牙板领用记录",
+        &[
+            ("领用ID", "id"),
+            ("牙板ID", "dieId"),
+            ("领用人", "user"),
+            ("领用数量", "quantity"),
+            ("领用时间", "useDate"),
+            ("备注", "remark"),
+        ],
+    ),
+    (
+        "牙板-螺丝规格关联",
+        &[
+            ("关联ID", "id"),
+            ("牙板ID", "dieId"),
+            ("螺丝规格ID", "screwSpecId"),
+            ("备注", "remark"),
+        ],
+    ),
+    (
+        "牙板库存汇总",
+        &[
+            ("牙板ID", "dieId"),
+            ("名称", "name"),
+            ("当前库存", "currentStock"),
+            ("安全库存", "safetyStock"),
+            ("库存状态", "status"),
+        ],
+    ),
+    (
+        "皮带信息表",
+        &[
+            ("内部ID", "id"),
+            ("名称", "name"),
+            ("适用机器", "machine"),
+            ("安全库存", "safetyStock"),
+            ("备注", "remark"),
+        ],
+    ),
+    (
+        "皮带入库记录",
+        &[
+            ("入库ID", "id"),
+            ("皮带ID", "beltId"),
+            ("入库数量", "quantity"),
+            ("入库时间", "orderDate"),
+            ("到货状态", "status"),
+            ("备注", "remark"),
+        ],
+    ),
+    (
+        "皮带使用记录",
+        &[
+            ("使用ID", "id"),
+            ("皮带ID", "beltId"),
+            ("使用人", "user"),
+            ("使用数量", "quantity"),
+            ("使用时间", "useDate"),
+            ("备注", "remark"),
+        ],
+    ),
+    (
+        "皮带库存汇总",
+        &[
+            ("皮带ID", "beltId"),
+            ("名称", "name"),
+            ("当前库存", "currentStock"),
+            ("安全库存", "safetyStock"),
+            ("库存状态", "status"),
+        ],
+    ),
+    (
+        "主模具信息表",
+        &[
+            ("内部ID", "id"),
+            ("名称", "name"),
+            ("孔径", "holeDiameter"),
+            ("对应线材", "wireMaterial"),
+            ("安全库存", "safetyStock"),
+            ("备注", "remark"),
+        ],
+    ),
+    (
+        "主模具入库记录",
+        &[
+            ("入库ID", "id"),
+            ("主模具ID", "mainMoldId"),
+            ("入库数量", "quantity"),
+            ("入库时间", "orderDate"),
+            ("到货状态", "status"),
+            ("备注", "remark"),
+        ],
+    ),
+    (
+        "主模具使用记录",
+        &[
+            ("使用ID", "id"),
+            ("主模具ID", "mainMoldId"),
+            ("使用人", "user"),
+            ("使用数量", "quantity"),
+            ("使用时间", "useDate"),
+            ("备注", "remark"),
+        ],
+    ),
+    (
+        "主模具-线材关联",
+        &[
+            ("关联ID", "id"),
+            ("主模具ID", "mainMoldId"),
+            ("线材规格", "wireMaterial"),
+            ("备注", "remark"),
+        ],
+    ),
+    (
+        "主模具库存汇总",
+        &[
+            ("主模具ID", "mainMoldId"),
+            ("名称", "name"),
+            ("当前库存", "currentStock"),
+            ("安全库存", "safetyStock"),
+            ("库存状态", "status"),
+        ],
+    ),
+    (
+        "剪刀信息表",
+        &[
+            ("内部ID", "id"),
+            ("名称", "name"),
+            ("口径", "diameter"),
+            ("对应线材", "wireMaterial"),
+            ("安全库存", "safetyStock"),
+            ("备注", "remark"),
+        ],
+    ),
+    (
+        "剪刀入库记录",
+        &[
+            ("入库ID", "id"),
+            ("剪刀ID", "scissorId"),
+            ("入库数量", "quantity"),
+            ("入库时间", "orderDate"),
+            ("到货状态", "status"),
+            ("备注", "remark"),
+        ],
+    ),
+    (
+        "剪刀使用记录",
+        &[
+            ("使用ID", "id"),
+            ("剪刀ID", "scissorId"),
+            ("使用人", "user"),
+            ("使用数量", "quantity"),
+            ("使用时间", "useDate"),
+            ("备注", "remark"),
+        ],
+    ),
+    (
+        "剪刀-线材关联",
+        &[
+            ("关联ID", "id"),
+            ("剪刀ID", "scissorId"),
+            ("线材规格", "wireMaterial"),
+            ("备注", "remark"),
+        ],
+    ),
+    (
+        "剪刀库存汇总",
+        &[
+            ("剪刀ID", "scissorId"),
+            ("名称", "name"),
+            ("当前库存", "currentStock"),
+            ("安全库存", "safetyStock"),
+            ("库存状态", "status"),
+        ],
+    ),
+    (
+        "上冲信息表",
+        &[
+            ("内部ID", "id"),
+            ("名称", "name"),
+            ("口径", "diameter"),
+            ("对应线材", "wireMaterial"),
+            ("安全库存", "safetyStock"),
+            ("备注", "remark"),
+        ],
+    ),
+    (
+        "上冲入库记录",
+        &[
+            ("入库ID", "id"),
+            ("上冲ID", "upperPunchId"),
+            ("入库数量", "quantity"),
+            ("入库时间", "orderDate"),
+            ("到货状态", "status"),
+            ("备注", "remark"),
+        ],
+    ),
+    (
+        "上冲使用记录",
+        &[
+            ("使用ID", "id"),
+            ("上冲ID", "upperPunchId"),
+            ("使用人", "user"),
+            ("使用数量", "quantity"),
+            ("使用时间", "useDate"),
+            ("备注", "remark"),
+        ],
+    ),
+    (
+        "上冲-线材关联",
+        &[
+            ("关联ID", "id"),
+            ("上冲ID", "upperPunchId"),
+            ("线材规格", "wireMaterial"),
+            ("备注", "remark"),
+        ],
+    ),
+    (
+        "上冲库存汇总",
+        &[
+            ("上冲ID", "upperPunchId"),
+            ("名称", "name"),
+            ("当前库存", "currentStock"),
+            ("安全库存", "safetyStock"),
+            ("库存状态", "status"),
+        ],
+    ),
 ];
 
 fn get_column_keys(sheet_name: &str) -> Vec<&'static str> {
@@ -65,7 +352,13 @@ fn cell_to_string(cell: &Data) -> String {
             }
         }
         Data::Int(i) => format!("{}", i),
-        Data::Bool(b) => if *b { "true".to_string() } else { "false".to_string() },
+        Data::Bool(b) => {
+            if *b {
+                "true".to_string()
+            } else {
+                "false".to_string()
+            }
+        }
         Data::Empty => String::new(),
         Data::Error(e) => format!("ERROR:{:?}", e),
         Data::DateTime(d) => format!("{}", d),
@@ -114,22 +407,70 @@ fn generate_id(prefix: &str) -> String {
 
 fn create_empty_workbook(file_path: &str) -> Result<(), String> {
     if let Some(parent) = Path::new(file_path).parent() {
-        if !parent.exists() {
-            let _ = fs::create_dir_all(parent);
-        }
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("创建数据目录失败「{}」: {}", parent.display(), e))?;
     }
     let mut workbook = Workbook::new();
     for &(sheet_name, cols) in SHEETS {
-        let sheet = workbook.add_worksheet()
+        let sheet = workbook
+            .add_worksheet()
             .set_name(sheet_name)
             .map_err(|e| e.to_string())?;
         for (i, &(header, _)) in cols.iter().enumerate() {
-            sheet.write_string(0, i as u16, header).map_err(|e| e.to_string())?;
+            sheet
+                .write_string(0, i as u16, header)
+                .map_err(|e| e.to_string())?;
         }
     }
-    workbook.save(file_path)
-        .map_err(|e| format!("保存数据文件失败「{}」: {}", file_path, e))?;
+    save_workbook_atomically(&mut workbook, Path::new(file_path))
+}
+
+fn save_workbook_atomically(workbook: &mut Workbook, target: &Path) -> Result<(), String> {
+    if let Some(parent) = target.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("创建数据目录失败「{}」: {}", parent.display(), e))?;
+    }
+    let temporary = storage::temporary_path(target, "xlsx")?;
+    let result = (|| {
+        workbook
+            .save(&temporary)
+            .map_err(|e| format!("生成临时数据文件失败「{}」: {}", temporary.display(), e))?;
+        validate_workbook(&temporary)?;
+        storage::sync_file(&temporary)?;
+        storage::replace_file(&temporary, target)
+    })();
+    if result.is_err() && temporary.exists() {
+        let _ = fs::remove_file(&temporary);
+    }
+    result.map_err(|e| format!("保存数据文件失败「{}」: {}", target.display(), e))
+}
+
+pub fn validate_workbook(path: &Path) -> Result<(), String> {
+    let mut workbook = open_workbook_auto(path)
+        .map_err(|e| format!("验证 Excel 文件失败「{}」: {}", path.display(), e))?;
+    if workbook.sheet_names().is_empty() {
+        return Err(format!("Excel 文件没有工作表「{}」", path.display()));
+    }
+    for &(name, _) in SHEETS {
+        workbook
+            .worksheet_range(name)
+            .map_err(|e| format!("Excel 缺少或无法读取工作表「{}」: {}", name, e))?;
+    }
     Ok(())
+}
+
+pub fn workbook_stats(path: &Path) -> Result<HashMap<String, i64>, String> {
+    let mut workbook = open_workbook_auto(path)
+        .map_err(|e| format!("读取 Excel 统计失败「{}」: {}", path.display(), e))?;
+    let names = workbook.sheet_names().to_vec();
+    let mut stats = HashMap::new();
+    for name in names {
+        let range = workbook
+            .worksheet_range(&name)
+            .map_err(|e| format!("读取工作表「{}」失败: {}", name, e))?;
+        stats.insert(name, range.rows().count().saturating_sub(1) as i64);
+    }
+    Ok(stats)
 }
 
 /// 清洗 JSON 数组格式的字符串，如 ["30R特"] → 30R特
@@ -144,7 +485,8 @@ fn normalize_value(val: String) -> String {
 }
 
 fn normalize_text(value: &str) -> String {
-    value.chars()
+    value
+        .chars()
         .flat_map(|ch| {
             let normalized = match ch {
                 '\u{3000}' => ' ',
@@ -178,7 +520,10 @@ fn normalize_dimension(value: &str) -> String {
                 format!("{}", number as i64)
             } else {
                 let formatted = format!("{:.12}", number);
-                formatted.trim_end_matches('0').trim_end_matches('.').to_string()
+                formatted
+                    .trim_end_matches('0')
+                    .trim_end_matches('.')
+                    .to_string()
             };
         }
     }
@@ -211,16 +556,22 @@ fn field<'a>(record: &'a HashMap<String, String>, key: &str) -> &'a str {
 
 fn business_unique_key(sheet_name: &str, record: &HashMap<String, String>) -> Option<String> {
     match sheet_name {
-        "冲头信息表" => Some([
-            normalize_punch_name(field(record, "name")),
-            normalize_dimension(field(record, "spec")),
-            normalize_text(field(record, "material")),
-        ].join("|")),
-        "牙板信息表" => Some([
-            normalize_text(field(record, "name")),
-            normalize_text(field(record, "machineType")),
-            normalize_dimension(field(record, "wireDiameter")),
-        ].join("|")),
+        "冲头信息表" => Some(
+            [
+                normalize_punch_name(field(record, "name")),
+                normalize_dimension(field(record, "spec")),
+                normalize_text(field(record, "material")),
+            ]
+            .join("|"),
+        ),
+        "牙板信息表" => Some(
+            [
+                normalize_text(field(record, "name")),
+                normalize_text(field(record, "machineType")),
+                normalize_dimension(field(record, "wireDiameter")),
+            ]
+            .join("|"),
+        ),
         _ => None,
     }
 }
@@ -237,10 +588,19 @@ fn ensure_unique_record(
 
     if let Some(existing) = existing_rows.iter().find(|row| {
         let is_current = exclude_id.is_some_and(|id| field(row, "id") == id);
-        !is_current && business_unique_key(sheet_name, row).as_deref() == Some(candidate_key.as_str())
+        !is_current
+            && business_unique_key(sheet_name, row).as_deref() == Some(candidate_key.as_str())
     }) {
-        let resource = if sheet_name == "冲头信息表" { "冲头" } else { "牙板" };
-        return Err(format!("DUPLICATE_RECORD|{}|{}", resource, field(existing, "id")));
+        let resource = if sheet_name == "冲头信息表" {
+            "冲头"
+        } else {
+            "牙板"
+        };
+        return Err(format!(
+            "DUPLICATE_RECORD|{}|{}",
+            resource,
+            field(existing, "id")
+        ));
     }
 
     Ok(())
@@ -253,16 +613,22 @@ pub fn get_all(file_path: &str, sheet_name: &str) -> Result<Vec<HashMap<String, 
     }
     let mut workbook = open_workbook_auto(file_path)
         .map_err(|e| format!("打开数据文件失败「{}」: {}", file_path, e))?;
-    let range = workbook.worksheet_range(sheet_name)
+    let range = workbook
+        .worksheet_range(sheet_name)
         .map_err(|e| format!("读取工作表「{}」失败: {}", sheet_name, e))?;
     let keys = get_column_keys(sheet_name);
     let mut items = Vec::new();
     for (row_idx, row) in range.rows().enumerate() {
-        if row_idx == 0 { continue; }
+        if row_idx == 0 {
+            continue;
+        }
         let mut item = HashMap::new();
         for (col_idx, cell) in row.iter().enumerate() {
             if col_idx < keys.len() {
-                item.insert(keys[col_idx].to_string(), normalize_value(cell_to_string(cell)));
+                item.insert(
+                    keys[col_idx].to_string(),
+                    normalize_value(cell_to_string(cell)),
+                );
             }
         }
         items.push(item);
@@ -270,12 +636,22 @@ pub fn get_all(file_path: &str, sheet_name: &str) -> Result<Vec<HashMap<String, 
     Ok(items)
 }
 
-pub fn get_by_id(file_path: &str, sheet_name: &str, id: &str) -> Result<Option<HashMap<String, String>>, String> {
+pub fn get_by_id(
+    file_path: &str,
+    sheet_name: &str,
+    id: &str,
+) -> Result<Option<HashMap<String, String>>, String> {
     let items = get_all(file_path, sheet_name)?;
-    Ok(items.into_iter().find(|item| item.get("id").map(|v| v == id).unwrap_or(false)))
+    Ok(items
+        .into_iter()
+        .find(|item| item.get("id").map(|v| v == id).unwrap_or(false)))
 }
 
-pub fn add_row(file_path: &str, sheet_name: &str, item: &HashMap<String, String>) -> Result<HashMap<String, String>, String> {
+pub fn add_row(
+    file_path: &str,
+    sheet_name: &str,
+    item: &HashMap<String, String>,
+) -> Result<HashMap<String, String>, String> {
     if !Path::new(file_path).exists() {
         create_empty_workbook(file_path)?;
     }
@@ -291,7 +667,12 @@ pub fn add_row(file_path: &str, sheet_name: &str, item: &HashMap<String, String>
     Ok(result)
 }
 
-pub fn update_row(file_path: &str, sheet_name: &str, id: &str, data: &HashMap<String, String>) -> Result<HashMap<String, String>, String> {
+pub fn update_row(
+    file_path: &str,
+    sheet_name: &str,
+    id: &str,
+    data: &HashMap<String, String>,
+) -> Result<HashMap<String, String>, String> {
     let mut all_rows = get_all(file_path, sheet_name)?;
     let Some(current) = all_rows.iter().find(|row| field(row, "id") == id) else {
         return Err("记录未找到".to_string());
@@ -321,12 +702,18 @@ pub fn delete_row(file_path: &str, sheet_name: &str, id: &str) -> Result<bool, S
     let mut all_rows = get_all(file_path, sheet_name)?;
     let original_len = all_rows.len();
     all_rows.retain(|row| row.get("id").map(|v| v != id).unwrap_or(true));
-    if all_rows.len() == original_len { return Ok(false); }
+    if all_rows.len() == original_len {
+        return Ok(false);
+    }
     write_sheet_data(file_path, sheet_name, &all_rows)?;
     Ok(true)
 }
 
-fn write_sheet_data(file_path: &str, sheet_name: &str, rows: &[HashMap<String, String>]) -> Result<(), String> {
+fn write_sheet_data(
+    file_path: &str,
+    sheet_name: &str,
+    rows: &[HashMap<String, String>],
+) -> Result<(), String> {
     let mut all_sheets_data: Vec<(String, Vec<HashMap<String, String>>)> = Vec::new();
     if Path::new(file_path).exists() {
         let mut wb = open_workbook_auto(file_path).map_err(|e| e.to_string())?;
@@ -335,7 +722,9 @@ fn write_sheet_data(file_path: &str, sheet_name: &str, rows: &[HashMap<String, S
                 let keys = get_column_keys(sname);
                 let mut sheet_rows = Vec::new();
                 for (row_idx, row) in range.rows().enumerate() {
-                    if row_idx == 0 { continue; }
+                    if row_idx == 0 {
+                        continue;
+                    }
                     let mut item = HashMap::new();
                     for (col_idx, cell) in row.iter().enumerate() {
                         if col_idx < keys.len() {
@@ -355,29 +744,34 @@ fn write_sheet_data(file_path: &str, sheet_name: &str, rows: &[HashMap<String, S
         }
     }
     for (name, data) in &mut all_sheets_data {
-        if name == sheet_name { *data = rows.to_vec(); }
+        if name == sheet_name {
+            *data = rows.to_vec();
+        }
     }
     let mut workbook = Workbook::new();
     for &(sname, cols) in SHEETS {
-        let sheet = workbook.add_worksheet()
+        let sheet = workbook
+            .add_worksheet()
             .set_name(sname)
             .map_err(|e| e.to_string())?;
         for (i, &(header, _)) in cols.iter().enumerate() {
-            sheet.write_string(0, i as u16, header).map_err(|e| e.to_string())?;
+            sheet
+                .write_string(0, i as u16, header)
+                .map_err(|e| e.to_string())?;
         }
         if let Some((_, sheet_data)) = all_sheets_data.iter().find(|(n, _)| n == sname) {
             for (row_idx, row) in sheet_data.iter().enumerate() {
                 for (col_idx, &(_, key)) in cols.iter().enumerate() {
                     if let Some(value) = row.get(key) {
-                        sheet.write_string((row_idx + 1) as u32, col_idx as u16, value).map_err(|e| e.to_string())?;
+                        sheet
+                            .write_string((row_idx + 1) as u32, col_idx as u16, value)
+                            .map_err(|e| e.to_string())?;
                     }
                 }
             }
         }
     }
-    workbook.save(file_path)
-        .map_err(|e| format!("保存数据文件失败「{}」: {}", file_path, e))?;
-    Ok(())
+    save_workbook_atomically(&mut workbook, Path::new(file_path))
 }
 
 pub fn export_data(file_path: &str) -> Result<Vec<u8>, String> {
@@ -388,64 +782,121 @@ pub fn export_data(file_path: &str) -> Result<Vec<u8>, String> {
 }
 
 pub fn import_data(file_path: &str, data: &[u8]) -> Result<HashMap<String, i64>, String> {
-    if let Some(parent) = Path::new(file_path).parent() {
-        if !parent.exists() {
-            let _ = fs::create_dir_all(parent);
-        }
+    let target = Path::new(file_path);
+    if let Some(parent) = target.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("创建数据目录失败「{}」: {}", parent.display(), e))?;
     }
-    if Path::new(file_path).exists() {
-        let backup = file_path.replace(".xlsx", &format!("-backup-{}.xlsx", Local::now().timestamp_millis()));
-        let _ = fs::copy(file_path, &backup);
+    let temporary = storage::temporary_path(target, "xlsx")?;
+    let result = (|| {
+        fs::write(&temporary, data)
+            .map_err(|e| format!("写入导入暂存文件失败「{}」: {}", temporary.display(), e))?;
+        validate_workbook(&temporary)?;
+        let stats = workbook_stats(&temporary)?;
+        storage::sync_file(&temporary)?;
+        storage::replace_file(&temporary, target)?;
+        Ok(stats)
+    })();
+    if result.is_err() && temporary.exists() {
+        let _ = fs::remove_file(&temporary);
     }
-    fs::write(file_path, data).map_err(|e| e.to_string())?;
-    let mut stats = HashMap::new();
-    let mut wb = open_workbook_auto(file_path).map_err(|e| e.to_string())?;
-    for name in wb.sheet_names() {
-        if let Ok(range) = wb.worksheet_range(&name) {
-            let count = range.rows().count().saturating_sub(1) as i64;
-            stats.insert(name.clone(), count);
-        }
-    }
-    Ok(stats)
+    result
 }
 
-pub fn calculate_stock(file_path: &str, stock_type: &str) -> Result<Vec<HashMap<String, String>>, String> {
+pub fn calculate_stock(
+    file_path: &str,
+    stock_type: &str,
+) -> Result<Vec<HashMap<String, String>>, String> {
     let (info_sheet, order_sheet, use_sheet, stock_sheet, item_id_key) = match stock_type {
-        "punch" => ("冲头信息表", "冲头入库记录", "冲头领用记录", "冲头库存汇总", "punchId"),
-        "die" => ("牙板信息表", "牙板入库记录", "牙板领用记录", "牙板库存汇总", "dieId"),
-        "belt" => ("皮带信息表", "皮带入库记录", "皮带使用记录", "皮带库存汇总", "beltId"),
-        "mainMold" => ("主模具信息表", "主模具入库记录", "主模具使用记录", "主模具库存汇总", "mainMoldId"),
-        "scissor" => ("剪刀信息表", "剪刀入库记录", "剪刀使用记录", "剪刀库存汇总", "scissorId"),
-        "upperPunch" => ("上冲信息表", "上冲入库记录", "上冲使用记录", "上冲库存汇总", "upperPunchId"),
+        "punch" => (
+            "冲头信息表",
+            "冲头入库记录",
+            "冲头领用记录",
+            "冲头库存汇总",
+            "punchId",
+        ),
+        "die" => (
+            "牙板信息表",
+            "牙板入库记录",
+            "牙板领用记录",
+            "牙板库存汇总",
+            "dieId",
+        ),
+        "belt" => (
+            "皮带信息表",
+            "皮带入库记录",
+            "皮带使用记录",
+            "皮带库存汇总",
+            "beltId",
+        ),
+        "mainMold" => (
+            "主模具信息表",
+            "主模具入库记录",
+            "主模具使用记录",
+            "主模具库存汇总",
+            "mainMoldId",
+        ),
+        "scissor" => (
+            "剪刀信息表",
+            "剪刀入库记录",
+            "剪刀使用记录",
+            "剪刀库存汇总",
+            "scissorId",
+        ),
+        "upperPunch" => (
+            "上冲信息表",
+            "上冲入库记录",
+            "上冲使用记录",
+            "上冲库存汇总",
+            "upperPunchId",
+        ),
         _ => return Err("未知类型".to_string()),
     };
     let info_items = get_all(file_path, info_sheet)?;
     let orders = get_all(file_path, order_sheet)?;
     let uses = get_all(file_path, use_sheet)?;
-    let stock_data: Vec<HashMap<String, String>> = info_items.iter().map(|item| {
-        let item_id = item.get("id").cloned().unwrap_or_default();
-        let total_ordered: i64 = orders.iter()
-            .filter(|o| o.get(item_id_key).map(|v| v == &item_id).unwrap_or(false)
-                     && o.get("status").map(|v| v == "已到货").unwrap_or(false))
-            .filter_map(|o| o.get("quantity").and_then(|q| q.parse::<i64>().ok()))
-            .sum();
-        let total_used: i64 = uses.iter()
-            .filter(|u| u.get(item_id_key).map(|v| v == &item_id).unwrap_or(false))
-            .filter_map(|u| u.get("quantity").and_then(|q| q.parse::<i64>().ok()))
-            .sum();
-        let current_stock = total_ordered - total_used;
-        let safety_stock: i64 = item.get("safety_stock")
-            .or_else(|| item.get("safetyStock"))
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(0);
-        let mut row = HashMap::new();
-        row.insert(item_id_key.to_string(), item_id);
-        row.insert("name".to_string(), item.get("name").cloned().unwrap_or_default());
-        row.insert("currentStock".to_string(), current_stock.to_string());
-        row.insert("safetyStock".to_string(), safety_stock.to_string());
-        row.insert("status".to_string(), if current_stock < safety_stock { "需入库".to_string() } else { "安全".to_string() });
-        row
-    }).collect();
+    let stock_data: Vec<HashMap<String, String>> = info_items
+        .iter()
+        .map(|item| {
+            let item_id = item.get("id").cloned().unwrap_or_default();
+            let total_ordered: i64 = orders
+                .iter()
+                .filter(|o| {
+                    o.get(item_id_key).map(|v| v == &item_id).unwrap_or(false)
+                        && o.get("status").map(|v| v == "已到货").unwrap_or(false)
+                })
+                .filter_map(|o| o.get("quantity").and_then(|q| q.parse::<i64>().ok()))
+                .sum();
+            let total_used: i64 = uses
+                .iter()
+                .filter(|u| u.get(item_id_key).map(|v| v == &item_id).unwrap_or(false))
+                .filter_map(|u| u.get("quantity").and_then(|q| q.parse::<i64>().ok()))
+                .sum();
+            let current_stock = total_ordered - total_used;
+            let safety_stock: i64 = item
+                .get("safety_stock")
+                .or_else(|| item.get("safetyStock"))
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0);
+            let mut row = HashMap::new();
+            row.insert(item_id_key.to_string(), item_id);
+            row.insert(
+                "name".to_string(),
+                item.get("name").cloned().unwrap_or_default(),
+            );
+            row.insert("currentStock".to_string(), current_stock.to_string());
+            row.insert("safetyStock".to_string(), safety_stock.to_string());
+            row.insert(
+                "status".to_string(),
+                if current_stock < safety_stock {
+                    "需入库".to_string()
+                } else {
+                    "安全".to_string()
+                },
+            );
+            row
+        })
+        .collect();
     write_sheet_data(file_path, stock_sheet, &stock_data)?;
     Ok(stock_data)
 }
@@ -455,32 +906,77 @@ mod tests {
     use super::*;
 
     fn record(fields: &[(&str, &str)]) -> HashMap<String, String> {
-        fields.iter().map(|(key, value)| (key.to_string(), value.to_string())).collect()
+        fields
+            .iter()
+            .map(|(key, value)| (key.to_string(), value.to_string()))
+            .collect()
     }
 
     #[test]
     fn punch_short_and_full_names_share_unique_key() {
         let short = record(&[("name", "30R"), ("spec", "14.0 mm"), ("material", "SKD11")]);
         let full = record(&[("name", "JMR M30"), ("spec", "14"), ("material", "skd11")]);
-        assert_eq!(business_unique_key("冲头信息表", &short), business_unique_key("冲头信息表", &full));
+        assert_eq!(
+            business_unique_key("冲头信息表", &short),
+            business_unique_key("冲头信息表", &full)
+        );
     }
 
     #[test]
     fn die_numeric_diameters_share_unique_key() {
-        let left = record(&[("name", "牙板 A"), ("machineType", "M12"), ("wireDiameter", "Φ14.0 mm")]);
-        let right = record(&[("name", "牙板A"), ("machineType", "m12"), ("wireDiameter", "14")]);
-        assert_eq!(business_unique_key("牙板信息表", &left), business_unique_key("牙板信息表", &right));
+        let left = record(&[
+            ("name", "牙板 A"),
+            ("machineType", "M12"),
+            ("wireDiameter", "Φ14.0 mm"),
+        ]);
+        let right = record(&[
+            ("name", "牙板A"),
+            ("machineType", "m12"),
+            ("wireDiameter", "14"),
+        ]);
+        assert_eq!(
+            business_unique_key("牙板信息表", &left),
+            business_unique_key("牙板信息表", &right)
+        );
+    }
+
+    #[test]
+    fn invalid_import_keeps_existing_workbook() {
+        let root =
+            std::env::temp_dir().join(format!("mold-excel-import-test-{}", uuid::Uuid::new_v4()));
+        fs::create_dir_all(&root).unwrap();
+        let path = root.join("mold-data.xlsx");
+        create_empty_workbook(path.to_str().unwrap()).unwrap();
+        let before = fs::read(&path).unwrap();
+        assert!(import_data(path.to_str().unwrap(), b"not-an-xlsx").is_err());
+        assert_eq!(fs::read(&path).unwrap(), before);
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
     fn update_excludes_current_record_but_rejects_other_duplicate() {
         let rows = vec![
-            record(&[("id", "CT1"), ("name", "30R"), ("spec", "14"), ("material", "SKD11")]),
-            record(&[("id", "CT2"), ("name", "31R"), ("spec", "15"), ("material", "SKD11")]),
+            record(&[
+                ("id", "CT1"),
+                ("name", "30R"),
+                ("spec", "14"),
+                ("material", "SKD11"),
+            ]),
+            record(&[
+                ("id", "CT2"),
+                ("name", "31R"),
+                ("spec", "15"),
+                ("material", "SKD11"),
+            ]),
         ];
         assert!(ensure_unique_record("冲头信息表", &rows[0], &rows, Some("CT1")).is_ok());
 
-        let duplicate = record(&[("id", "CT2"), ("name", "JMR M30"), ("spec", "14.0"), ("material", "skd11")]);
+        let duplicate = record(&[
+            ("id", "CT2"),
+            ("name", "JMR M30"),
+            ("spec", "14.0"),
+            ("material", "skd11"),
+        ]);
         assert_eq!(
             ensure_unique_record("冲头信息表", &duplicate, &rows, Some("CT2")),
             Err("DUPLICATE_RECORD|冲头|CT1".to_string())
@@ -496,7 +992,10 @@ pub fn get_default_file_path() -> String {
     } else {
         std::env::current_exe()
             .ok()
-            .and_then(|p| p.parent().map(|d| d.join("data").to_string_lossy().to_string()))
+            .and_then(|p| {
+                p.parent()
+                    .map(|d| d.join("data").to_string_lossy().to_string())
+            })
             .unwrap_or_else(|| "./data".to_string())
     };
     format!("{}/mold-data.xlsx", base)

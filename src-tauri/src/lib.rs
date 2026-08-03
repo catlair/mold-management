@@ -1,13 +1,16 @@
-mod excel;
 mod attachments;
+mod backup;
+mod data_package;
+mod excel;
+mod storage;
 
-use std::sync::Mutex;
-use std::fs;
-use std::path::{Path, PathBuf};
+use chrono::{Local, NaiveDateTime};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use tauri::{State, Manager};
-use chrono::Local;
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::sync::Mutex;
+use tauri::{Manager, State};
 
 // ========== 备份记录结构 ==========
 
@@ -24,23 +27,130 @@ fn get_backup_index_path(backup_dir: &str) -> PathBuf {
     PathBuf::from(backup_dir).join("backups.json")
 }
 
-fn load_backup_index(backup_dir: &str) -> Vec<BackupRecord> {
+fn load_backup_index(backup_dir: &str) -> Result<Vec<BackupRecord>, String> {
     let index_path = get_backup_index_path(backup_dir);
-    if index_path.exists() {
-        if let Ok(content) = fs::read_to_string(&index_path) {
-            if let Ok(records) = serde_json::from_str::<Vec<BackupRecord>>(&content) {
-                return records;
+    if !index_path.exists() {
+        return Ok(Vec::new());
+    }
+    let content = fs::read_to_string(&index_path)
+        .map_err(|e| format!("读取备份索引失败「{}」: {}", index_path.display(), e))?;
+    match serde_json::from_str(&content) {
+        Ok(records) => Ok(records),
+        Err(error) => {
+            let damaged_path = index_path.with_file_name(format!(
+                "backups-damaged-{}.json",
+                Local::now().format("%Y%m%d_%H%M%S")
+            ));
+            fs::rename(&index_path, &damaged_path).map_err(|rename_error| {
+                format!(
+                    "备份索引损坏（{}），且无法隔离旧索引「{}」: {}",
+                    error,
+                    index_path.display(),
+                    rename_error
+                )
+            })?;
+            eprintln!(
+                "备份索引损坏，已隔离到「{}」并准备从目录重建: {}",
+                damaged_path.display(),
+                error
+            );
+            Ok(Vec::new())
+        }
+    }
+}
+
+fn save_backup_index(backup_dir: &str, records: &[BackupRecord]) -> Result<(), String> {
+    fs::create_dir_all(backup_dir)
+        .map_err(|e| format!("创建备份目录失败「{}」: {}", backup_dir, e))?;
+    storage::atomic_write_json(&get_backup_index_path(backup_dir), records)
+        .map_err(|e| format!("保存备份索引失败: {}", e))
+}
+
+fn backup_time_from_path(path: &Path) -> String {
+    let stem = path
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or_default();
+    let raw = stem.strip_prefix("mold-backup-").unwrap_or_default();
+    NaiveDateTime::parse_from_str(raw, "%Y%m%d_%H%M%S_%3f")
+        .map(|value| value.format("%Y-%m-%d %H:%M:%S").to_string())
+        .or_else(|_| {
+            fs::metadata(path)
+                .and_then(|metadata| metadata.modified())
+                .map(|modified| {
+                    chrono::DateTime::<Local>::from(modified)
+                        .format("%Y-%m-%d %H:%M:%S")
+                        .to_string()
+                })
+        })
+        .unwrap_or_else(|_| Local::now().format("%Y-%m-%d %H:%M:%S").to_string())
+}
+
+fn is_managed_backup_path(path: &Path) -> bool {
+    path.is_file()
+        && path
+            .extension()
+            .and_then(|value| value.to_str())
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("zip"))
+        && path
+            .file_stem()
+            .and_then(|value| value.to_str())
+            .and_then(|name| name.strip_prefix("mold-backup-"))
+            .is_some_and(|timestamp| {
+                NaiveDateTime::parse_from_str(timestamp, "%Y%m%d_%H%M%S_%3f").is_ok()
+            })
+}
+
+fn repair_backup_index(backup_dir: &str) -> Result<Vec<BackupRecord>, String> {
+    fs::create_dir_all(backup_dir)
+        .map_err(|e| format!("创建备份目录失败「{}」: {}", backup_dir, e))?;
+    let records = load_backup_index(backup_dir)?;
+    let mut actual_files = Vec::new();
+    for entry in fs::read_dir(backup_dir)
+        .map_err(|e| format!("扫描备份目录失败「{}」: {}", backup_dir, e))?
+    {
+        let path = entry
+            .map_err(|e| format!("读取备份目录项失败: {}", e))?
+            .path();
+        if is_managed_backup_path(&path) {
+            match backup::validate_backup_zip(&path) {
+                Ok(()) => actual_files.push(path),
+                Err(error) => eprintln!(
+                    "发现无法使用的备份 ZIP，已保留文件但不加入索引「{}」: {}",
+                    path.display(),
+                    error
+                ),
             }
         }
     }
-    vec![]
-}
-
-fn save_backup_index(backup_dir: &str, records: &[BackupRecord]) {
-    let index_path = get_backup_index_path(backup_dir);
-    if let Ok(content) = serde_json::to_string_pretty(records) {
-        let _ = fs::write(index_path, content);
+    actual_files.sort();
+    let mut repaired_records = Vec::with_capacity(actual_files.len());
+    for path in actual_files {
+        // 索引只保存备份目录实际扫描到的文件，不能通过 JSON 将清理范围扩展到目录外。
+        if let Some(existing) = records
+            .iter()
+            .find(|record| Path::new(&record.file_path) == path)
+        {
+            if repaired_records
+                .iter()
+                .any(|record: &BackupRecord| record.file_path == existing.file_path)
+            {
+                continue;
+            }
+            repaired_records.push(existing.clone());
+        } else {
+            repaired_records.push(BackupRecord {
+                file_path: path.to_string_lossy().to_string(),
+                backup_time: backup_time_from_path(&path),
+                backup_reason: "索引自动修复".to_string(),
+                backup_md5: String::new(),
+                locked: false,
+            });
+        }
     }
+    repaired_records.sort_by(|left, right| left.backup_time.cmp(&right.backup_time));
+    save_backup_index(backup_dir, &repaired_records)?;
+    Ok(repaired_records)
 }
 
 fn attachment_dir_for_data(file_path: &str) -> Result<PathBuf, String> {
@@ -48,17 +158,6 @@ fn attachment_dir_for_data(file_path: &str) -> Result<PathBuf, String> {
         .parent()
         .map(|parent| parent.join("attachments"))
         .ok_or_else(|| "无法确定附件数据目录".to_string())
-}
-
-fn attachment_snapshot_dir(backup_file: &Path) -> Result<PathBuf, String> {
-    let parent = backup_file
-        .parent()
-        .ok_or_else(|| "无法确定备份目录".to_string())?;
-    let stem = backup_file
-        .file_stem()
-        .and_then(|value| value.to_str())
-        .ok_or_else(|| "备份文件名无效".to_string())?;
-    Ok(parent.join(format!("{}-attachments", stem)))
 }
 
 fn collect_files(directory: &Path, files: &mut Vec<PathBuf>) -> Result<(), String> {
@@ -98,26 +197,6 @@ fn dataset_md5(file_path: &str) -> Result<String, String> {
     Ok(format!("{:x}", hasher.finalize()))
 }
 
-fn copy_directory(source: &Path, target: &Path) -> Result<(), String> {
-    fs::create_dir_all(target).map_err(|e| format!("创建附件备份目录失败: {}", e))?;
-    if !source.exists() {
-        return Ok(());
-    }
-    for entry in fs::read_dir(source).map_err(|e| format!("读取附件目录失败: {}", e))? {
-        let entry = entry.map_err(|e| format!("读取附件目录项失败: {}", e))?;
-        let source_path = entry.path();
-        let target_path = target.join(entry.file_name());
-        if source_path.is_dir() {
-            copy_directory(&source_path, &target_path)?;
-        } else if source_path.is_file() {
-            fs::copy(&source_path, &target_path).map_err(|e| {
-                format!("复制附件失败 {}: {}", source_path.display(), e)
-            })?;
-        }
-    }
-    Ok(())
-}
-
 fn do_backup(file_path: &str, backup_dir: &str, reason: &str) -> Result<String, String> {
     if !Path::new(file_path).exists() {
         return Err(format!("数据文件不存在: {}", file_path));
@@ -131,57 +210,45 @@ fn do_backup(file_path: &str, backup_dir: &str, reason: &str) -> Result<String, 
 
     let current_md5 = dataset_md5(file_path)?;
 
-    // Excel 与附件目录共同组成一个数据集；任一内容变化都会创建新快照。
-    let records = load_backup_index(backup_dir);
-    for record in &records {
-        if record.backup_md5 == current_md5 {
-            return Ok(String::new());
-        }
+    // 只与最近一次新版备份比较；数据回到早期状态时仍会创建新的当前快照。
+    let records = repair_backup_index(backup_dir)?;
+    if records
+        .last()
+        .is_some_and(|record| !record.backup_md5.is_empty() && record.backup_md5 == current_md5)
+    {
+        return Ok(String::new());
     }
 
-    let timestamp = Local::now().format("%Y%m%d_%H%M%S");
-    let backup_name = format!("mold-data-backup-{}.xlsx", timestamp);
+    let now = Local::now();
+    let backup_name = format!("mold-backup-{}.zip", now.format("%Y%m%d_%H%M%S_%3f"));
     let backup_file = PathBuf::from(backup_dir).join(&backup_name);
-    let bytes_copied = fs::copy(file_path, &backup_file)
-        .map_err(|e| format!("复制数据文件失败: {}", e))?;
+    let created_at = now.format("%Y-%m-%d %H:%M:%S").to_string();
+    let bytes = backup::create_backup_zip(file_path, reason, &created_at)?;
+    storage::atomic_write(&backup_file, &bytes)?;
 
-    let source_attachments = attachment_dir_for_data(file_path)?;
-    if source_attachments.exists() {
-        let snapshot_dir = attachment_snapshot_dir(&backup_file)?;
-        if snapshot_dir.exists() {
-            fs::remove_dir_all(&snapshot_dir)
-                .map_err(|e| format!("清理旧附件快照失败: {}", e))?;
-        }
-        copy_directory(&source_attachments, &snapshot_dir)?;
-    }
-
-    // 验证备份文件已创建且有内容
-    if !backup_file.exists() {
-        return Err("备份文件创建失败".to_string());
-    }
-    if bytes_copied == 0 {
-        return Err("备份文件为空".to_string());
-    }
-
-    // 写入索引记录
+    // 备份 ZIP 完整落盘后再写入索引。
     let mut new_records = records;
     new_records.push(BackupRecord {
         file_path: backup_file.to_string_lossy().to_string(),
-        backup_time: Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+        backup_time: created_at,
         backup_reason: reason.to_string(),
         backup_md5: current_md5,
         locked: false,
     });
-    save_backup_index(backup_dir, &new_records);
+    if let Err(error) = save_backup_index(backup_dir, &new_records) {
+        let _ = fs::remove_file(&backup_file);
+        return Err(error);
+    }
 
     Ok(backup_file.to_string_lossy().to_string())
 }
 
-fn cleanup_old_backups(backup_dir: &str, keep_count: usize) {
-    let mut records = load_backup_index(backup_dir);
+fn cleanup_old_backups(backup_dir: &str, keep_count: usize) -> Result<(), String> {
+    let mut records = repair_backup_index(backup_dir)?;
 
     // 统计未锁定的记录
-    let unlocked: Vec<usize> = records.iter()
+    let unlocked: Vec<usize> = records
+        .iter()
         .enumerate()
         .filter(|(_, r)| !r.locked)
         .map(|(i, _)| i)
@@ -196,17 +263,14 @@ fn cleanup_old_backups(backup_dir: &str, keep_count: usize) {
         for idx in remove_indices {
             let record = &records[idx];
             let backup_file = Path::new(&record.file_path);
-            let _ = fs::remove_file(backup_file);
-            if let Ok(snapshot_dir) = attachment_snapshot_dir(backup_file) {
-                if snapshot_dir.exists() {
-                    let _ = fs::remove_dir_all(snapshot_dir);
-                }
-            }
+            fs::remove_file(backup_file)
+                .map_err(|e| format!("删除过期备份失败「{}」: {}", backup_file.display(), e))?;
             records.remove(idx);
         }
 
-        save_backup_index(backup_dir, &records);
+        save_backup_index(backup_dir, &records)?;
     }
+    Ok(())
 }
 
 #[tauri::command]
@@ -214,8 +278,8 @@ fn list_backups(state: State<AppState>) -> Result<Value, String> {
     let path = state.file_path.lock().map_err(|e| e.to_string())?;
     let config = state.config.lock().map_err(|e| e.to_string())?;
     let backup_dir = get_backup_dir_for_file(&path, &config);
-    let records = load_backup_index(&backup_dir);
-    Ok(serde_json::to_value(records).unwrap_or(json!([])))
+    let records = repair_backup_index(&backup_dir)?;
+    serde_json::to_value(records).map_err(|e| format!("序列化备份记录失败: {}", e))
 }
 
 #[tauri::command]
@@ -223,10 +287,10 @@ fn toggle_backup_lock(state: State<AppState>, index: usize) -> Result<Value, Str
     let path = state.file_path.lock().map_err(|e| e.to_string())?;
     let config = state.config.lock().map_err(|e| e.to_string())?;
     let backup_dir = get_backup_dir_for_file(&path, &config);
-    let mut records = load_backup_index(&backup_dir);
+    let mut records = repair_backup_index(&backup_dir)?;
     if index < records.len() {
         records[index].locked = !records[index].locked;
-        save_backup_index(&backup_dir, &records);
+        save_backup_index(&backup_dir, &records)?;
         Ok(json!({ "success": true, "locked": records[index].locked }))
     } else {
         Err("无效的索引".to_string())
@@ -241,7 +305,8 @@ fn get_backup_dir_for_file(file_path: &str, config: &Config) -> String {
         }
     }
     // 没配置则用数据文件同级 backups 目录
-    Path::new(file_path).parent()
+    Path::new(file_path)
+        .parent()
         .map(|p| p.join("backups").to_string_lossy().to_string())
         .unwrap_or_else(|| default_backup_dir())
 }
@@ -255,9 +320,29 @@ struct Config {
     backup_path: Option<String>,
     #[serde(default)]
     allow_delete: bool,
+    #[serde(default = "default_die_machine_types")]
+    die_machine_types: Vec<String>,
+    #[serde(default = "default_punch_specs")]
+    punch_specs: Vec<String>,
 }
 
-fn default_backup_count() -> usize { 10 }
+fn default_backup_count() -> usize {
+    10
+}
+
+fn default_die_machine_types() -> Vec<String> {
+    ["003", "3/16", "1/4", "6R"]
+        .into_iter()
+        .map(String::from)
+        .collect()
+}
+
+fn default_punch_specs() -> Vec<String> {
+    ["12*15", "14*15", "18*18"]
+        .into_iter()
+        .map(String::from)
+        .collect()
+}
 
 struct AppState {
     file_path: Mutex<String>,
@@ -279,6 +364,8 @@ fn load_config(config_path: &Path) -> Config {
             backup_count: 10,
             backup_path: None,
             allow_delete: false,
+            die_machine_types: default_die_machine_types(),
+            punch_specs: default_punch_specs(),
         })
     } else {
         Config {
@@ -286,25 +373,33 @@ fn load_config(config_path: &Path) -> Config {
             backup_count: 10,
             backup_path: None,
             allow_delete: false,
+            die_machine_types: default_die_machine_types(),
+            punch_specs: default_punch_specs(),
         }
     }
 }
 
-fn save_config(config_path: &Path, config: &Config) {
-    if let Ok(content) = serde_json::to_string_pretty(config) {
-        let _ = fs::write(config_path, content);
-    }
+fn save_config(config_path: &Path, config: &Config) -> Result<(), String> {
+    storage::atomic_write_json(config_path, config)
+        .map_err(|e| format!("保存应用配置失败「{}」: {}", config_path.display(), e))
 }
 
 #[tauri::command]
 fn get_all_records(state: State<AppState>, sheet_name: String) -> Result<Vec<Value>, String> {
     let path = state.file_path.lock().map_err(|e| e.to_string())?;
     let items = excel::get_all(&path, &sheet_name)?;
-    Ok(items.into_iter().map(|m| serde_json::to_value(m).unwrap_or(json!({}))).collect())
+    Ok(items
+        .into_iter()
+        .map(|m| serde_json::to_value(m).unwrap_or(json!({})))
+        .collect())
 }
 
 #[tauri::command]
-fn get_record(state: State<AppState>, sheet_name: String, id: String) -> Result<Option<Value>, String> {
+fn get_record(
+    state: State<AppState>,
+    sheet_name: String,
+    id: String,
+) -> Result<Option<Value>, String> {
     let path = state.file_path.lock().map_err(|e| e.to_string())?;
     let item = excel::get_by_id(&path, &sheet_name, &id)?;
     Ok(item.map(|m| serde_json::to_value(m).unwrap_or(json!({}))))
@@ -314,57 +409,72 @@ fn get_record(state: State<AppState>, sheet_name: String, id: String) -> Result<
 fn add_record(state: State<AppState>, sheet_name: String, item: Value) -> Result<Value, String> {
     let path = state.file_path.lock().map_err(|e| e.to_string())?;
     // 将所有值转为字符串，数组用逗号连接
-    let map: std::collections::HashMap<String, String> = item.as_object()
-        .map(|obj| obj.iter().map(|(k, v)| {
-            let val = match v {
-                Value::String(s) => s.clone(),
-                Value::Number(n) => n.to_string(),
-                Value::Bool(b) => b.to_string(),
-                Value::Null => String::new(),
-                Value::Array(arr) => {
-                    arr.iter().filter_map(|item| {
-                        match item {
-                            Value::String(s) => Some(s.clone()),
-                            Value::Number(n) => Some(n.to_string()),
-                            Value::Bool(b) => Some(b.to_string()),
-                            _ => None,
-                        }
-                    }).collect::<Vec<_>>().join(",")
-                }
-                _ => v.to_string(),
-            };
-            (k.clone(), val)
-        }).collect())
+    let map: std::collections::HashMap<String, String> = item
+        .as_object()
+        .map(|obj| {
+            obj.iter()
+                .map(|(k, v)| {
+                    let val = match v {
+                        Value::String(s) => s.clone(),
+                        Value::Number(n) => n.to_string(),
+                        Value::Bool(b) => b.to_string(),
+                        Value::Null => String::new(),
+                        Value::Array(arr) => arr
+                            .iter()
+                            .filter_map(|item| match item {
+                                Value::String(s) => Some(s.clone()),
+                                Value::Number(n) => Some(n.to_string()),
+                                Value::Bool(b) => Some(b.to_string()),
+                                _ => None,
+                            })
+                            .collect::<Vec<_>>()
+                            .join(","),
+                        _ => v.to_string(),
+                    };
+                    (k.clone(), val)
+                })
+                .collect()
+        })
         .ok_or("无效的数据格式")?;
     let result = excel::add_row(&path, &sheet_name, &map)?;
     Ok(serde_json::to_value(result).unwrap_or(json!({})))
 }
 
 #[tauri::command]
-fn update_record(state: State<AppState>, sheet_name: String, id: String, data: Value) -> Result<Value, String> {
+fn update_record(
+    state: State<AppState>,
+    sheet_name: String,
+    id: String,
+    data: Value,
+) -> Result<Value, String> {
     let path = state.file_path.lock().map_err(|e| e.to_string())?;
     // 将所有值转为字符串，数组用逗号连接
-    let map: std::collections::HashMap<String, String> = data.as_object()
-        .map(|obj| obj.iter().map(|(k, v)| {
-            let val = match v {
-                Value::String(s) => s.clone(),
-                Value::Number(n) => n.to_string(),
-                Value::Bool(b) => b.to_string(),
-                Value::Null => String::new(),
-                Value::Array(arr) => {
-                    arr.iter().filter_map(|item| {
-                        match item {
-                            Value::String(s) => Some(s.clone()),
-                            Value::Number(n) => Some(n.to_string()),
-                            Value::Bool(b) => Some(b.to_string()),
-                            _ => None,
-                        }
-                    }).collect::<Vec<_>>().join(",")
-                }
-                _ => v.to_string(),
-            };
-            (k.clone(), val)
-        }).collect())
+    let map: std::collections::HashMap<String, String> = data
+        .as_object()
+        .map(|obj| {
+            obj.iter()
+                .map(|(k, v)| {
+                    let val = match v {
+                        Value::String(s) => s.clone(),
+                        Value::Number(n) => n.to_string(),
+                        Value::Bool(b) => b.to_string(),
+                        Value::Null => String::new(),
+                        Value::Array(arr) => arr
+                            .iter()
+                            .filter_map(|item| match item {
+                                Value::String(s) => Some(s.clone()),
+                                Value::Number(n) => Some(n.to_string()),
+                                Value::Bool(b) => Some(b.to_string()),
+                                _ => None,
+                            })
+                            .collect::<Vec<_>>()
+                            .join(","),
+                        _ => v.to_string(),
+                    };
+                    (k.clone(), val)
+                })
+                .collect()
+        })
         .ok_or("无效的数据格式")?;
     let result = excel::update_row(&path, &sheet_name, &id, &map)?;
     Ok(serde_json::to_value(result).unwrap_or(json!({})))
@@ -395,7 +505,11 @@ fn get_screw_attachment_counts(state: State<AppState>) -> Result<Value, String> 
 }
 
 #[tauri::command]
-fn import_screw_attachment(state: State<AppState>, screw_spec_id: String, source_path: String) -> Result<Value, String> {
+fn import_screw_attachment(
+    state: State<AppState>,
+    screw_spec_id: String,
+    source_path: String,
+) -> Result<Value, String> {
     let path = state.file_path.lock().map_err(|e| e.to_string())?;
     let item = attachments::import(&path, &screw_spec_id, &source_path)?;
     serde_json::to_value(item).map_err(|e| e.to_string())
@@ -436,11 +550,60 @@ fn export_data(state: State<AppState>) -> Result<Value, String> {
 }
 
 #[tauri::command]
+fn export_data_package(state: State<AppState>, destination_path: String) -> Result<Value, String> {
+    let destination = Path::new(&destination_path);
+    if !destination
+        .extension()
+        .and_then(|value| value.to_str())
+        .is_some_and(|value| value.eq_ignore_ascii_case("moldpkg"))
+    {
+        return Err("完整数据包文件必须使用 .moldpkg 扩展名".to_string());
+    }
+    let path = state.file_path.lock().map_err(|e| e.to_string())?;
+    let bytes = data_package::export_package(&path)?;
+    storage::atomic_write(destination, &bytes)
+        .map_err(|e| format!("写出完整数据包失败「{}」: {}", destination.display(), e))?;
+    Ok(json!({ "success": true, "filePath": destination_path }))
+}
+
+#[tauri::command]
+fn import_data_package(state: State<AppState>, source_path: String) -> Result<Value, String> {
+    let source = Path::new(&source_path);
+    if !source.is_file() {
+        return Err(format!("完整数据包不存在「{}」", source.display()));
+    }
+    if !source
+        .extension()
+        .and_then(|value| value.to_str())
+        .is_some_and(|value| value.eq_ignore_ascii_case("moldpkg"))
+    {
+        return Err("完整数据包文件必须使用 .moldpkg 扩展名".to_string());
+    }
+    let bytes = fs::read(source)
+        .map_err(|e| format!("读取完整数据包失败「{}」: {}", source.display(), e))?;
+    let path = state.file_path.lock().map_err(|e| e.to_string())?;
+    let config = state.config.lock().map_err(|e| e.to_string())?;
+    let backup_dir = get_backup_dir_for_file(&path, &config);
+    let count = config.backup_count;
+    do_backup(&path, &backup_dir, "完整数据包导入前备份")?;
+    let result = data_package::import_package(&path, &bytes)?;
+    cleanup_old_backups(&backup_dir, count)?;
+    Ok(result)
+}
+
+#[tauri::command]
 fn import_data(state: State<AppState>, data: String) -> Result<Value, String> {
     use base64::Engine;
-    let bytes = base64::engine::general_purpose::STANDARD.decode(&data).map_err(|e| e.to_string())?;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(&data)
+        .map_err(|e| format!("解析导入文件失败: {}", e))?;
     let path = state.file_path.lock().map_err(|e| e.to_string())?;
+    let config = state.config.lock().map_err(|e| e.to_string())?;
+    let backup_dir = get_backup_dir_for_file(&path, &config);
+    let count = config.backup_count;
+    do_backup(&path, &backup_dir, "Excel 导入前备份")?;
     let stats = excel::import_data(&path, &bytes)?;
+    cleanup_old_backups(&backup_dir, count)?;
     Ok(json!({ "success": true, "stats": stats }))
 }
 
@@ -452,14 +615,23 @@ fn get_file_path_cmd(state: State<AppState>) -> Result<String, String> {
 
 #[tauri::command]
 fn set_file_path(state: State<AppState>, path: String) -> Result<Value, String> {
-    {
-        let mut fp = state.file_path.lock().map_err(|e| e.to_string())?;
-        *fp = path.clone();
+    let target = Path::new(&path);
+    if !target.is_file() {
+        return Err(format!("所选数据文件不存在「{}」", path));
     }
+    excel::validate_workbook(target)?;
+
+    // 与其他同时读取 file_path/config 的命令保持统一锁顺序，避免反向加锁。
+    // 配置文件写入成功前不修改内存状态，写入失败时两者都保持原值。
+    let mut file_path = state.file_path.lock().map_err(|e| e.to_string())?;
     let mut config = state.config.lock().map_err(|e| e.to_string())?;
-    config.file_path = Some(path.clone());
     let config_path = state.config_path.lock().map_err(|e| e.to_string())?;
-    save_config(&config_path, &config);
+    let mut next_config = config.clone();
+    next_config.file_path = Some(path.clone());
+    save_config(&config_path, &next_config)?;
+    *file_path = path.clone();
+    *config = next_config;
+
     Ok(json!({ "success": true, "filePath": path }))
 }
 
@@ -471,7 +643,10 @@ fn calculate_stock(state: State<AppState>, stock_type: String) -> Result<Value, 
         let mut results = serde_json::Map::new();
         for t in types {
             let data = excel::calculate_stock(&path, t)?;
-            results.insert(t.to_string(), serde_json::to_value(data).unwrap_or(json!([])));
+            results.insert(
+                t.to_string(),
+                serde_json::to_value(data).unwrap_or(json!([])),
+            );
         }
         Ok(Value::Object(results))
     } else {
@@ -486,10 +661,8 @@ fn backup_data(state: State<AppState>) -> Result<Value, String> {
     let config = state.config.lock().map_err(|e| e.to_string())?;
     let backup_dir = get_backup_dir_for_file(&path, &config);
     let count = config.backup_count;
-    drop(config);
-    drop(path);
-    let backup_file = do_backup(&state.file_path.lock().map_err(|e| e.to_string())?, &backup_dir, "手动备份")?;
-    cleanup_old_backups(&backup_dir, count);
+    let backup_file = do_backup(&path, &backup_dir, "手动备份")?;
+    cleanup_old_backups(&backup_dir, count)?;
     if backup_file.is_empty() {
         Ok(json!({ "success": true, "skipped": true, "message": "文件内容未变化，跳过备份" }))
     } else {
@@ -502,22 +675,37 @@ fn get_backup_config(state: State<AppState>) -> Result<Value, String> {
     let path = state.file_path.lock().map_err(|e| e.to_string())?;
     let config = state.config.lock().map_err(|e| e.to_string())?;
     let backup_dir = get_backup_dir_for_file(&path, &config);
+    let default_dir = Path::new(&*path)
+        .parent()
+        .map(|parent| parent.join("backups").to_string_lossy().to_string())
+        .unwrap_or_else(default_backup_dir);
     Ok(json!({
         "backupCount": config.backup_count,
         "backupPath": config.backup_path,
-        "defaultBackupDir": default_backup_dir(),
+        "defaultBackupDir": default_dir,
         "effectiveBackupDir": backup_dir,
     }))
 }
 
 #[tauri::command]
-fn set_backup_config(state: State<AppState>, backup_count: usize, backup_path: Option<String>) -> Result<Value, String> {
-    {
-        let mut config = state.config.lock().map_err(|e| e.to_string())?;
-        config.backup_count = backup_count;
-        config.backup_path = backup_path;
-        let config_path = state.config_path.lock().map_err(|e| e.to_string())?;
-        save_config(&config_path, &config);
+fn set_backup_config(
+    state: State<AppState>,
+    backup_count: usize,
+    backup_path: Option<String>,
+) -> Result<Value, String> {
+    if !(1..=100).contains(&backup_count) {
+        return Err("备份保留数量必须在 1 到 100 之间".to_string());
+    }
+    let mut config = state.config.lock().map_err(|e| e.to_string())?;
+    let previous_count = config.backup_count;
+    let previous_path = config.backup_path.clone();
+    config.backup_count = backup_count;
+    config.backup_path = backup_path;
+    let config_path = state.config_path.lock().map_err(|e| e.to_string())?;
+    if let Err(error) = save_config(&config_path, &config) {
+        config.backup_count = previous_count;
+        config.backup_path = previous_path;
+        return Err(error);
     }
     Ok(json!({ "success": true }))
 }
@@ -530,47 +718,150 @@ fn get_allow_delete(state: State<AppState>) -> Result<bool, String> {
 
 #[tauri::command]
 fn set_allow_delete(state: State<AppState>, allow: bool) -> Result<Value, String> {
-    {
-        let mut config = state.config.lock().map_err(|e| e.to_string())?;
-        config.allow_delete = allow;
-        let config_path = state.config_path.lock().map_err(|e| e.to_string())?;
-        save_config(&config_path, &config);
+    let mut config = state.config.lock().map_err(|e| e.to_string())?;
+    let previous = config.allow_delete;
+    config.allow_delete = allow;
+    let config_path = state.config_path.lock().map_err(|e| e.to_string())?;
+    if let Err(error) = save_config(&config_path, &config) {
+        config.allow_delete = previous;
+        return Err(error);
     }
     Ok(json!({ "success": true }))
 }
 
 #[tauri::command]
+fn get_die_machine_types(state: State<AppState>) -> Result<Vec<String>, String> {
+    let config = state.config.lock().map_err(|e| e.to_string())?;
+    Ok(config.die_machine_types.clone())
+}
+
+#[tauri::command]
+fn set_die_machine_types(
+    state: State<AppState>,
+    machine_types: Vec<String>,
+) -> Result<Value, String> {
+    let mut normalized = Vec::new();
+    for machine_type in machine_types {
+        let value = machine_type.trim();
+        if value.is_empty() {
+            continue;
+        }
+        if value.chars().count() > 40 {
+            return Err(format!("机型「{}」长度不能超过 40 个字符", value));
+        }
+        if !normalized
+            .iter()
+            .any(|item: &String| item.eq_ignore_ascii_case(value))
+        {
+            normalized.push(value.to_string());
+        }
+    }
+    if normalized.is_empty() {
+        return Err("牙板机型列表至少保留一个选项".to_string());
+    }
+    if normalized.len() > 100 {
+        return Err("牙板机型列表最多允许 100 个选项".to_string());
+    }
+
+    let mut config = state.config.lock().map_err(|e| e.to_string())?;
+    let previous = config.die_machine_types.clone();
+    config.die_machine_types = normalized.clone();
+    let config_path = state.config_path.lock().map_err(|e| e.to_string())?;
+    if let Err(error) = save_config(&config_path, &config) {
+        config.die_machine_types = previous;
+        return Err(error);
+    }
+    Ok(json!({ "success": true, "machineTypes": normalized }))
+}
+
+#[tauri::command]
+fn get_punch_specs(state: State<AppState>) -> Result<Vec<String>, String> {
+    let config = state.config.lock().map_err(|e| e.to_string())?;
+    Ok(config.punch_specs.clone())
+}
+
+#[tauri::command]
+fn set_punch_specs(state: State<AppState>, specs: Vec<String>) -> Result<Value, String> {
+    let mut normalized = Vec::new();
+    for spec in specs {
+        let value = spec.trim();
+        if value.is_empty() {
+            continue;
+        }
+        if value.chars().count() > 40 {
+            return Err(format!("规格「{}」长度不能超过 40 个字符", value));
+        }
+        if !normalized
+            .iter()
+            .any(|item: &String| item.eq_ignore_ascii_case(value))
+        {
+            normalized.push(value.to_string());
+        }
+    }
+    if normalized.is_empty() {
+        return Err("冲头规格列表至少保留一个选项".to_string());
+    }
+    if normalized.len() > 100 {
+        return Err("冲头规格列表最多允许 100 个选项".to_string());
+    }
+
+    let mut config = state.config.lock().map_err(|e| e.to_string())?;
+    let previous = config.punch_specs.clone();
+    config.punch_specs = normalized.clone();
+    let config_path = state.config_path.lock().map_err(|e| e.to_string())?;
+    if let Err(error) = save_config(&config_path, &config) {
+        config.punch_specs = previous;
+        return Err(error);
+    }
+    Ok(json!({ "success": true, "specs": normalized }))
+}
+
+#[tauri::command]
 fn restore_backup(state: State<AppState>, backup_path: String) -> Result<Value, String> {
-    if !Path::new(&backup_path).exists() {
+    let backup_file = Path::new(&backup_path);
+    if !backup_file.is_file() {
         return Err("备份文件不存在".to_string());
     }
+    backup::validate_backup_zip(backup_file)?;
+
     let file_path = state.file_path.lock().map_err(|e| e.to_string())?;
     let config = state.config.lock().map_err(|e| e.to_string())?;
     let backup_dir = get_backup_dir_for_file(&file_path, &config);
     do_backup(&file_path, &backup_dir, "恢复前备份")?;
-    fs::copy(&backup_path, &*file_path)
-        .map_err(|e| format!("恢复数据文件失败: {}", e))?;
 
-    let source_snapshot = attachment_snapshot_dir(Path::new(&backup_path))?;
-    let mut attachments_restored = false;
-    if source_snapshot.exists() {
-        let target_attachments = attachment_dir_for_data(&file_path)?;
-        if target_attachments.exists() {
-            fs::remove_dir_all(&target_attachments)
-                .map_err(|e| format!("清理当前附件目录失败: {}", e))?;
-        }
-        copy_directory(&source_snapshot, &target_attachments)?;
-        attachments_restored = true;
-    }
+    let attachments_restored = backup::restore_backup_zip(backup_file, &file_path)?;
     Ok(json!({
         "success": true,
         "attachmentsRestored": attachments_restored,
         "message": if attachments_restored {
-            "数据与附件已同步恢复"
+            "数据与附件已从 ZIP 备份同步恢复"
         } else {
-            "历史备份没有附件快照，已保留当前附件"
+            "备份没有附件快照，已保留当前附件"
         }
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn only_millisecond_zip_backup_names_are_managed() {
+        let root =
+            std::env::temp_dir().join(format!("mold-backup-name-test-{}", uuid::Uuid::new_v4()));
+        fs::create_dir_all(&root).unwrap();
+        let current = root.join("mold-backup-20260803_204014_123.zip");
+        let legacy_seconds = root.join("mold-backup-20260803_204014.zip");
+        let legacy_old_format = root.join("mold-data-backup-20260803_204014_123.xlsx");
+        fs::write(&current, b"current").unwrap();
+        fs::write(&legacy_seconds, b"legacy").unwrap();
+        fs::write(&legacy_old_format, b"legacy").unwrap();
+
+        assert!(is_managed_backup_path(&current));
+        assert!(!is_managed_backup_path(&legacy_seconds));
+        assert!(!is_managed_backup_path(&legacy_old_format));
+        fs::remove_dir_all(root).unwrap();
+    }
 }
 
 fn default_backup_dir() -> String {
@@ -592,14 +883,20 @@ pub fn run() {
     let config_path = get_config_path();
     let config = load_config(&config_path);
 
-    let initial_path = config.file_path.clone()
+    let initial_path = config
+        .file_path
+        .clone()
         .filter(|p| !p.is_empty() && Path::new(p).exists())
         .unwrap_or_else(|| excel::get_default_file_path());
 
     // 启动时备份
     let backup_dir = get_backup_dir_for_file(&initial_path, &config);
-    let _ = do_backup(&initial_path, &backup_dir, "应用启动");
-    cleanup_old_backups(&backup_dir, config.backup_count);
+    if let Err(error) = do_backup(&initial_path, &backup_dir, "应用启动") {
+        eprintln!("启动备份失败: {}", error);
+    }
+    if let Err(error) = cleanup_old_backups(&backup_dir, config.backup_count) {
+        eprintln!("清理启动备份失败: {}", error);
+    }
 
     let app_state = AppState {
         file_path: Mutex::new(initial_path),
@@ -619,6 +916,8 @@ pub fn run() {
             delete_record,
             export_data,
             import_data,
+            export_data_package,
+            import_data_package,
             get_file_path_cmd,
             set_file_path,
             calculate_stock,
@@ -630,6 +929,10 @@ pub fn run() {
             restore_backup,
             get_allow_delete,
             set_allow_delete,
+            get_die_machine_types,
+            set_die_machine_types,
+            get_punch_specs,
+            set_punch_specs,
             list_screw_attachments,
             get_screw_attachment_counts,
             import_screw_attachment,
@@ -645,8 +948,12 @@ pub fn run() {
                     let fp = state.file_path.lock().unwrap().clone();
                     let config = state.config.lock().unwrap().clone();
                     let backup_dir = get_backup_dir_for_file(&fp, &config);
-                    let _ = do_backup(&fp, &backup_dir, "应用退出");
-                    cleanup_old_backups(&backup_dir, config.backup_count);
+                    if let Err(error) = do_backup(&fp, &backup_dir, "应用退出") {
+                        eprintln!("退出备份失败: {}", error);
+                    }
+                    if let Err(error) = cleanup_old_backups(&backup_dir, config.backup_count) {
+                        eprintln!("清理退出备份失败: {}", error);
+                    }
                 }
             }
         });

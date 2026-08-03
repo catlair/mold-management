@@ -7,19 +7,37 @@
           <span>数据导入导出</span>
         </div>
       </template>
-      <div class="action-buttons">
-        <el-button type="primary" @click="handleExport" :loading="exporting">
-          <el-icon><Download /></el-icon>
-          导出数据
-        </el-button>
-        <el-button type="warning" @click="handleImport" :loading="importing">
-          <el-icon><Upload /></el-icon>
-          导入数据
-        </el-button>
+      <div class="action-group">
+        <div class="action-group-title">完整数据包（推荐用于迁移和完整归档）</div>
+        <div class="action-buttons">
+          <el-button type="success" @click="handleExportPackage" :loading="packageExporting">
+            <el-icon><Download /></el-icon>
+            导出完整数据包
+          </el-button>
+          <el-button type="danger" plain @click="handleImportPackage" :loading="packageImporting">
+            <el-icon><Upload /></el-icon>
+            导入完整数据包
+          </el-button>
+        </div>
+        <div class="action-desc">
+          <p>完整数据包包含 Excel、全部附件和版本清单，适合换电脑、完整迁移和离线归档。</p>
+        </div>
       </div>
-      <div class="action-desc">
-        <p>导出：将当前所有数据导出为 Excel 文件</p>
-        <p>导入：从 Excel 文件导入数据（将替换当前数据，原数据会自动备份）</p>
+      <div class="action-group secondary-action-group">
+        <div class="action-group-title">仅 Excel（兼容旧流程）</div>
+        <div class="action-buttons">
+          <el-button type="primary" @click="handleExport" :loading="exporting">
+            <el-icon><Download /></el-icon>
+            导出 Excel
+          </el-button>
+          <el-button type="warning" @click="handleImport" :loading="importing">
+            <el-icon><Upload /></el-icon>
+            导入 Excel
+          </el-button>
+        </div>
+        <div class="action-desc">
+          <p>仅 Excel 不包含附件；导入前会创建包含当前 Excel 与附件的联合备份。</p>
+        </div>
       </div>
     </el-card>
 
@@ -68,6 +86,56 @@
     <el-card class="settings-card">
       <template #header>
         <div class="card-header">
+          <el-icon><Grid /></el-icon>
+          <span>模具选项配置</span>
+        </div>
+      </template>
+      <el-form label-width="120px">
+        <el-form-item label="牙板机型">
+          <div class="option-list-config">
+            <el-select
+              v-model="dieMachineTypes"
+              multiple
+              filterable
+              allow-create
+              default-first-option
+              placeholder="输入机型后按回车添加"
+            />
+            <div class="option-list-actions">
+              <el-button type="primary" :loading="savingDieMachineTypes" @click="saveDieMachineTypes">
+                保存牙板机型
+              </el-button>
+              <el-button @click="resetDieMachineTypes">恢复默认</el-button>
+            </div>
+          </div>
+        </el-form-item>
+        <el-form-item label="冲头规格">
+          <div class="option-list-config">
+            <el-select
+              v-model="punchSpecs"
+              multiple
+              filterable
+              allow-create
+              default-first-option
+              placeholder="输入规格后按回车添加"
+            />
+            <div class="option-list-actions">
+              <el-button type="primary" :loading="savingPunchSpecs" @click="savePunchSpecs">
+                保存冲头规格
+              </el-button>
+              <el-button @click="resetPunchSpecs">恢复默认</el-button>
+            </div>
+          </div>
+        </el-form-item>
+      </el-form>
+      <div class="action-desc">
+        <p>牙板和冲头新增、编辑时会显示对应候选项；表单中仍可临时手动输入其他内容。</p>
+      </div>
+    </el-card>
+
+    <el-card class="settings-card">
+      <template #header>
+        <div class="card-header">
           <el-icon><Clock /></el-icon>
           <span>自动备份配置</span>
         </div>
@@ -96,6 +164,9 @@
             <el-tag type="success" class="backup-policy-tag">退出时自动备份</el-tag>
           </el-form-item>
         </el-form>
+      </div>
+      <div class="action-desc">
+        <p>每次备份生成一个单文件 ZIP（包含 Excel 与全部附件），备份记录按保留份数自动清理。</p>
       </div>
       <div class="action-buttons backup-action">
         <el-button type="primary" @click="handleBackupNow" :loading="backingUp">
@@ -144,17 +215,25 @@ import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { save, open } from '@tauri-apps/plugin-dialog'
 import { readFile, writeFile } from '@tauri-apps/plugin-fs'
-import { dataApi, settingsApi, backupApi, allowDeleteApi } from '../api'
+import { dataApi, settingsApi, backupApi, allowDeleteApi, dieMachineTypeApi, punchSpecApi } from '../api'
 import { isUserCancellation, showDetailedError } from '../utils/errorFeedback'
 
 const exporting = ref(false)
 const importing = ref(false)
+const packageExporting = ref(false)
+const packageImporting = ref(false)
 const backingUp = ref(false)
 const dataPath = ref('')
 const backupCount = ref(10)
 const backupConfig = ref<any>({})
 const backups = ref<any[]>([])
 const allowDeleteVal = ref(false)
+const defaultDieMachineTypes = ['003', '3/16', '1/4', '6R']
+const dieMachineTypes = ref<string[]>([])
+const savingDieMachineTypes = ref(false)
+const defaultPunchSpecs = ['12*15', '14*15', '18*18']
+const punchSpecs = ref<string[]>([])
+const savingPunchSpecs = ref(false)
 
 async function handleAllowDeleteChange(val: boolean) {
   try {
@@ -175,12 +254,106 @@ onMounted(async () => {
   }
   await loadBackupConfig()
   await loadBackups()
+  await loadDieMachineTypes()
+  await loadPunchSpecs()
   try {
     allowDeleteVal.value = await allowDeleteApi.get()
   } catch (error) {
     showDetailedError('加载删除功能设置', error)
   }
 })
+
+async function loadDieMachineTypes() {
+  try {
+    dieMachineTypes.value = await dieMachineTypeApi.get()
+  } catch (error) {
+    dieMachineTypes.value = [...defaultDieMachineTypes]
+    showDetailedError('加载牙板机型列表', error)
+  }
+}
+
+async function saveDieMachineTypes() {
+  const normalized = dieMachineTypes.value
+    .map(item => item.trim())
+    .filter((item, index, items) => item && items.findIndex(value => value.toLocaleLowerCase() === item.toLocaleLowerCase()) === index)
+  if (normalized.length === 0) {
+    ElMessage.warning('牙板机型列表至少保留一个选项')
+    return
+  }
+  const previous = [...dieMachineTypes.value]
+  savingDieMachineTypes.value = true
+  try {
+    const result = await dieMachineTypeApi.set(normalized)
+    dieMachineTypes.value = result.machineTypes
+    ElMessage.success('牙板机型列表已保存')
+  } catch (error) {
+    dieMachineTypes.value = previous
+    showDetailedError('保存牙板机型列表', error)
+  } finally {
+    savingDieMachineTypes.value = false
+  }
+}
+
+async function resetDieMachineTypes() {
+  const previous = [...dieMachineTypes.value]
+  savingDieMachineTypes.value = true
+  try {
+    const result = await dieMachineTypeApi.set(defaultDieMachineTypes)
+    dieMachineTypes.value = result.machineTypes
+    ElMessage.success('已恢复默认牙板机型列表')
+  } catch (error) {
+    dieMachineTypes.value = previous
+    showDetailedError('恢复默认牙板机型列表', error)
+  } finally {
+    savingDieMachineTypes.value = false
+  }
+}
+
+async function loadPunchSpecs() {
+  try {
+    punchSpecs.value = await punchSpecApi.get()
+  } catch (error) {
+    punchSpecs.value = [...defaultPunchSpecs]
+    showDetailedError('加载冲头规格列表', error)
+  }
+}
+
+async function savePunchSpecs() {
+  const normalized = punchSpecs.value
+    .map(item => item.trim())
+    .filter((item, index, items) => item && items.findIndex(value => value.toLocaleLowerCase() === item.toLocaleLowerCase()) === index)
+  if (normalized.length === 0) {
+    ElMessage.warning('冲头规格列表至少保留一个选项')
+    return
+  }
+  const previous = [...punchSpecs.value]
+  savingPunchSpecs.value = true
+  try {
+    const result = await punchSpecApi.set(normalized)
+    punchSpecs.value = result.specs
+    ElMessage.success('冲头规格列表已保存')
+  } catch (error) {
+    punchSpecs.value = previous
+    showDetailedError('保存冲头规格列表', error)
+  } finally {
+    savingPunchSpecs.value = false
+  }
+}
+
+async function resetPunchSpecs() {
+  const previous = [...punchSpecs.value]
+  savingPunchSpecs.value = true
+  try {
+    const result = await punchSpecApi.set(defaultPunchSpecs)
+    punchSpecs.value = result.specs
+    ElMessage.success('已恢复默认冲头规格列表')
+  } catch (error) {
+    punchSpecs.value = previous
+    showDetailedError('恢复默认冲头规格列表', error)
+  } finally {
+    savingPunchSpecs.value = false
+  }
+}
 
 async function loadBackupConfig() {
   try {
@@ -302,11 +475,60 @@ async function resetBackupDir() {
   }
 }
 
+async function handleExportPackage() {
+  packageExporting.value = true
+  try {
+    const timestamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)
+    const filePath = await save({
+      defaultPath: `mold-data-package-${timestamp}.moldpkg`,
+      filters: [{ name: '模具完整数据包', extensions: ['moldpkg'] }]
+    })
+    if (!filePath) return
+    await dataApi.exportPackage(filePath)
+    ElMessage.success('完整数据包导出成功')
+  } catch (error) {
+    if (!isUserCancellation(error)) showDetailedError('导出完整数据包', error)
+  } finally {
+    packageExporting.value = false
+  }
+}
+
+async function handleImportPackage() {
+  packageImporting.value = true
+  try {
+    const filePath = await open({
+      filters: [{ name: '模具完整数据包', extensions: ['moldpkg'] }],
+      multiple: false,
+      title: '选择完整数据包'
+    })
+    if (!filePath) return
+    await ElMessageBox.confirm(
+      '完整数据包将同时替换当前 Excel 和全部附件。当前数据集会先创建联合备份，确定继续？',
+      '确认导入完整数据包',
+      { type: 'warning', confirmButtonText: '确定导入', cancelButtonText: '取消' }
+    )
+    const result = await dataApi.importPackage(filePath as string)
+    const statsText = Object.entries(result.stats)
+      .map(([name, count]) => `${name}: ${count} 条`)
+      .join('\n')
+    await ElMessageBox.alert(
+      `完整数据包导入成功！\n附件：${result.attachmentCount} 个\n\n${statsText}`,
+      '导入结果',
+      { type: 'success' }
+    )
+    window.location.reload()
+  } catch (error) {
+    if (!isUserCancellation(error)) showDetailedError('导入完整数据包', error)
+  } finally {
+    packageImporting.value = false
+  }
+}
+
 async function handleExport() {
   exporting.value = true
   try {
     const result = await dataApi.exportData()
-    const bytes = Uint8Array.from(atob(result.data), c => c.charCodeAt(0))
+    const bytes = base64ToBytes(result.data)
 
     const filePath = await save({
       defaultPath: result.filename,
@@ -357,6 +579,10 @@ async function handleImport() {
   } finally {
     importing.value = false
   }
+}
+
+function base64ToBytes(data: string): Uint8Array {
+  return Uint8Array.from(atob(data), character => character.charCodeAt(0))
 }
 
 async function fetchFileAsBase64(filePath: string): Promise<string> {
@@ -438,11 +664,28 @@ async function handleSelectPath() {
   font-weight: 600;
 }
 
+.action-group {
+  display: grid;
+  gap: 8px;
+}
+
+.secondary-action-group {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.action-group-title {
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .action-buttons {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  margin-bottom: 10px;
+  margin-bottom: 2px;
 }
 
 .backup-action {
@@ -513,6 +756,23 @@ async function handleSelectPath() {
 
 .backup-config {
   margin-bottom: 0;
+}
+
+.option-list-config {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.option-list-config .el-select {
+  width: 100%;
+}
+
+.option-list-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .form-tip {

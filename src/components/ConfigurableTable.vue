@@ -3,6 +3,8 @@
     :is="component"
     v-if="visible"
     v-bind="forwardedProps"
+    :field="resolvedField"
+    :col-id="resolvedColumnId"
     :sortable="sortable"
     :width="resolvedWidth"
     :resizable="resizable"
@@ -45,6 +47,7 @@ const attrs = useAttrs()
 const context = inject<TablePreferenceContext | null>('tablePreferenceContext', null)
 const resolvedTableId = computed(() => props.tableId || context?.tableId.value || '')
 const resolvedColumnId = computed(() => props.columnId || String(attrs.field || attrs.title || ''))
+const resolvedField = computed(() => String(attrs.field || resolvedColumnId.value))
 const { getColumnPreference } = useTablePreferences()
 
 const isConfigured = computed(() => Boolean(resolvedTableId.value && tableDefinitionExists(resolvedTableId.value)))
@@ -52,7 +55,7 @@ const preference = computed(() => getColumnPreference(resolvedTableId.value, res
 const visible = computed(() => !isConfigured.value || preference.value.visible !== false)
 const sortable = computed(() => isConfigured.value ? preference.value.sortable : props.sortable)
 const filterable = computed(() => isConfigured.value ? Boolean(preference.value.filterable) : props.filters.length > 0)
-const resolvedWidth = computed(() => preference.value.width || attrs.width)
+const resolvedWidth = computed(() => preference.value.width ?? attrs.width)
 const resizable = computed(() => {
   if (props.resizable !== undefined) return props.resizable
   return resolvedColumnId.value !== '操作'

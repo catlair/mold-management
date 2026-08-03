@@ -184,7 +184,16 @@
           <el-input v-model="form.name" />
         </el-form-item>
         <el-form-item label="规格" prop="spec">
-          <el-input v-model="form.spec" />
+          <el-select
+            v-model="form.spec"
+            filterable
+            allow-create
+            default-first-option
+            placeholder="请选择或输入规格"
+            style="width: 100%"
+          >
+            <el-option v-for="item in specOptions" :key="item" :label="item" :value="item" />
+          </el-select>
         </el-form-item>
         <el-form-item label="材质">
           <el-input v-model="form.material" />
@@ -309,7 +318,7 @@
 import { ref, computed, onMounted, inject } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance } from 'element-plus'
-import { punchApi, punchOrderApi, punchUseApi, punchLinkApi, screwSpecApi, stockCalcApi } from '../api'
+import { punchApi, punchOrderApi, punchUseApi, punchLinkApi, screwSpecApi, stockCalcApi, punchSpecApi } from '../api'
 import { useAllowDelete } from '../composables/useAllowDelete'
 import { useHighlight } from '../composables/useHighlight'
 import { settleNamedRequests, showBatchErrors, showDetailedError } from '../utils/errorFeedback'
@@ -341,6 +350,7 @@ const useList = ref<any[]>([])
 const linkList = ref<any[]>([])
 const screwSpecList = ref<any[]>([])
 const loading = ref(true)
+const specOptions = ref<string[]>(['12*15', '14*15', '18*18'])
 
 const orderCurrentPage = ref(1)
 const orderPageSize = ref(10)
@@ -470,7 +480,17 @@ const linkFormRules = {
 
 onMounted(() => {
   loadData()
+  loadSpecOptions()
 })
+
+async function loadSpecOptions() {
+  try {
+    const options = await punchSpecApi.get()
+    if (options.length > 0) specOptions.value = options
+  } catch (error) {
+    showDetailedError('加载冲头规格列表', error)
+  }
+}
 
 async function loadData() {
   loading.value = true

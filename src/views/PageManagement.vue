@@ -10,7 +10,24 @@
               <span>配置各页面表格的显示列、排序和筛选；在列表表头拖动列边界可调整宽度。</span>
             </div>
           </div>
-          <el-button @click="resetAll">恢复全部默认</el-button>
+          <div class="header-actions">
+            <el-button :loading="importing" @click="handleImport">
+              <el-icon><Upload /></el-icon>
+              导入配置
+            </el-button>
+            <el-button :loading="exporting" @click="handleExport">
+              <el-icon><Download /></el-icon>
+              导出配置
+            </el-button>
+            <el-button @click="resetAll">恢复全部默认</el-button>
+          </div>
+          <input
+            ref="browserFileInput"
+            class="browser-file-input"
+            type="file"
+            accept="application/json,.json"
+            @change="handleBrowserFileSelected"
+          />
         </div>
       </template>
 
@@ -108,14 +125,27 @@
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Operation } from '@element-plus/icons-vue'
+import { open, save } from '@tauri-apps/plugin-dialog'
+import { readFile, writeFile } from '@tauri-apps/plugin-fs'
+import { Download, Operation, Upload } from '@element-plus/icons-vue'
+import { isTauriEnvironment } from '../api'
 import { pageTableCatalog } from '../config/tableCatalog'
-import { useTablePreferences, type ColumnPreference } from '../composables/useTablePreferences'
+import {
+  applyTablePreferencesImport,
+  createTablePreferencesExport,
+  parseTablePreferencesImport,
+  useTablePreferences,
+  type ColumnPreference,
+  type TablePreferencesImportResult,
+} from '../composables/useTablePreferences'
 import { isUserCancellation, showDetailedError } from '../utils/errorFeedback'
 
 const router = useRouter()
 const activePageId = ref(pageTableCatalog[0]?.id || '')
 const activeTables = ref<string[]>([])
+const exporting = ref(false)
+const importing = ref(false)
+const browserFileInput = ref<HTMLInputElement>()
 const activePage = computed(() => pageTableCatalog.find(page => page.id === activePageId.value))
 const { getColumnPreference, setColumnPreference, resetTablePreference, resetAllPreferences } = useTablePreferences()
 
@@ -139,6 +169,98 @@ function visibleCount(tableId: string) {
 function resetTable(tableId: string) {
   resetTablePreference(tableId)
   ElMessage.success('已恢复该表格默认配置')
+}
+
+function createExportFilename() {
+  const timestamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)
+  return `mold-table-config-${timestamp}.json`
+}
+
+function downloadBrowserFile(filename: string, content: string) {
+  const blob = new Blob([content], { type: 'application/json;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = filename
+  anchor.click()
+  URL.revokeObjectURL(url)
+}
+
+async function handleExport() {
+  exporting.value = true
+  try {
+    const content = JSON.stringify(createTablePreferencesExport(), null, 2)
+    const filename = createExportFilename()
+    if (isTauriEnvironment()) {
+      const filePath = await save({
+        defaultPath: filename,
+        filters: [{ name: '表格配置文件', extensions: ['json'] }],
+      })
+      if (!filePath) return
+      await writeFile(filePath, new TextEncoder().encode(content))
+    } else {
+      downloadBrowserFile(filename, content)
+    }
+    ElMessage.success('表格配置导出成功')
+  } catch (error) {
+    if (!isUserCancellation(error)) showDetailedError('导出表格配置', error)
+  } finally {
+    exporting.value = false
+  }
+}
+
+async function confirmAndApplyImport(result: TablePreferencesImportResult) {
+  const ignored = result.ignoredTableCount || result.ignoredColumnCount
+    ? `\n其中 ${result.ignoredTableCount} 个未知表格、${result.ignoredColumnCount} 个未知列将被忽略。`
+    : ''
+  await ElMessageBox.confirm(
+    `将导入 ${result.tableCount} 个表格、${result.columnCount} 个列配置，并替换当前全部表格配置。${ignored}\n\n确定继续？`,
+    '确认导入配置',
+    { type: 'warning', confirmButtonText: '确定导入', cancelButtonText: '取消' },
+  )
+  applyTablePreferencesImport(result)
+  ElMessage.success('表格配置导入成功')
+}
+
+async function importFromText(content: string) {
+  await confirmAndApplyImport(parseTablePreferencesImport(content))
+}
+
+async function handleImport() {
+  if (!isTauriEnvironment()) {
+    browserFileInput.value?.click()
+    return
+  }
+  importing.value = true
+  try {
+    const filePath = await open({
+      filters: [{ name: '表格配置文件', extensions: ['json'] }],
+      multiple: false,
+      title: '选择表格配置文件',
+    })
+    if (!filePath) return
+    const bytes = await readFile(filePath as string)
+    await importFromText(new TextDecoder().decode(bytes))
+  } catch (error) {
+    if (!isUserCancellation(error)) showDetailedError('导入表格配置', error, '请确认选择的是由本系统导出的 JSON 配置文件。')
+  } finally {
+    importing.value = false
+  }
+}
+
+async function handleBrowserFileSelected(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  importing.value = true
+  try {
+    await importFromText(await file.text())
+  } catch (error) {
+    if (!isUserCancellation(error)) showDetailedError('导入表格配置', error, '请确认选择的是由本系统导出的 JSON 配置文件。')
+  } finally {
+    importing.value = false
+  }
 }
 
 async function resetAll() {
@@ -175,6 +297,7 @@ function openPage() {
 }
 
 .card-header,
+.header-actions,
 .title-block,
 .page-summary,
 .table-title,
@@ -187,6 +310,20 @@ function openPage() {
 .card-header {
   justify-content: space-between;
   gap: 20px;
+}
+
+.header-actions {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.header-actions .el-button + .el-button {
+  margin-left: 0;
+}
+
+.browser-file-input {
+  display: none;
 }
 
 .title-block {

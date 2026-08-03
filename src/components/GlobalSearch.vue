@@ -1,6 +1,7 @@
 <template>
   <div class="global-search">
     <el-input
+      v-if="!collapsed"
       v-model="keyword"
       placeholder="搜索... (Ctrl+K)"
       prefix-icon="Search"
@@ -10,6 +11,16 @@
       tabindex="-1"
       class="search-input"
     />
+    <button
+      v-else
+      type="button"
+      class="search-icon-btn"
+      title="搜索 (Ctrl+K)"
+      aria-label="搜索"
+      @click="openSearch"
+    >
+      <el-icon><Search /></el-icon>
+    </button>
     <el-dialog
       v-model="visible"
       width="600px"
@@ -75,6 +86,8 @@ const keyword = ref('')
 const loading = ref(false)
 const searchInputRef = ref<any>(null)
 const groups = ref<any[]>([])
+
+defineProps<{ collapsed?: boolean }>()
 
 let searchTimer: any = null
 
@@ -282,6 +295,30 @@ onUnmounted(() => { document.removeEventListener('keydown', onKeydown) })
 .search-input :deep(.el-input__wrapper) {
   background: color-mix(in srgb, var(--card-bg) 72%, transparent);
   border-radius: 6px;
+}
+.search-icon-btn {
+  width: 100%;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--sidebar-text);
+  background: transparent;
+  cursor: pointer;
+  transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+}
+.search-icon-btn .el-icon {
+  font-size: 18px;
+}
+.search-icon-btn:hover {
+  color: var(--primary-light);
+  background: var(--sidebar-hover);
+}
+.search-icon-btn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }
 .search-dialog :deep(.el-dialog__header) {
   display: none;

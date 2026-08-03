@@ -161,7 +161,16 @@
           <el-input v-model="form.name" />
         </el-form-item>
         <el-form-item label="机型" prop="machineType">
-          <el-input v-model="form.machineType" />
+          <el-select
+            v-model="form.machineType"
+            filterable
+            allow-create
+            default-first-option
+            placeholder="请选择或输入机型"
+            style="width: 100%"
+          >
+            <el-option v-for="item in machineTypeOptions" :key="item" :label="item" :value="item" />
+          </el-select>
         </el-form-item>
         <el-form-item label="线径" prop="wireDiameter">
           <el-input v-model="form.wireDiameter" />
@@ -308,7 +317,7 @@
 import { ref, computed, onMounted, inject } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance } from 'element-plus'
-import { dieApi, dieOrderApi, dieUseApi, dieLinkApi, screwSpecApi, stockCalcApi } from '../api'
+import { dieApi, dieOrderApi, dieUseApi, dieLinkApi, screwSpecApi, stockCalcApi, dieMachineTypeApi } from '../api'
 import { useAllowDelete } from '../composables/useAllowDelete'
 import { useHighlight } from '../composables/useHighlight'
 import { settleNamedRequests, showBatchErrors, showDetailedError } from '../utils/errorFeedback'
@@ -379,6 +388,8 @@ const linkPaginated = computed(() => {
   const start = (linkCurrentPage.value - 1) * linkPageSize.value
   return linkList.value.slice(start, start + linkPageSize.value)
 })
+
+const machineTypeOptions = ref<string[]>(['003', '3/16', '1/4', '6R'])
 
 // 筛选选项
 const machineTypeFilters = computed(() => {
@@ -455,7 +466,17 @@ const linkFormRules = {
 
 onMounted(() => {
   loadData()
+  loadMachineTypeOptions()
 })
+
+async function loadMachineTypeOptions() {
+  try {
+    const options = await dieMachineTypeApi.get()
+    if (options.length > 0) machineTypeOptions.value = options
+  } catch (error) {
+    showDetailedError('加载牙板机型列表', error)
+  }
+}
 
 async function loadData() {
   loading.value = true
