@@ -1,6 +1,6 @@
 use crate::{attachments, excel, storage};
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -11,8 +11,8 @@ use zip::{ZipArchive, ZipWriter};
 const BACKUP_FORMAT: &str = "mold-management-backup";
 const BACKUP_VERSION: u32 = 1;
 const MANIFEST_NAME: &str = "backup-manifest.json";
+const ATTACHMENT_MAP_NAME: &str = "attachment-map.json";
 const WORKBOOK_NAME: &str = "mold-data.xlsx";
-const ATTACHMENT_PREFIX: &str = "attachments/";
 const MAX_BACKUP_BYTES: u64 = 1024 * 1024 * 1024;
 const MAX_ENTRY_BYTES: u64 = 100 * 1024 * 1024;
 const MAX_MANIFEST_BYTES: u64 = 1024 * 1024;
@@ -46,17 +46,58 @@ pub fn create_backup_zip(
     }
 
     let attachment_root = attachments::root_path(data_file_path)?;
-    let mut files = Vec::new();
+    let mut entries: Vec<(String, PathBuf)> = Vec::new();
+    let mut attachment_map = HashMap::<String, String>::new();
     if attachment_root.exists() {
         attachments::validate_root(&attachment_root)?;
-        collect_files(&attachment_root, &mut files)?;
-        files.sort();
+        let index_json = attachment_root.join("index.json");
+        if index_json.is_file() {
+            entries.push(("attachments/index.json".to_string(), index_json));
+        }
+        // 附件条目用「螺丝ID_螺丝名_设置名」命名（重名自动加序号），
+        // 同时记录映射，恢复时按映射放回原相对路径，附件索引无需改动。
+        let screw_names: HashMap<String, String> = excel::get_all(data_file_path, "螺丝规格表")
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|row| {
+                row.get("id").cloned().map(|id| {
+                    let name = row.get("name").cloned().unwrap_or_default();
+                    (id, name)
+                })
+            })
+            .collect();
+        let mut used_names = HashSet::new();
+        for meta in attachments::load_all(data_file_path)? {
+            let dir = meta
+                .relative_path
+                .split('/')
+                .next()
+                .filter(|value| !value.is_empty())
+                .unwrap_or("attachments");
+            let screw_name = screw_names
+                .get(&meta.screw_spec_id)
+                .cloned()
+                .unwrap_or_default();
+            let entry_file = attachments::build_attachment_file_name(
+                &meta.screw_spec_id,
+                &screw_name,
+                &meta.display_name,
+                None,
+            );
+            let zip_name = unique_attachment_name(dir, &entry_file, &mut used_names);
+            let source = attachment_root.join(&meta.relative_path);
+            if !source.is_file() {
+                return Err(format!("附件文件缺失「{}」", source.display()));
+            }
+            attachment_map.insert(zip_name.clone(), meta.relative_path.clone());
+            entries.push((zip_name, source));
+        }
     }
-    if files.len() + 2 > MAX_BACKUP_ENTRIES {
-        return Err(format!("备份条目过多: {}", files.len() + 2));
+    if entries.len() + 3 > MAX_BACKUP_ENTRIES {
+        return Err(format!("备份条目过多: {}", entries.len() + 3));
     }
     let mut total_bytes = workbook_bytes;
-    for path in &files {
+    for (_, path) in &entries {
         let size = fs::metadata(path)
             .map_err(|e| format!("读取附件大小失败「{}」: {}", path.display(), e))?
             .len();
@@ -99,6 +140,16 @@ pub fn create_backup_zip(
         .map_err(|e| format!("写入备份清单失败: {}", e))?;
 
     archive
+        .start_file(ATTACHMENT_MAP_NAME, options)
+        .map_err(|e| format!("创建附件映射清单失败: {}", e))?;
+    archive
+        .write_all(
+            &serde_json::to_vec(&attachment_map)
+                .map_err(|e| format!("序列化附件映射清单失败: {}", e))?,
+        )
+        .map_err(|e| format!("写入附件映射清单失败: {}", e))?;
+
+    archive
         .start_file(WORKBOOK_NAME, options)
         .map_err(|e| format!("创建备份 Excel 项失败: {}", e))?;
     let mut workbook = File::open(workbook_path)
@@ -106,15 +157,7 @@ pub fn create_backup_zip(
     std::io::copy(&mut workbook, &mut archive)
         .map_err(|e| format!("写入备份 Excel 失败: {}", e))?;
 
-    for path in files {
-        let relative = path
-            .strip_prefix(&attachment_root)
-            .map_err(|e| format!("计算附件相对路径失败: {}", e))?;
-        let archive_name = format!(
-            "{}{}",
-            ATTACHMENT_PREFIX,
-            relative.to_string_lossy().replace('\\', "/")
-        );
+    for (archive_name, path) in entries {
         archive
             .start_file(archive_name, options)
             .map_err(|e| format!("创建备份附件项失败「{}」: {}", path.display(), e))?;
@@ -156,6 +199,7 @@ pub fn validate_backup_zip(path: &Path) -> Result<(), String> {
         }
         let relative = crate::data_package::safe_relative_path(entry.name())?;
         let allowed = relative == Path::new(MANIFEST_NAME)
+            || relative == Path::new(ATTACHMENT_MAP_NAME)
             || relative == Path::new(WORKBOOK_NAME)
             || relative.starts_with("attachments");
         if !allowed {
@@ -169,6 +213,10 @@ pub fn validate_backup_zip(path: &Path) -> Result<(), String> {
                 return Err("备份清单不能超过 1MB".to_string());
             }
             has_manifest = true;
+        } else if relative == Path::new(ATTACHMENT_MAP_NAME) {
+            if entry.is_dir() || entry.size() > MAX_MANIFEST_BYTES {
+                return Err("备份附件映射清单无效".to_string());
+            }
         } else if relative == Path::new(WORKBOOK_NAME) {
             if entry.is_dir() {
                 return Err("备份 Excel 不能是目录".to_string());
@@ -205,6 +253,8 @@ pub fn restore_backup_zip(backup_path: &Path, data_file_path: &str) -> Result<bo
     let result = (|| {
         fs::create_dir_all(&staging).map_err(|e| format!("创建备份暂存目录失败: {}", e))?;
         extract_backup(&bytes, &staging)?;
+        // 新版备份的附件按可读文件名打包；按映射清单还原到原相对路径，保持附件索引一致。
+        apply_attachment_map(&staging)?;
         let manifest_path = staging.join(MANIFEST_NAME);
         let manifest: BackupManifest = serde_json::from_slice(
             &fs::read(&manifest_path).map_err(|e| format!("读取备份清单失败: {}", e))?,
@@ -296,6 +346,7 @@ fn extract_backup(data: &[u8], target: &Path) -> Result<(), String> {
         }
         let relative = crate::data_package::safe_relative_path(entry.name())?;
         let allowed = relative == Path::new(MANIFEST_NAME)
+            || relative == Path::new(ATTACHMENT_MAP_NAME)
             || relative == Path::new(WORKBOOK_NAME)
             || relative.starts_with("attachments");
         if !allowed {
@@ -332,18 +383,81 @@ fn extract_backup(data: &[u8], target: &Path) -> Result<(), String> {
     Ok(())
 }
 
-fn collect_files(directory: &Path, files: &mut Vec<PathBuf>) -> Result<(), String> {
-    for entry in fs::read_dir(directory)
-        .map_err(|e| format!("读取附件目录失败「{}」: {}", directory.display(), e))?
-    {
-        let path = entry
-            .map_err(|e| format!("读取附件目录项失败: {}", e))?
-            .path();
-        if path.is_dir() {
-            collect_files(&path, files)?;
-        } else if path.is_file() {
-            files.push(path);
+/// 生成可读的 ZIP 附件条目名：attachments/<目录>/<文件名>；同目录重名自动加序号。
+fn unique_attachment_name(dir: &str, file_name: &str, used: &mut HashSet<String>) -> String {
+    let cleaned = sanitize_file_name(file_name);
+    let base = format!("attachments/{}/{}", dir, cleaned);
+    if used.insert(base.clone()) {
+        return base;
+    }
+    let (stem, extension) = match cleaned.rfind('.') {
+        Some(index) if index > 0 => {
+            let (head, tail) = cleaned.split_at(index);
+            (head.to_string(), tail.to_string())
         }
+        _ => (cleaned.clone(), String::new()),
+    };
+    let mut counter = 1;
+    loop {
+        let candidate = if extension.is_empty() {
+            format!("attachments/{}/{} ({})", dir, stem, counter)
+        } else {
+            format!("attachments/{}/{} ({}){}", dir, stem, counter, extension)
+        };
+        if used.insert(candidate.clone()) {
+            return candidate;
+        }
+        counter += 1;
+    }
+}
+
+/// 清洗文件名中的路径分隔与 Windows 非法字符，防止 ZIP 条目路径逃逸或无法落盘。
+fn sanitize_file_name(file_name: &str) -> String {
+    let cleaned: String = file_name
+        .chars()
+        .map(|ch| match ch {
+            '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' | '\0' => '_',
+            _ => ch,
+        })
+        .collect();
+    let trimmed = cleaned.trim().trim_end_matches('.').to_string();
+    if trimmed.is_empty() {
+        "attachment".to_string()
+    } else {
+        trimmed
+    }
+}
+
+/// 按附件映射清单，把暂存目录中以可读文件名解压的附件还原到原相对路径。
+/// 旧版备份没有映射清单时直接跳过（条目本身即原相对路径）。
+fn apply_attachment_map(staging: &Path) -> Result<(), String> {
+    let map_path = staging.join(ATTACHMENT_MAP_NAME);
+    if !map_path.is_file() {
+        return Ok(());
+    }
+    let content =
+        fs::read_to_string(&map_path).map_err(|e| format!("读取附件映射清单失败: {}", e))?;
+    let map: HashMap<String, String> =
+        serde_json::from_str(&content).map_err(|e| format!("解析附件映射清单失败: {}", e))?;
+    let attachments_dir = staging.join("attachments");
+    for (zip_name, relative_path) in &map {
+        let source = staging.join(zip_name);
+        let destination = attachments_dir.join(relative_path);
+        if !source.is_file() {
+            return Err(format!("备份附件缺失「{}」", zip_name));
+        }
+        if let Some(parent) = destination.parent() {
+            fs::create_dir_all(parent)
+                .map_err(|e| format!("创建附件目录失败「{}」: {}", parent.display(), e))?;
+        }
+        fs::rename(&source, &destination).map_err(|e| {
+            format!(
+                "还原备份附件失败「{}」→「{}」: {}",
+                source.display(),
+                destination.display(),
+                e
+            )
+        })?;
     }
     Ok(())
 }
@@ -378,10 +492,34 @@ mod tests {
         create_test_workbook(&source_excel);
         create_test_workbook(&target_excel);
 
+        // 构造真实附件索引：物理文件名为 UUID，原始文件名为 test.png。
+        let attachment_id = Uuid::new_v4().to_string();
+        let relative_path = format!("LS0001/{}.png", attachment_id);
         let attachment_dir = source_dir.join("attachments").join("LS0001");
         fs::create_dir_all(&attachment_dir).unwrap();
-        fs::write(attachment_dir.join("test.png"), b"attachment-data").unwrap();
-        fs::write(source_dir.join("attachments").join("index.json"), b"[]").unwrap();
+        fs::write(
+            attachment_dir.join(format!("{}.png", attachment_id)),
+            b"attachment-data",
+        )
+        .unwrap();
+        let meta = crate::attachments::ScrewAttachment {
+            id: attachment_id,
+            screw_spec_id: "LS0001".to_string(),
+            display_name: "规格图纸.png".to_string(),
+            file_name: "test.png".to_string(),
+            mime_type: "image/png".to_string(),
+            size: 15,
+            relative_path: relative_path.clone(),
+            annotations: vec![],
+            sort_order: 0,
+            created_at: "2026-08-03 00:00:00".to_string(),
+            updated_at: "2026-08-03 00:00:00".to_string(),
+        };
+        fs::write(
+            source_dir.join("attachments").join("index.json"),
+            serde_json::to_vec(&vec![meta]).unwrap(),
+        )
+        .unwrap();
 
         let created_at = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
         let bytes =
@@ -390,20 +528,54 @@ mod tests {
         fs::write(&zip_path, bytes).unwrap();
         validate_backup_zip(&zip_path).unwrap();
 
+        // ZIP 内附件使用「螺丝ID_螺丝名_设置名」可读命名，而不是 UUID 物理名。
+        let cursor = std::io::Cursor::new(fs::read(&zip_path).unwrap());
+        let mut archive = ZipArchive::new(cursor).unwrap();
+        let names: Vec<String> = (0..archive.len())
+            .map(|index| archive.by_index(index).unwrap().name().to_string())
+            .collect();
+        let attachment_entries: Vec<&String> = names
+            .iter()
+            .filter(|name| name.starts_with("attachments/LS0001/"))
+            .collect();
+        assert_eq!(attachment_entries.len(), 1);
+        assert!(attachment_entries[0].starts_with("attachments/LS0001/LS0001_"));
+        assert!(attachment_entries[0].ends_with("规格图纸.png"));
+        assert!(!names.contains(&format!("attachments/{}", relative_path)));
+        assert!(names.contains(&"attachment-map.json".to_string()));
+
         let restored = restore_backup_zip(&zip_path, target_excel.to_str().unwrap()).unwrap();
         assert!(restored);
+        // 恢复后附件还原到原相对路径，附件索引保持一致。
         assert_eq!(
-            fs::read(
-                target_dir
-                    .join("attachments")
-                    .join("LS0001")
-                    .join("test.png")
-            )
-            .unwrap(),
+            fs::read(target_dir.join("attachments").join(&relative_path)).unwrap(),
             b"attachment-data"
         );
         excel::validate_workbook(&target_excel).unwrap();
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn attachment_file_name_combines_screw_id_name_and_display_name() {
+        assert_eq!(
+            attachments::build_attachment_file_name(
+                "LS0001",
+                "M3*8自攻",
+                "规格图纸.png",
+                Some("png")
+            ),
+            // Windows 非法字符 * 被替换为 _
+            "LS0001_M3_8自攻_规格图纸.png"
+        );
+        // 显示名不带扩展名时追加原扩展名
+        assert_eq!(
+            attachments::build_attachment_file_name("LS0001", "M3*8自攻", "图纸", Some("png")),
+            "LS0001_M3_8自攻_图纸.png"
+        );
+        // 非法字符被清洗，结果不含路径分隔符
+        let cleaned = attachments::build_attachment_file_name("A/B", "x:y", "a<b>c", Some("png"));
+        assert!(!cleaned.contains('/') && !cleaned.contains(':') && !cleaned.contains('<'));
+        assert!(cleaned.ends_with(".png"));
     }
 
     #[test]

@@ -5,7 +5,7 @@ import vue from '@vitejs/plugin-vue'
 export default defineConfig({
   plugins: [vue()],
   // 使用独立可再生缓存，避开旧 `.vite-temp` 在桌面安全删除钩子下的权限/超时问题
-  cacheDir: 'node_modules/.vite-runtime-v2',
+  cacheDir: 'node_modules/.vite-runtime',
   build: {
     // 本机 safe-delete 钩子会拦截 dist 清空操作，禁用自动清空，避免构建失败
     emptyOutDir: false,

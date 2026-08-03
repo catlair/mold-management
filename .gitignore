@@ -2,6 +2,7 @@ node_modules/
 dist/
 dist-opt/
 dist-validation/
+dist-check/
 src-tauri/target/
 src-tauri/target-*/
 .workbuddy/

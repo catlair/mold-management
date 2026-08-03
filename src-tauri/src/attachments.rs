@@ -1,4 +1,4 @@
-use crate::storage;
+use crate::{excel, storage};
 use base64::Engine;
 use chrono::Local;
 use serde::{Deserialize, Serialize};
@@ -9,6 +9,8 @@ use uuid::Uuid;
 
 const MAX_ATTACHMENT_BYTES: u64 = 50 * 1024 * 1024;
 const ALLOWED_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "webp", "gif", "pdf"];
+const MAX_ATTACHMENT_FILE_NAME: usize = 160;
+const SCREW_SPEC_SHEET: &str = "螺丝规格表";
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -96,6 +98,93 @@ fn safe_segment(value: &str) -> String {
     }
 }
 
+/// 生成可读附件文件名：螺丝ID_螺丝名_设置的名称[.扩展名]。
+/// 清洗 Windows 非法字符、限制总长度；供导入、改名和备份打包共用。
+pub(crate) fn build_attachment_file_name(
+    screw_id: &str,
+    screw_name: &str,
+    display_name: &str,
+    extension: Option<&str>,
+) -> String {
+    let id_part = sanitize_name_part(screw_id, 40);
+    let name_part = sanitize_name_part(screw_name, 60);
+    let display_part = sanitize_name_part(display_name, 80);
+    let mut name = format!("{}_{}_{}", id_part, name_part, display_part);
+    if Path::new(&display_part).extension().is_none() {
+        if let Some(ext) = extension.filter(|value| !value.is_empty()) {
+            name.push('.');
+            name.push_str(&sanitize_name_part(ext, 10));
+        }
+    }
+    truncate_file_name(&name, MAX_ATTACHMENT_FILE_NAME)
+}
+
+fn sanitize_name_part(value: &str, limit: usize) -> String {
+    let cleaned: String = value
+        .chars()
+        .map(|ch| match ch {
+            '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' | '\0' => '_',
+            _ => ch,
+        })
+        .collect();
+    let trimmed = cleaned.trim().trim_end_matches('.').to_string();
+    if trimmed.is_empty() {
+        "unknown".to_string()
+    } else {
+        trimmed.chars().take(limit).collect()
+    }
+}
+
+fn truncate_file_name(name: &str, limit: usize) -> String {
+    if name.chars().count() <= limit {
+        return name.to_string();
+    }
+    let extension = Path::new(name)
+        .extension()
+        .and_then(|value| value.to_str())
+        .map(|value| format!(".{}", value))
+        .unwrap_or_default();
+    let keep = limit.saturating_sub(extension.chars().count());
+    let head: String = name.chars().take(keep).collect();
+    format!("{}{}", head.trim_end_matches('.'), extension)
+}
+
+/// 同一目录内重名时追加序号（保持扩展名）。
+fn unique_stored_name(base: &str, used: &std::collections::HashSet<String>) -> String {
+    if !used.contains(base) {
+        return base.to_string();
+    }
+    let (stem, extension) = match base.rfind('.') {
+        Some(index) if index > 0 => {
+            let (head, tail) = base.split_at(index);
+            (head.to_string(), tail.to_string())
+        }
+        _ => (base.to_string(), String::new()),
+    };
+    let mut counter = 1;
+    loop {
+        let candidate = if extension.is_empty() {
+            format!("{} ({})", stem, counter)
+        } else {
+            format!("{} ({}){}", stem, counter, extension)
+        };
+        if !used.contains(&candidate) {
+            return candidate;
+        }
+        counter += 1;
+    }
+}
+
+/// 查询螺丝规格名；查询失败（测试数据或螺丝已删除）时回退为螺丝 ID。
+fn screw_display_name(data_file_path: &str, screw_spec_id: &str) -> String {
+    excel::get_by_id(data_file_path, SCREW_SPEC_SHEET, screw_spec_id)
+        .ok()
+        .flatten()
+        .and_then(|row| row.get("name").cloned())
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| screw_spec_id.to_string())
+}
+
 fn mime_type(extension: &str) -> &'static str {
     match extension {
         "png" => "image/png",
@@ -138,6 +227,12 @@ pub fn counts(data_file_path: &str) -> Result<std::collections::HashMap<String, 
     Ok(result)
 }
 
+/// 读取全部附件元数据（备份/数据包打包时用于生成可读条目名）。
+pub fn load_all(data_file_path: &str) -> Result<Vec<ScrewAttachment>, String> {
+    let root = attachment_root(data_file_path)?;
+    load_index(&root)
+}
+
 pub fn import(
     data_file_path: &str,
     screw_spec_id: &str,
@@ -169,18 +264,28 @@ pub fn import(
     let screw_dir = root.join(&screw_dir_name);
     fs::create_dir_all(&screw_dir).map_err(|e| format!("创建附件目录失败: {e}"))?;
 
-    let id = Uuid::new_v4().to_string();
-    let stored_name = format!("{}.{}", id, extension);
-    let target = screw_dir.join(&stored_name);
-    fs::copy(source, &target).map_err(|e| format!("复制附件失败: {e}"))?;
-
     let file_name = source
         .file_name()
         .and_then(|value| value.to_str())
         .unwrap_or("附件")
         .to_string();
-    let now = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let mut index = load_index(&root)?;
+    let screw_name = screw_display_name(data_file_path, screw_spec_id);
+    let base_name =
+        build_attachment_file_name(screw_spec_id, &screw_name, &file_name, Some(&extension));
+    let used: std::collections::HashSet<String> = index
+        .iter()
+        .filter(|item| item.screw_spec_id == screw_spec_id)
+        .filter_map(|item| item.relative_path.rsplit('/').next())
+        .map(|value| value.to_string())
+        .collect();
+    let stored_name = unique_stored_name(&base_name, &used);
+
+    let id = Uuid::new_v4().to_string();
+    let target = screw_dir.join(&stored_name);
+    fs::copy(source, &target).map_err(|e| format!("复制附件失败: {e}"))?;
+
+    let now = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let sort_order = index
         .iter()
         .filter(|item| item.screw_spec_id == screw_spec_id)
@@ -225,16 +330,61 @@ pub fn update(
 ) -> Result<ScrewAttachment, String> {
     let root = attachment_root(data_file_path)?;
     let mut index = load_index(&root)?;
-    let item = index
-        .iter_mut()
-        .find(|item| item.id == attachment_id)
-        .ok_or_else(|| "附件记录不存在".to_string())?;
-    if let Some(name) = display_name {
+    let Some(position) = index.iter().position(|item| item.id == attachment_id) else {
+        return Err("附件记录不存在".to_string());
+    };
+    let mut renamed = false;
+    let mut previous_relative_path: Option<String> = None;
+    let mut renamed_from: Option<PathBuf> = None;
+    let mut renamed_to: Option<PathBuf> = None;
+
+    if let Some(ref name) = display_name {
         let trimmed = name.trim();
         if trimmed.is_empty() {
             return Err("附件名称不能为空".to_string());
         }
-        item.display_name = trimmed.to_string();
+        let current = &index[position];
+        let current_display = current.display_name.clone();
+        let current_relative = current.relative_path.clone();
+        let current_screw = current.screw_spec_id.clone();
+        if trimmed != current_display {
+            // 设置名称变化时同步重命名物理文件，保持「螺丝ID_螺丝名_设置名」一致。
+            let extension = Path::new(&current_relative)
+                .extension()
+                .and_then(|value| value.to_str())
+                .map(|value| value.to_string());
+            let screw_name = screw_display_name(data_file_path, &current_screw);
+            let base_name = build_attachment_file_name(
+                &current_screw,
+                &screw_name,
+                trimmed,
+                extension.as_deref(),
+            );
+            let used: std::collections::HashSet<String> = index
+                .iter()
+                .enumerate()
+                .filter(|(candidate_index, candidate)| {
+                    *candidate_index != position && candidate.screw_spec_id == current_screw
+                })
+                .filter_map(|(_, candidate)| candidate.relative_path.rsplit('/').next())
+                .map(|value| value.to_string())
+                .collect();
+            let stored_name = unique_stored_name(&base_name, &used);
+            let old_path = resolve_stored_path(&root, &current_relative)?;
+            let dir = current_relative.split('/').next().unwrap_or("attachments");
+            let new_relative = format!("{}/{}", dir, stored_name);
+            let new_path = root.join(&new_relative);
+            fs::rename(&old_path, &new_path).map_err(|e| format!("重命名附件文件失败: {e}"))?;
+            renamed = true;
+            previous_relative_path = Some(current_relative);
+            renamed_from = Some(old_path);
+            renamed_to = Some(new_path);
+        }
+    }
+
+    let item = &mut index[position];
+    if let Some(ref name) = display_name {
+        item.display_name = name.trim().to_string();
     }
     if let Some(value) = annotations {
         item.annotations = value;
@@ -243,8 +393,30 @@ pub fn update(
         item.sort_order = value;
     }
     item.updated_at = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    if renamed {
+        item.relative_path = renamed_to
+            .as_ref()
+            .and_then(|path| path.file_name())
+            .and_then(|value| value.to_str())
+            .map(|file_name| {
+                let dir = previous_relative_path
+                    .as_deref()
+                    .and_then(|value| value.split('/').next())
+                    .unwrap_or("attachments");
+                format!("{}/{}", dir, file_name)
+            })
+            .unwrap_or_default();
+    }
     let result = item.clone();
-    save_index(&root, &index)?;
+    if let Err(error) = save_index(&root, &index) {
+        // 索引写入失败时回滚文件重命名，避免索引指向不存在的文件。
+        if renamed {
+            if let (Some(from), Some(to)) = (renamed_from, renamed_to) {
+                let _ = fs::rename(&to, &from);
+            }
+        }
+        return Err(error);
+    }
     Ok(result)
 }
 
@@ -311,6 +483,10 @@ mod tests {
             list(data_file.to_str().unwrap(), "screw-1").unwrap().len(),
             1
         );
+        // 物理文件名遵循「螺丝ID_螺丝名_原始文件名」规则（测试数据查不到螺丝名时回退为 ID）
+        assert!(imported
+            .relative_path
+            .contains("screw-1_screw-1_source.png"));
 
         let content = read_content(data_file.to_str().unwrap(), &imported.id).unwrap();
         let encoded = content.get("data").and_then(Value::as_str).unwrap();
@@ -342,6 +518,14 @@ mod tests {
         .unwrap();
         assert_eq!(updated.display_name, "已标注图纸");
         assert_eq!(updated.annotations.len(), 1);
+        // 设置名称变化后物理文件同步重命名，索引指向新文件名
+        assert!(updated.relative_path.contains("已标注图纸"));
+        assert!(!updated.relative_path.contains("source.png"));
+        assert!(root
+            .join("attachments")
+            .join("screw-1")
+            .join(&updated.relative_path.split('/').next_back().unwrap())
+            .is_file());
 
         assert!(delete(data_file.to_str().unwrap(), &imported.id).unwrap());
         assert!(list(data_file.to_str().unwrap(), "screw-1")

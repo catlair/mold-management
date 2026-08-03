@@ -71,81 +71,12 @@
     <el-card class="settings-card">
       <template #header>
         <div class="card-header">
-          <el-icon><Warning /></el-icon>
-          <span>安全设置</span>
-        </div>
-      </template>
-      <el-form label-width="120px">
-        <el-form-item label="允许删除">
-          <el-switch v-model="allowDeleteVal" @change="handleAllowDeleteChange" />
-          <span class="form-tip">开启后各管理页面的删除按钮才可见</span>
-        </el-form-item>
-      </el-form>
-    </el-card>
-
-    <el-card class="settings-card">
-      <template #header>
-        <div class="card-header">
-          <el-icon><Grid /></el-icon>
-          <span>模具选项配置</span>
-        </div>
-      </template>
-      <el-form label-width="120px">
-        <el-form-item label="牙板机型">
-          <div class="option-list-config">
-            <el-select
-              v-model="dieMachineTypes"
-              multiple
-              filterable
-              allow-create
-              default-first-option
-              placeholder="输入机型后按回车添加"
-            />
-            <div class="option-list-actions">
-              <el-button type="primary" :loading="savingDieMachineTypes" @click="saveDieMachineTypes">
-                保存牙板机型
-              </el-button>
-              <el-button @click="resetDieMachineTypes">恢复默认</el-button>
-            </div>
-          </div>
-        </el-form-item>
-        <el-form-item label="冲头规格">
-          <div class="option-list-config">
-            <el-select
-              v-model="punchSpecs"
-              multiple
-              filterable
-              allow-create
-              default-first-option
-              placeholder="输入规格后按回车添加"
-            />
-            <div class="option-list-actions">
-              <el-button type="primary" :loading="savingPunchSpecs" @click="savePunchSpecs">
-                保存冲头规格
-              </el-button>
-              <el-button @click="resetPunchSpecs">恢复默认</el-button>
-            </div>
-          </div>
-        </el-form-item>
-      </el-form>
-      <div class="action-desc">
-        <p>牙板和冲头新增、编辑时会显示对应候选项；表单中仍可临时手动输入其他内容。</p>
-      </div>
-    </el-card>
-
-    <el-card class="settings-card">
-      <template #header>
-        <div class="card-header">
           <el-icon><Clock /></el-icon>
           <span>自动备份配置</span>
         </div>
       </template>
       <div class="backup-config">
         <el-form label-width="120px">
-          <el-form-item label="保留份数">
-            <el-input-number v-model="backupCount" :min="1" :max="100" @change="saveBackupConfig" />
-            <span class="form-tip">超过此数量将自动删除最早的备份</span>
-          </el-form-item>
           <el-form-item label="备份目录">
             <div class="backup-path-row">
               <el-tag
@@ -215,7 +146,7 @@ import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { save, open } from '@tauri-apps/plugin-dialog'
 import { readFile, writeFile } from '@tauri-apps/plugin-fs'
-import { dataApi, settingsApi, backupApi, allowDeleteApi, dieMachineTypeApi, punchSpecApi } from '../api'
+import { dataApi, settingsApi, backupApi } from '../api'
 import { isUserCancellation, showDetailedError } from '../utils/errorFeedback'
 
 const exporting = ref(false)
@@ -227,23 +158,6 @@ const dataPath = ref('')
 const backupCount = ref(10)
 const backupConfig = ref<any>({})
 const backups = ref<any[]>([])
-const allowDeleteVal = ref(false)
-const defaultDieMachineTypes = ['003', '3/16', '1/4', '6R']
-const dieMachineTypes = ref<string[]>([])
-const savingDieMachineTypes = ref(false)
-const defaultPunchSpecs = ['12*15', '14*15', '18*18']
-const punchSpecs = ref<string[]>([])
-const savingPunchSpecs = ref(false)
-
-async function handleAllowDeleteChange(val: boolean) {
-  try {
-    await allowDeleteApi.set(val)
-    ElMessage.success(val ? '已开启删除功能' : '已关闭删除功能')
-  } catch (error) {
-    allowDeleteVal.value = !val
-    showDetailedError('更新删除功能设置', error)
-  }
-}
 
 onMounted(async () => {
   try {
@@ -254,106 +168,7 @@ onMounted(async () => {
   }
   await loadBackupConfig()
   await loadBackups()
-  await loadDieMachineTypes()
-  await loadPunchSpecs()
-  try {
-    allowDeleteVal.value = await allowDeleteApi.get()
-  } catch (error) {
-    showDetailedError('加载删除功能设置', error)
-  }
 })
-
-async function loadDieMachineTypes() {
-  try {
-    dieMachineTypes.value = await dieMachineTypeApi.get()
-  } catch (error) {
-    dieMachineTypes.value = [...defaultDieMachineTypes]
-    showDetailedError('加载牙板机型列表', error)
-  }
-}
-
-async function saveDieMachineTypes() {
-  const normalized = dieMachineTypes.value
-    .map(item => item.trim())
-    .filter((item, index, items) => item && items.findIndex(value => value.toLocaleLowerCase() === item.toLocaleLowerCase()) === index)
-  if (normalized.length === 0) {
-    ElMessage.warning('牙板机型列表至少保留一个选项')
-    return
-  }
-  const previous = [...dieMachineTypes.value]
-  savingDieMachineTypes.value = true
-  try {
-    const result = await dieMachineTypeApi.set(normalized)
-    dieMachineTypes.value = result.machineTypes
-    ElMessage.success('牙板机型列表已保存')
-  } catch (error) {
-    dieMachineTypes.value = previous
-    showDetailedError('保存牙板机型列表', error)
-  } finally {
-    savingDieMachineTypes.value = false
-  }
-}
-
-async function resetDieMachineTypes() {
-  const previous = [...dieMachineTypes.value]
-  savingDieMachineTypes.value = true
-  try {
-    const result = await dieMachineTypeApi.set(defaultDieMachineTypes)
-    dieMachineTypes.value = result.machineTypes
-    ElMessage.success('已恢复默认牙板机型列表')
-  } catch (error) {
-    dieMachineTypes.value = previous
-    showDetailedError('恢复默认牙板机型列表', error)
-  } finally {
-    savingDieMachineTypes.value = false
-  }
-}
-
-async function loadPunchSpecs() {
-  try {
-    punchSpecs.value = await punchSpecApi.get()
-  } catch (error) {
-    punchSpecs.value = [...defaultPunchSpecs]
-    showDetailedError('加载冲头规格列表', error)
-  }
-}
-
-async function savePunchSpecs() {
-  const normalized = punchSpecs.value
-    .map(item => item.trim())
-    .filter((item, index, items) => item && items.findIndex(value => value.toLocaleLowerCase() === item.toLocaleLowerCase()) === index)
-  if (normalized.length === 0) {
-    ElMessage.warning('冲头规格列表至少保留一个选项')
-    return
-  }
-  const previous = [...punchSpecs.value]
-  savingPunchSpecs.value = true
-  try {
-    const result = await punchSpecApi.set(normalized)
-    punchSpecs.value = result.specs
-    ElMessage.success('冲头规格列表已保存')
-  } catch (error) {
-    punchSpecs.value = previous
-    showDetailedError('保存冲头规格列表', error)
-  } finally {
-    savingPunchSpecs.value = false
-  }
-}
-
-async function resetPunchSpecs() {
-  const previous = [...punchSpecs.value]
-  savingPunchSpecs.value = true
-  try {
-    const result = await punchSpecApi.set(defaultPunchSpecs)
-    punchSpecs.value = result.specs
-    ElMessage.success('已恢复默认冲头规格列表')
-  } catch (error) {
-    punchSpecs.value = previous
-    showDetailedError('恢复默认冲头规格列表', error)
-  } finally {
-    savingPunchSpecs.value = false
-  }
-}
 
 async function loadBackupConfig() {
   try {
@@ -383,15 +198,6 @@ async function handleToggleLock(index: number) {
     }
   } catch (error) {
     showDetailedError('切换备份锁定状态', error)
-  }
-}
-
-async function saveBackupConfig() {
-  try {
-    await backupApi.setConfig(backupCount.value, backupConfig.value.backupPath || null)
-    ElMessage.success('备份配置已保存')
-  } catch (error) {
-    showDetailedError('保存备份配置', error)
   }
 }
 
@@ -756,23 +562,6 @@ async function handleSelectPath() {
 
 .backup-config {
   margin-bottom: 0;
-}
-
-.option-list-config {
-  width: 100%;
-  min-width: 0;
-  display: grid;
-  gap: 10px;
-}
-
-.option-list-config .el-select {
-  width: 100%;
-}
-
-.option-list-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
 }
 
 .form-tip {

@@ -52,18 +52,17 @@
           </el-menu-item-group>
           <el-menu-item-group>
             <template #title><span v-show="!isCollapse" class="menu-group-title">系统功能</span></template>
-            <el-menu-item index="/page-management">
+            <el-menu-item index="/configuration-management">
               <el-icon><Operation /></el-icon>
-              <template #title>页面管理</template>
+              <template #title>配置管理</template>
             </el-menu-item>
             <el-menu-item index="/settings">
               <el-icon><Setting /></el-icon>
-              <template #title>配置</template>
+              <template #title>数据与备份</template>
             </el-menu-item>
           </el-menu-item-group>
         </el-menu>
       </el-scrollbar>
-      <ThemeToggle :collapsed="isCollapse" />
       <button
         class="collapse-btn"
         type="button"
@@ -96,7 +95,6 @@
 import { ref, computed, onMounted, provide } from 'vue'
 import { useRoute } from 'vue-router'
 import GlobalSearch from './components/GlobalSearch.vue'
-import ThemeToggle from './components/ThemeToggle.vue'
 import { useFullscreen } from './composables/useFullscreen'
 import { useFixedOperationColumns } from './composables/useFixedOperationColumns'
 
