@@ -19,7 +19,7 @@
         <el-tab-pane label="皮带信息" name="info">
            <DataTable table-id="belt.info" :data="beltList" :loading="loading">
             <ConfigurableTable field="name" title="名称" width="160" sortable />
-            <ConfigurableTable field="machine" title="适用机器" width="120" sortable :filters="machineFilters" :filter-method="filterHandler" />
+            <ConfigurableTable field="machine" title="适用机器" width="120" sortable :filters="machineFilters" :filter-method="exactFilter" />
             <ConfigurableTable field="safetyStock" title="安全库存" width="100" sortable />
             <ConfigurableTable field="currentStock" title="当前库存" width="100" sortable />
             <ConfigurableTable field="status" title="库存状态" width="100" sortable>
@@ -56,7 +56,7 @@
               </ConfigurableTable>
               <ConfigurableTable field="quantity" title="入库数量" width="14%" min-width="120" sortable />
               <ConfigurableTable field="orderDate" title="入库时间" width="22%" min-width="180" sortable />
-              <ConfigurableTable field="status" title="到货状态" width="16%" min-width="140" sortable :filters="statusFilters" :filter-method="filterHandler" />
+              <ConfigurableTable field="status" title="到货状态" width="16%" min-width="140" sortable :filters="STATUS_FILTERS" :filter-method="exactFilter" />
               <ConfigurableTable field="remark" title="备注" width="22%" min-width="180" />
             </ConfigurableVxeTable>
           </div>
@@ -200,6 +200,7 @@ import { useHighlight } from '../composables/useHighlight'
 import { showBatchErrors, showDetailedError, type NamedError } from '../utils/errorFeedback'
 import DataTable from '../components/DataTable.vue'
 import FullscreenToggle from '../components/FullscreenToggle.vue'
+import { exactFilter, STATUS_FILTERS, buildFilters } from '../utils/tableFilters'
 
 const { allowDelete } = useAllowDelete()
 // 全屏状态由 App 全局提供（isFullscreen 仅用于页面容器样式）
@@ -231,20 +232,7 @@ const usePaginated = computed(() => {
 })
 
 // 筛选选项
-const machineFilters = computed(() => {
-  const types = [...new Set(beltList.value.map(item => item.machine).filter(Boolean))]
-  return types.map(t => ({ label: t, value: t }))
-})
-
-const statusFilters = [
-  { label: '未到货', value: '未到货' },
-  { label: '已到货', value: '已到货' }
-]
-
-function filterHandler({ value, row, column }: any) {
-  const property = column.property
-  return row[property] === value
-}
+const machineFilters = computed(() => buildFilters(beltList.value, 'machine'))
 
 // 获取皮带名称
 function getBeltName(beltId: string) {

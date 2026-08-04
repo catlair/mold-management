@@ -63,6 +63,7 @@
           </el-menu-item-group>
         </el-menu>
       </el-scrollbar>
+      <ThemeToggle :collapsed="isCollapse" />
       <button
         class="collapse-btn"
         type="button"
@@ -95,6 +96,7 @@
 import { ref, computed, onMounted, provide } from 'vue'
 import { useRoute } from 'vue-router'
 import GlobalSearch from './components/GlobalSearch.vue'
+import ThemeToggle from './components/ThemeToggle.vue'
 import { useFullscreen } from './composables/useFullscreen'
 import { useFixedOperationColumns } from './composables/useFixedOperationColumns'
 

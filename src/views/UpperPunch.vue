@@ -57,7 +57,7 @@
               </ConfigurableTable>
               <ConfigurableTable field="quantity" title="入库数量" width="14%" min-width="120" sortable />
               <ConfigurableTable field="orderDate" title="入库时间" width="22%" min-width="180" sortable />
-              <ConfigurableTable field="status" title="到货状态" width="16%" min-width="140" sortable :filters="statusFilters" :filter-method="filterHandler" />
+              <ConfigurableTable field="status" title="到货状态" width="16%" min-width="140" sortable :filters="STATUS_FILTERS" :filter-method="exactFilter" />
               <ConfigurableTable field="remark" title="备注" width="22%" min-width="180" />
             </ConfigurableVxeTable>
           </div>
@@ -262,6 +262,7 @@ import { useHighlight } from '../composables/useHighlight'
 import { settleNamedRequests, showBatchErrors, showDetailedError } from '../utils/errorFeedback'
 import DataTable from '../components/DataTable.vue'
 import FullscreenToggle from '../components/FullscreenToggle.vue'
+import { exactFilter, STATUS_FILTERS } from '../utils/tableFilters'
 
 const { allowDelete } = useAllowDelete()
 // 全屏状态由 App 全局提供（isFullscreen 仅用于页面容器样式）
@@ -298,17 +299,6 @@ const linkPaginated = computed(() => {
   const start = (linkCurrentPage.value - 1) * linkPageSize.value
   return linkList.value.slice(start, start + linkPageSize.value)
 })
-
-// 筛选选项
-const statusFilters = [
-  { label: '未到货', value: '未到货' },
-  { label: '已到货', value: '已到货' }
-]
-
-function filterHandler({ value, row, column }: any) {
-  const property = column.property
-  return row[property] === value
-}
 
 // 获取上冲名称
 function getUpperPunchName(upperPunchId: string) {

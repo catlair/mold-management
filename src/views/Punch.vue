@@ -32,7 +32,7 @@
               </template>
             </ConfigurableTable>
             <ConfigurableTable field="spec" title="规格" width="80" sortable />
-            <ConfigurableTable field="material" title="材质" width="120" sortable :filters="materialFilters" :filter-method="filterHandler" />
+            <ConfigurableTable field="material" title="材质" width="120" sortable :filters="materialFilters" :filter-method="exactFilter" />
             <ConfigurableTable field="safetyStock" title="安全库存" width="100" sortable />
             <ConfigurableTable field="currentStock" title="当前库存" width="100" sortable />
             <ConfigurableTable field="status" title="库存状态" width="100" sortable>
@@ -69,7 +69,7 @@
               </ConfigurableTable>
               <ConfigurableTable field="quantity" title="入库数量" width="14%" min-width="120" sortable />
               <ConfigurableTable field="orderDate" title="入库时间" width="22%" min-width="180" sortable />
-              <ConfigurableTable field="status" title="到货状态" width="16%" min-width="140" sortable :filters="statusFilters" :filter-method="filterHandler" />
+              <ConfigurableTable field="status" title="到货状态" width="16%" min-width="140" sortable :filters="STATUS_FILTERS" :filter-method="exactFilter" />
               <ConfigurableTable field="remark" title="备注" width="22%" min-width="180" />
             </ConfigurableVxeTable>
           </div>
@@ -357,6 +357,7 @@ import PrintArea from '../components/PrintArea.vue'
 import { punchPrintColumns } from '../config/printColumns'
 import { usePrint } from '../composables/usePrint'
 import { usePrintSettings } from '../composables/usePrintSettings'
+import { exactFilter, STATUS_FILTERS, buildFilters } from '../utils/tableFilters'
 import { toFullName } from '../utils/punchName'
 import {
   duplicateErrorMessage,
@@ -437,20 +438,7 @@ const linkPaginated = computed(() => {
 })
 
 // 筛选选项
-const materialFilters = computed(() => {
-  const types = [...new Set(punchList.value.map(item => item.material).filter(Boolean))]
-  return types.map(t => ({ label: t, value: t }))
-})
-
-const statusFilters = [
-  { label: '未到货', value: '未到货' },
-  { label: '已到货', value: '已到货' }
-]
-
-function filterHandler({ value, row, column }: any) {
-  const property = column.property
-  return row[property] === value
-}
+const materialFilters = computed(() => buildFilters(punchList.value, 'material'))
 
 // 获取冲头完整标识
 function getPunchName(punchId: string) {

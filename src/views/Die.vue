@@ -31,7 +31,7 @@
                 <el-link type="primary" :underline="false" @click="showLinkedScrews(row)">{{ row.name }}</el-link>
               </template>
             </ConfigurableTable>
-            <ConfigurableTable field="machineType" title="机型" width="120" sortable :filters="machineTypeFilters" :filter-method="filterHandler" />
+            <ConfigurableTable field="machineType" title="机型" width="120" sortable :filters="machineTypeFilters" :filter-method="exactFilter" />
             <ConfigurableTable field="wireDiameter" title="线径" width="100" sortable />
             <ConfigurableTable field="safetyStock" title="安全库存" width="100" sortable />
             <ConfigurableTable field="currentStock" title="当前库存" width="100" sortable />
@@ -362,6 +362,7 @@ import {
   findDieDuplicate,
   isDuplicateError,
 } from '../utils/duplicateDetection'
+import { exactFilter, buildFilters } from '../utils/tableFilters'
 
 const { allowDelete } = useAllowDelete()
 // 全屏状态由 App 全局提供（isFullscreen 仅用于页面容器样式）
@@ -457,15 +458,7 @@ const linkPaginated = computed(() => {
 const machineTypeOptions = ref<string[]>(['003', '3/16', '1/4', '6R'])
 
 // 筛选选项
-const machineTypeFilters = computed(() => {
-  const types = [...new Set(dieList.value.map(item => item.machineType).filter(Boolean))]
-  return types.map(t => ({ label: t, value: t }))
-})
-
-function filterHandler({ value, row, column }: any) {
-  const property = column.property
-  return row[property] === value
-}
+const machineTypeFilters = computed(() => buildFilters(dieList.value, 'machineType'))
 
 // 获取牙板完整标识
 function getDieName(dieId: string) {

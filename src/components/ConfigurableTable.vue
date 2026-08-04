@@ -21,6 +21,7 @@
 import { computed, inject, useAttrs, type Ref } from 'vue'
 import { tableDefinitionMap } from '../config/tableCatalog'
 import { useTablePreferences } from '../composables/useTablePreferences'
+import { exactFilter } from '../utils/tableFilters'
 
 interface TablePreferenceContext {
   tableId: Ref<string | undefined>
@@ -68,16 +69,11 @@ const resolvedFilters = computed(() => {
   return values.map(value => ({ label: String(value), value }))
 })
 const resolvedFilterMethod = computed(() => filterable.value && resolvedFilters.value?.length
-  ? (props.filterMethod || defaultFilterMethod)
+  ? (props.filterMethod || exactFilter)
   : undefined)
 const forwardedProps = computed(() => attrs)
 
 function tableDefinitionExists(tableId: string) {
   return tableDefinitionMap.has(tableId)
-}
-
-function defaultFilterMethod({ value, row, column }: any) {
-  const field = column?.field || column?.property || resolvedColumnId.value
-  return row?.[field] === value
 }
 </script>

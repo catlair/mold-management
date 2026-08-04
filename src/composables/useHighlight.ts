@@ -12,14 +12,22 @@ export function useHighlight(tableData: any) {
     highlightId.value = id
     nextTick(() => {
       setTimeout(() => {
-        const rows = document.querySelectorAll('.el-table__body tr')
+        // vxe-table 行选择器：优先 .vxe-body--row，兼容旧 .el-table__body tr
+        const rows = document.querySelectorAll<HTMLElement>('.vxe-body--row, .el-table__body tr')
+        // 找到目标行索引（基于 rowid 属性或数据索引）
+        let targetRow: HTMLElement | null = null
         for (let i = 0; i < tableData.value.length; i++) {
           if (tableData.value[i].id === id) {
-            rows[i]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-            rows[i]?.classList.add('highlight-flash')
-            setTimeout(() => rows[i]?.classList.remove('highlight-flash'), 2000)
+            // 优先通过 vxe-table 的 rowid 定位
+            targetRow = document.querySelector<HTMLElement>(`[rowid="${id}"]`)
+            if (!targetRow) targetRow = rows[i] as HTMLElement
             break
           }
+        }
+        if (targetRow) {
+          targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          targetRow.classList.add('highlight-flash')
+          setTimeout(() => targetRow?.classList.remove('highlight-flash'), 2000)
         }
         if (route.query.highlight) {
           router.replace({ path: route.path })
