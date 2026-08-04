@@ -5,6 +5,17 @@ use rust_xlsxwriter::Workbook;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
+use std::sync::{Mutex, MutexGuard};
+
+/// 全局 Excel 文件访问锁：桌面命令并发执行时，同一时刻只允许一个命令持有
+/// mold-data.xlsx 的文件句柄，避免“读取句柄未释放时原子替换”被自身阻塞。
+static EXCEL_IO_LOCK: Mutex<()> = Mutex::new(());
+
+fn lock_excel() -> Result<MutexGuard<'static, ()>, String> {
+    EXCEL_IO_LOCK
+        .lock()
+        .map_err(|error| format!("获取数据文件访问锁失败: {}", error))
+}
 
 pub const SHEETS: &[(&str, &[(&str, &str)])] = &[
     (
@@ -405,7 +416,7 @@ fn generate_id(prefix: &str) -> String {
     format!("{}{}{}{:03}", prefix, date_part, time_part, seq)
 }
 
-fn create_empty_workbook(file_path: &str) -> Result<(), String> {
+fn create_empty_workbook_inner(file_path: &str) -> Result<(), String> {
     if let Some(parent) = Path::new(file_path).parent() {
         fs::create_dir_all(parent)
             .map_err(|e| format!("创建数据目录失败「{}」: {}", parent.display(), e))?;
@@ -435,7 +446,7 @@ fn save_workbook_atomically(workbook: &mut Workbook, target: &Path) -> Result<()
         workbook
             .save(&temporary)
             .map_err(|e| format!("生成临时数据文件失败「{}」: {}", temporary.display(), e))?;
-        validate_workbook(&temporary)?;
+        validate_workbook_inner(&temporary)?;
         storage::sync_file(&temporary)?;
         storage::replace_file(&temporary, target)
     })();
@@ -446,6 +457,11 @@ fn save_workbook_atomically(workbook: &mut Workbook, target: &Path) -> Result<()
 }
 
 pub fn validate_workbook(path: &Path) -> Result<(), String> {
+    let _guard = lock_excel()?;
+    validate_workbook_inner(path)
+}
+
+fn validate_workbook_inner(path: &Path) -> Result<(), String> {
     let mut workbook = open_workbook_auto(path)
         .map_err(|e| format!("验证 Excel 文件失败「{}」: {}", path.display(), e))?;
     if workbook.sheet_names().is_empty() {
@@ -460,6 +476,11 @@ pub fn validate_workbook(path: &Path) -> Result<(), String> {
 }
 
 pub fn workbook_stats(path: &Path) -> Result<HashMap<String, i64>, String> {
+    let _guard = lock_excel()?;
+    workbook_stats_inner(path)
+}
+
+fn workbook_stats_inner(path: &Path) -> Result<HashMap<String, i64>, String> {
     let mut workbook = open_workbook_auto(path)
         .map_err(|e| format!("读取 Excel 统计失败「{}」: {}", path.display(), e))?;
     let names = workbook.sheet_names().to_vec();
@@ -607,8 +628,16 @@ fn ensure_unique_record(
 }
 
 pub fn get_all(file_path: &str, sheet_name: &str) -> Result<Vec<HashMap<String, String>>, String> {
+    let _guard = lock_excel()?;
+    get_all_inner(file_path, sheet_name)
+}
+
+fn get_all_inner(
+    file_path: &str,
+    sheet_name: &str,
+) -> Result<Vec<HashMap<String, String>>, String> {
     if !Path::new(file_path).exists() {
-        create_empty_workbook(file_path)?;
+        create_empty_workbook_inner(file_path)?;
         return Ok(vec![]);
     }
     let mut workbook = open_workbook_auto(file_path)
@@ -641,7 +670,8 @@ pub fn get_by_id(
     sheet_name: &str,
     id: &str,
 ) -> Result<Option<HashMap<String, String>>, String> {
-    let items = get_all(file_path, sheet_name)?;
+    let _guard = lock_excel()?;
+    let items = get_all_inner(file_path, sheet_name)?;
     Ok(items
         .into_iter()
         .find(|item| item.get("id").map(|v| v == id).unwrap_or(false)))
@@ -652,15 +682,24 @@ pub fn add_row(
     sheet_name: &str,
     item: &HashMap<String, String>,
 ) -> Result<HashMap<String, String>, String> {
+    let _guard = lock_excel()?;
+    add_row_inner(file_path, sheet_name, item)
+}
+
+fn add_row_inner(
+    file_path: &str,
+    sheet_name: &str,
+    item: &HashMap<String, String>,
+) -> Result<HashMap<String, String>, String> {
     if !Path::new(file_path).exists() {
-        create_empty_workbook(file_path)?;
+        create_empty_workbook_inner(file_path)?;
     }
     let mut result = item.clone();
     if result.get("id").map(|v| v.is_empty()).unwrap_or(true) || !result.contains_key("id") {
         let prefix = get_sheet_prefix(sheet_name);
         result.insert("id".to_string(), generate_id(prefix));
     }
-    let mut all_rows = get_all(file_path, sheet_name)?;
+    let mut all_rows = get_all_inner(file_path, sheet_name)?;
     ensure_unique_record(sheet_name, &result, &all_rows, None)?;
     all_rows.push(result.clone());
     write_sheet_data(file_path, sheet_name, &all_rows)?;
@@ -673,7 +712,17 @@ pub fn update_row(
     id: &str,
     data: &HashMap<String, String>,
 ) -> Result<HashMap<String, String>, String> {
-    let mut all_rows = get_all(file_path, sheet_name)?;
+    let _guard = lock_excel()?;
+    update_row_inner(file_path, sheet_name, id, data)
+}
+
+fn update_row_inner(
+    file_path: &str,
+    sheet_name: &str,
+    id: &str,
+    data: &HashMap<String, String>,
+) -> Result<HashMap<String, String>, String> {
+    let mut all_rows = get_all_inner(file_path, sheet_name)?;
     let Some(current) = all_rows.iter().find(|row| field(row, "id") == id) else {
         return Err("记录未找到".to_string());
     };
@@ -699,7 +748,12 @@ pub fn update_row(
 }
 
 pub fn delete_row(file_path: &str, sheet_name: &str, id: &str) -> Result<bool, String> {
-    let mut all_rows = get_all(file_path, sheet_name)?;
+    let _guard = lock_excel()?;
+    delete_row_inner(file_path, sheet_name, id)
+}
+
+fn delete_row_inner(file_path: &str, sheet_name: &str, id: &str) -> Result<bool, String> {
+    let mut all_rows = get_all_inner(file_path, sheet_name)?;
     let original_len = all_rows.len();
     all_rows.retain(|row| row.get("id").map(|v| v != id).unwrap_or(true));
     if all_rows.len() == original_len {
@@ -716,26 +770,30 @@ fn write_sheet_data(
 ) -> Result<(), String> {
     let mut all_sheets_data: Vec<(String, Vec<HashMap<String, String>>)> = Vec::new();
     if Path::new(file_path).exists() {
-        let mut wb = open_workbook_auto(file_path).map_err(|e| e.to_string())?;
-        for &(sname, _) in SHEETS {
-            if let Ok(range) = wb.worksheet_range(sname) {
-                let keys = get_column_keys(sname);
-                let mut sheet_rows = Vec::new();
-                for (row_idx, row) in range.rows().enumerate() {
-                    if row_idx == 0 {
-                        continue;
-                    }
-                    let mut item = HashMap::new();
-                    for (col_idx, cell) in row.iter().enumerate() {
-                        if col_idx < keys.len() {
-                            item.insert(keys[col_idx].to_string(), cell_to_string(cell));
+        // 读取阶段独立作用域：确保 calamine 读取句柄在原子替换前释放，
+        // 否则替换目标文件会因自身读句柄占用而失败（Windows 拒绝访问）。
+        {
+            let mut wb = open_workbook_auto(file_path).map_err(|e| e.to_string())?;
+            for &(sname, _) in SHEETS {
+                if let Ok(range) = wb.worksheet_range(sname) {
+                    let keys = get_column_keys(sname);
+                    let mut sheet_rows = Vec::new();
+                    for (row_idx, row) in range.rows().enumerate() {
+                        if row_idx == 0 {
+                            continue;
                         }
+                        let mut item = HashMap::new();
+                        for (col_idx, cell) in row.iter().enumerate() {
+                            if col_idx < keys.len() {
+                                item.insert(keys[col_idx].to_string(), cell_to_string(cell));
+                            }
+                        }
+                        sheet_rows.push(item);
                     }
-                    sheet_rows.push(item);
+                    all_sheets_data.push((sname.to_string(), sheet_rows));
+                } else {
+                    all_sheets_data.push((sname.to_string(), vec![]));
                 }
-                all_sheets_data.push((sname.to_string(), sheet_rows));
-            } else {
-                all_sheets_data.push((sname.to_string(), vec![]));
             }
         }
     } else {
@@ -775,6 +833,11 @@ fn write_sheet_data(
 }
 
 pub fn export_data(file_path: &str) -> Result<Vec<u8>, String> {
+    let _guard = lock_excel()?;
+    export_data_inner(file_path)
+}
+
+fn export_data_inner(file_path: &str) -> Result<Vec<u8>, String> {
     if !Path::new(file_path).exists() {
         return Err("数据文件不存在".to_string());
     }
@@ -782,6 +845,11 @@ pub fn export_data(file_path: &str) -> Result<Vec<u8>, String> {
 }
 
 pub fn import_data(file_path: &str, data: &[u8]) -> Result<HashMap<String, i64>, String> {
+    let _guard = lock_excel()?;
+    import_data_inner(file_path, data)
+}
+
+fn import_data_inner(file_path: &str, data: &[u8]) -> Result<HashMap<String, i64>, String> {
     let target = Path::new(file_path);
     if let Some(parent) = target.parent() {
         fs::create_dir_all(parent)
@@ -791,8 +859,8 @@ pub fn import_data(file_path: &str, data: &[u8]) -> Result<HashMap<String, i64>,
     let result = (|| {
         fs::write(&temporary, data)
             .map_err(|e| format!("写入导入暂存文件失败「{}」: {}", temporary.display(), e))?;
-        validate_workbook(&temporary)?;
-        let stats = workbook_stats(&temporary)?;
+        validate_workbook_inner(&temporary)?;
+        let stats = workbook_stats_inner(&temporary)?;
         storage::sync_file(&temporary)?;
         storage::replace_file(&temporary, target)?;
         Ok(stats)
@@ -804,6 +872,14 @@ pub fn import_data(file_path: &str, data: &[u8]) -> Result<HashMap<String, i64>,
 }
 
 pub fn calculate_stock(
+    file_path: &str,
+    stock_type: &str,
+) -> Result<Vec<HashMap<String, String>>, String> {
+    let _guard = lock_excel()?;
+    calculate_stock_inner(file_path, stock_type)
+}
+
+fn calculate_stock_inner(
     file_path: &str,
     stock_type: &str,
 ) -> Result<Vec<HashMap<String, String>>, String> {
@@ -852,9 +928,9 @@ pub fn calculate_stock(
         ),
         _ => return Err("未知类型".to_string()),
     };
-    let info_items = get_all(file_path, info_sheet)?;
-    let orders = get_all(file_path, order_sheet)?;
-    let uses = get_all(file_path, use_sheet)?;
+    let info_items = get_all_inner(file_path, info_sheet)?;
+    let orders = get_all_inner(file_path, order_sheet)?;
+    let uses = get_all_inner(file_path, use_sheet)?;
     let stock_data: Vec<HashMap<String, String>> = info_items
         .iter()
         .map(|item| {
@@ -946,7 +1022,7 @@ mod tests {
             std::env::temp_dir().join(format!("mold-excel-import-test-{}", uuid::Uuid::new_v4()));
         fs::create_dir_all(&root).unwrap();
         let path = root.join("mold-data.xlsx");
-        create_empty_workbook(path.to_str().unwrap()).unwrap();
+        create_empty_workbook_inner(path.to_str().unwrap()).unwrap();
         let before = fs::read(&path).unwrap();
         assert!(import_data(path.to_str().unwrap(), b"not-an-xlsx").is_err());
         assert_eq!(fs::read(&path).unwrap(), before);

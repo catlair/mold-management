@@ -62,22 +62,23 @@ pub fn replace_file(source: &Path, target: &Path) -> Result<(), String> {
 
     let source_wide: Vec<u16> = source.as_os_str().encode_wide().chain(Some(0)).collect();
     let target_wide: Vec<u16> = target.as_os_str().encode_wide().chain(Some(0)).collect();
-    let result = unsafe {
-        MoveFileExW(
-            source_wide.as_ptr(),
-            target_wide.as_ptr(),
-            MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
-        )
-    };
-    if result == 0 {
-        return Err(format!(
-            "原子替换文件失败「{}」→「{}」: {}",
-            source.display(),
-            target.display(),
-            std::io::Error::last_os_error()
-        ));
+    let flags = MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH;
+    let mut last_error = std::io::Error::from_raw_os_error(0);
+    // 目标可能被外部程序（Excel、杀毒实时扫描等）瞬时占用，短重试后仍失败才报错。
+    for attempt in 0..5 {
+        let result = unsafe { MoveFileExW(source_wide.as_ptr(), target_wide.as_ptr(), flags) };
+        if result != 0 {
+            return Ok(());
+        }
+        last_error = std::io::Error::last_os_error();
+        std::thread::sleep(std::time::Duration::from_millis(150 * (attempt + 1)));
     }
-    Ok(())
+    Err(format!(
+        "原子替换文件失败「{}」→「{}」（重试 5 次后仍失败）: {}；目标文件可能正被 Excel 或其他程序打开，请关闭后重试",
+        source.display(),
+        target.display(),
+        last_error
+    ))
 }
 
 #[cfg(not(windows))]
