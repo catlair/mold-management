@@ -29,13 +29,15 @@
           <el-button
             v-for="group in exportGroups"
             :key="group.id"
+            size="small"
             :type="group.id === '螺丝规格' ? 'primary' : 'default'"
             plain
+            class="export-group-button"
             :loading="exportingGroup === group.id"
             @click="handleExportGroup(group.id)"
           >
             <el-icon><Download /></el-icon>
-            导出{{ group.label }}
+            {{ group.label }}
           </el-button>
         </div>
         <div class="action-desc">
@@ -670,11 +672,11 @@ async function handleSelectPath() {
   padding: 2px;
 }
 
-@media (min-width: 1100px) {
-  .settings-page {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+.export-group-button {
+  min-width: 88px;
+}
 
+@media (min-width: 1100px) {
   .backup-records-card {
     grid-column: 1 / -1;
   }
