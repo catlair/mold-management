@@ -76,87 +76,90 @@
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="螺丝名称" prop="name">
-              <el-input v-model="form.name" />
+              <SpecInput v-model="form.name" placeholder="如 4.2 X 13" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="螺丝头型">
-              <el-input v-model="form.headType" />
+              <SpecInput v-model="form.headType" placeholder="如 平头" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="冲头" prop="punch">
-              <el-select v-model="form.punch" placeholder="请选择冲头" filterable allow-create multiple collapse-tags>
+              <el-select v-model="form.punch" placeholder="请选择冲头" filterable allow-create multiple collapse-tags style="width: 100%">
                 <el-option v-for="item in punchOptions" :key="item.name" :label="item.name" :value="item.name">
                   <span>{{ item.name }}</span>
                   <span style="float: right; color: #8492a6; font-size: 12px">{{ item.specs }}</span>
                 </el-option>
               </el-select>
+              <div class="form-item-spacer"></div>
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="牙型">
-              <el-input v-model="form.threadType" />
+              <SpecInput v-model="form.threadType" placeholder="如 自攻" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="牙板" prop="die">
-              <el-select v-model="form.die" placeholder="请选择牙板" filterable allow-create multiple collapse-tags>
+              <el-select v-model="form.die" placeholder="请选择牙板" filterable allow-create multiple collapse-tags style="width: 100%">
                 <el-option v-for="item in dieOptions" :key="item.id" :label="item.label" :value="item.value">
                   <span>{{ item.shortName }}</span>
                   <span v-if="item.specs" style="float: right; color: #8492a6; font-size: 12px">{{ item.specs }}</span>
                 </el-option>
               </el-select>
+              <div class="form-item-spacer"></div>
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="头/垫片大小">
-              <el-input v-model="form.headSize" />
+              <SpecInput v-model="form.headSize" placeholder="如 9.1~9.3、5.3±0.1" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="头高">
-              <el-input v-model="form.headHeight" />
+              <SpecInput v-model="form.headHeight" placeholder="如 2.3~2.4、2.3±0.1" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="长度">
-              <el-input v-model="form.length" />
+              <SpecInput v-model="form.length" placeholder="如 8±0.5、8-0.5、7.7~8.1" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="牙径">
-              <el-input v-model="form.threadDiameter" />
+              <SpecInput v-model="form.threadDiameter" placeholder="如 2.5~2.6、4.22-0.18" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="光钉长度">
-              <el-input v-model="form.shankLength" />
+              <SpecInput v-model="form.shankLength" placeholder="如 11、11±0.1" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="线材">
-              <el-input v-model="form.wireMaterial" />
+              <SpecInput v-model="form.wireMaterial" placeholder="如 1018" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="电镀">
-              <el-input v-model="form.plating" />
+              <SpecInput v-model="form.plating" placeholder="如 彩锌" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="客户名">
-              <el-input v-model="form.customer" />
+              <SpecInput v-model="form.customer" placeholder="如 客户A" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="外部ID">
-              <el-input v-model="form.externalId" />
+              <SpecInput v-model="form.externalId" placeholder="如 A-001" />
             </el-form-item>
           </el-col>
           <el-col :span="24">
             <el-form-item label="备注">
               <el-input v-model="form.remark" type="textarea" />
+              <div class="form-item-spacer"></div>
             </el-form-item>
           </el-col>
           <el-col :span="24">
@@ -287,6 +290,7 @@ import { useHighlight } from '../composables/useHighlight'
 import { settleNamedRequests, showBatchErrors, showDetailedError } from '../utils/errorFeedback'
 import FullscreenToggle from '../components/FullscreenToggle.vue'
 import DataTable from '../components/DataTable.vue'
+import SpecInput from '../components/SpecInput.vue'
 import RelatedDataDialog from '../components/RelatedDataDialog.vue'
 import ScrewAttachmentWorkspace from '../components/ScrewAttachmentWorkspace.vue'
 import PrintSettingsDialog from '../components/PrintSettingsDialog.vue'
@@ -295,6 +299,7 @@ import { screwSpecPrintColumns } from '../config/printColumns'
 import { usePrint } from '../composables/usePrint'
 import { usePrintSettings } from '../composables/usePrintSettings'
 import { toShortCode, matchPunchNames } from '../utils/punchName'
+import { parseSpecText } from '../utils/specNormalize'
 
 const { allowDelete } = useAllowDelete()
 // 全屏状态由 App 全局提供（isFullscreen 仅用于页面容器样式）
@@ -613,11 +618,73 @@ async function syncLinks(screwSpecId: string, nameField: string, names: string[]
   }
 }
 
+// ====== 重复规格判断（命中任一规则即提示，用户可强制保存）======
+// 规则 A：名称 + 头型 + 牙型 三个字段全部一致（至少一个非空，避免空记录误报）
+// 规则 B：外部ID + 客户 全部一致且均非空（留空不算）
+function specFieldKey(value: unknown): string {
+  if (value === undefined || value === null) return ''
+  return parseSpecText(String(value)).key
+}
+
+function duplicateReason(a: Record<string, any>, b: Record<string, any>): string {
+  const nameA = specFieldKey(a.name)
+  const nameB = specFieldKey(b.name)
+  const headA = specFieldKey(a.headType)
+  const headB = specFieldKey(b.headType)
+  const threadA = specFieldKey(a.threadType)
+  const threadB = specFieldKey(b.threadType)
+  if ((nameA || headA || threadA) && nameA === nameB && headA === headB && threadA === threadB) {
+    return `名称、头型、牙型相同：${b.name || '-'} / ${b.headType || '-'} / ${b.threadType || '-'}`
+  }
+
+  const extA = specFieldKey(a.externalId)
+  const extB = specFieldKey(b.externalId)
+  const customerA = specFieldKey(a.customer)
+  const customerB = specFieldKey(b.customer)
+  if (extA && extB && customerA && customerB && extA === extB && customerA === customerB) {
+    return `外部ID、客户相同：${b.externalId} / ${b.customer}`
+  }
+
+  return ''
+}
+
+function buildDuplicateReport(): string[] {
+  const lines: string[] = []
+  const editingId = isEdit.value ? form.value.id : ''
+  for (const row of tableData.value) {
+    if (row.id === editingId) continue
+    const reason = duplicateReason(form.value, row)
+    if (reason) lines.push(`• ${reason}`)
+  }
+  return lines
+}
+
 async function handleSubmit() {
   if (!formRef.value) return
   await formRef.value.validate(async (valid) => {
     if (!valid) return
     try {
+      // 重复规格确认：程序只提示，由用户决定是否新增（可强制保存）
+      const duplicateReport = buildDuplicateReport()
+      if (duplicateReport.length) {
+        try {
+          await ElMessageBox.confirm(
+            `检测到与现有记录相同：\n\n${duplicateReport.join('\n')}\n\n` +
+            '如果这是不同客户或不同要求的独立规格，请点「仍要保存」继续；\n' +
+            '如果重复了，请点「返回修改」。',
+            '重复规格确认',
+            {
+              type: 'warning',
+              confirmButtonText: '仍要保存',
+              cancelButtonText: '返回修改',
+              distinguishCancelAndClose: true,
+            },
+          )
+        } catch {
+          return // 用户选择返回修改或直接关闭
+        }
+      }
+
       const punchNames = Array.isArray(form.value.punch) ? form.value.punch : []
       const dieNames = Array.isArray(form.value.die) ? form.value.die : []
       // 主表只存外显的第一个名字
@@ -651,6 +718,9 @@ async function handleSubmit() {
 .page-container.is-fullscreen .el-card { height: 100%; display: flex; flex-direction: column; margin: 0; border: none; border-radius: 0; box-shadow: none; }
 .page-container.is-fullscreen .el-card__header { display: none; }
 .page-container.is-fullscreen .el-card__body { flex: 1; overflow: hidden; padding: 12px; }
+
+/* 编辑对话框：所有字段统一高度（输入框 + 22px 信息行），无论有误预览/警告/普通输入都整齐 */
+.form-item-spacer { height: 22px; }
 
 .header-right { display: flex; gap: 8px; margin-left: auto; }
 .attachment-count-button { min-width: 46px; font-weight: 600; }
