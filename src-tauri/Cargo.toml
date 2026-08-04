@@ -26,3 +26,4 @@ base64 = "0.22"
 md-5 = "0.10"
 zip = { version = "4.6", default-features = false, features = ["deflate"] }
 windows-sys = { version = "0.61", features = ["Win32_Storage_FileSystem"] }
+rusqlite = { version = "0.32", features = ["bundled"] }

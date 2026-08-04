@@ -12,7 +12,7 @@ const BACKUP_FORMAT: &str = "mold-management-backup";
 const BACKUP_VERSION: u32 = 1;
 const MANIFEST_NAME: &str = "backup-manifest.json";
 const ATTACHMENT_MAP_NAME: &str = "attachment-map.json";
-const WORKBOOK_NAME: &str = "mold-data.xlsx";
+const WORKBOOK_NAME: &str = "mold-data.db";
 const MAX_BACKUP_BYTES: u64 = 1024 * 1024 * 1024;
 const MAX_ENTRY_BYTES: u64 = 100 * 1024 * 1024;
 const MAX_MANIFEST_BYTES: u64 = 1024 * 1024;
@@ -466,18 +466,10 @@ fn apply_attachment_map(staging: &Path) -> Result<(), String> {
 mod tests {
     use super::*;
     use chrono::Local;
-    use rust_xlsxwriter::Workbook;
 
-    fn create_test_workbook(path: &Path) {
-        let mut workbook = Workbook::new();
-        for &(sheet_name, columns) in excel::SHEETS {
-            let sheet = workbook.add_worksheet();
-            sheet.set_name(sheet_name).unwrap();
-            for (index, &(header, _)) in columns.iter().enumerate() {
-                sheet.write_string(0, index as u16, header).unwrap();
-            }
-        }
-        workbook.save(path).unwrap();
+    fn create_test_database(path: &Path) {
+        let conn = crate::db::connect(&path.to_string_lossy()).unwrap();
+        crate::db::init_schema(&conn).unwrap();
     }
 
     #[test]
@@ -489,8 +481,8 @@ mod tests {
         fs::create_dir_all(&target_dir).unwrap();
         let source_excel = source_dir.join(WORKBOOK_NAME);
         let target_excel = target_dir.join(WORKBOOK_NAME);
-        create_test_workbook(&source_excel);
-        create_test_workbook(&target_excel);
+        create_test_database(&source_excel);
+        create_test_database(&target_excel);
 
         // 构造真实附件索引：物理文件名为 UUID，原始文件名为 test.png。
         let attachment_id = Uuid::new_v4().to_string();
@@ -588,8 +580,8 @@ mod tests {
         fs::create_dir_all(&target_dir).unwrap();
         let source_excel = source_dir.join(WORKBOOK_NAME);
         let target_excel = target_dir.join(WORKBOOK_NAME);
-        create_test_workbook(&source_excel);
-        create_test_workbook(&target_excel);
+        create_test_database(&source_excel);
+        create_test_database(&target_excel);
         fs::write(target_dir.join("keep.txt"), b"keep").unwrap();
 
         let created_at = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();

@@ -1,6 +1,7 @@
 mod attachments;
 mod backup;
 mod data_package;
+mod db;
 mod excel;
 mod storage;
 
@@ -542,11 +543,62 @@ fn delete_screw_attachment(state: State<AppState>, attachment_id: String) -> Res
 
 #[tauri::command]
 fn export_data(state: State<AppState>) -> Result<Value, String> {
+    // 兼容旧入口：导出全部业务表到单个 Excel（新流程请使用 export_excel_group）
     let path = state.file_path.lock().map_err(|e| e.to_string())?;
     let bytes = excel::export_data(&path)?;
     use base64::Engine;
     let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
     Ok(json!({ "filename": "mold-data.xlsx", "data": b64 }))
+}
+
+#[tauri::command]
+fn export_excel_group(
+    state: State<AppState>,
+    group_id: String,
+    destination_path: String,
+) -> Result<Value, String> {
+    let destination = Path::new(&destination_path);
+    if !destination
+        .extension()
+        .and_then(|value| value.to_str())
+        .is_some_and(|value| value.eq_ignore_ascii_case("xlsx"))
+    {
+        return Err("Excel 文件必须使用 .xlsx 扩展名".to_string());
+    }
+    let group = excel::EXPORT_GROUPS
+        .iter()
+        .find(|(id, _)| *id == group_id)
+        .ok_or_else(|| "未知的导出分组".to_string())?;
+    let path = state.file_path.lock().map_err(|e| e.to_string())?;
+    let bytes = excel::export_group_xlsx(&path, group.1)?;
+    storage::atomic_write(destination, &bytes)
+        .map_err(|e| format!("写出 Excel 失败「{}」: {}", destination.display(), e))?;
+    Ok(json!({ "success": true, "filePath": destination_path, "group": group_id }))
+}
+
+#[tauri::command]
+fn list_excel_sheets(source_path: String) -> Result<Value, String> {
+    let sheets = excel::list_excel_sheets(&source_path)?;
+    Ok(json!({ "sheets": sheets }))
+}
+
+#[tauri::command]
+fn import_excel_sheets(
+    state: State<AppState>,
+    source_path: String,
+    selected_sheets: Vec<String>,
+) -> Result<Value, String> {
+    if selected_sheets.is_empty() {
+        return Err("请至少选择一个要导入的工作表".to_string());
+    }
+    let path = state.file_path.lock().map_err(|e| e.to_string())?;
+    let config = state.config.lock().map_err(|e| e.to_string())?;
+    let backup_dir = get_backup_dir_for_file(&path, &config);
+    let count = config.backup_count;
+    do_backup(&path, &backup_dir, "Excel 导入前备份")?;
+    let stats = excel::import_sheets_from_xlsx(&path, &source_path, &selected_sheets)?;
+    cleanup_old_backups(&backup_dir, count)?;
+    Ok(json!({ "success": true, "stats": stats }))
 }
 
 #[tauri::command]
@@ -593,6 +645,7 @@ fn import_data_package(state: State<AppState>, source_path: String) -> Result<Va
 
 #[tauri::command]
 fn import_data(state: State<AppState>, data: String) -> Result<Value, String> {
+    // 兼容旧入口：解析上传的 Excel 并导入全部可识别工作表
     use base64::Engine;
     let bytes = base64::engine::general_purpose::STANDARD
         .decode(&data)
@@ -601,8 +654,12 @@ fn import_data(state: State<AppState>, data: String) -> Result<Value, String> {
     let config = state.config.lock().map_err(|e| e.to_string())?;
     let backup_dir = get_backup_dir_for_file(&path, &config);
     let count = config.backup_count;
+    let temporary = storage::temporary_path(Path::new(&*path), "xlsx")?;
+    fs::write(&temporary, &bytes).map_err(|e| format!("写入导入暂存文件失败: {}", e))?;
+    let sheets = excel::list_excel_sheets(&temporary.to_string_lossy())?;
     do_backup(&path, &backup_dir, "Excel 导入前备份")?;
-    let stats = excel::import_data(&path, &bytes)?;
+    let stats = excel::import_sheets_from_xlsx(&path, &temporary.to_string_lossy(), &sheets)?;
+    let _ = fs::remove_file(&temporary);
     cleanup_old_backups(&backup_dir, count)?;
     Ok(json!({ "success": true, "stats": stats }))
 }
@@ -881,7 +938,7 @@ fn default_backup_dir() -> String {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let config_path = get_config_path();
-    let config = load_config(&config_path);
+    let mut config = load_config(&config_path);
 
     let initial_path = config
         .file_path
@@ -889,9 +946,59 @@ pub fn run() {
         .filter(|p| !p.is_empty() && Path::new(p).exists())
         .unwrap_or_else(|| excel::get_default_file_path());
 
+    // SQLite 存储初始化：旧 .xlsx 数据文件一次性迁移到数据库，之后一律使用 .db。
+    let is_legacy_xlsx = Path::new(&initial_path)
+        .extension()
+        .and_then(|value| value.to_str())
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("xlsx"));
+    let data_path = if is_legacy_xlsx {
+        let legacy_xlsx = initial_path.clone();
+        let db_path = Path::new(&legacy_xlsx)
+            .with_extension("db")
+            .to_string_lossy()
+            .to_string();
+        match db::connect(&db_path) {
+            Ok(conn) => {
+                if let Err(error) = db::init_schema(&conn) {
+                    eprintln!("初始化数据库结构失败: {}", error);
+                }
+                if let Err(error) = db::migrate_from_xlsx(&conn, &legacy_xlsx) {
+                    eprintln!("迁移旧 Excel 数据失败: {}", error);
+                }
+                drop(conn);
+            }
+            Err(error) => eprintln!("打开数据库失败: {}", error),
+        }
+        config.file_path = Some(db_path.clone());
+        if let Err(error) = save_config(&config_path, &config) {
+            eprintln!("保存数据文件配置失败: {}", error);
+        }
+        db_path
+    } else {
+        match db::connect(&initial_path) {
+            Ok(conn) => {
+                if let Err(error) = db::init_schema(&conn) {
+                    eprintln!("初始化数据库结构失败: {}", error);
+                }
+                let legacy_xlsx = Path::new(&initial_path)
+                    .with_extension("xlsx")
+                    .to_string_lossy()
+                    .to_string();
+                if Path::new(&legacy_xlsx).is_file() {
+                    if let Err(error) = db::migrate_from_xlsx(&conn, &legacy_xlsx) {
+                        eprintln!("迁移旧 Excel 数据失败: {}", error);
+                    }
+                }
+                drop(conn);
+            }
+            Err(error) => eprintln!("打开数据库失败: {}", error),
+        }
+        initial_path
+    };
+
     // 启动时备份
-    let backup_dir = get_backup_dir_for_file(&initial_path, &config);
-    if let Err(error) = do_backup(&initial_path, &backup_dir, "应用启动") {
+    let backup_dir = get_backup_dir_for_file(&data_path, &config);
+    if let Err(error) = do_backup(&data_path, &backup_dir, "应用启动") {
         eprintln!("启动备份失败: {}", error);
     }
     if let Err(error) = cleanup_old_backups(&backup_dir, config.backup_count) {
@@ -899,7 +1006,7 @@ pub fn run() {
     }
 
     let app_state = AppState {
-        file_path: Mutex::new(initial_path),
+        file_path: Mutex::new(data_path),
         config: Mutex::new(config),
         config_path: Mutex::new(config_path),
     };
@@ -916,6 +1023,9 @@ pub fn run() {
             delete_record,
             export_data,
             import_data,
+            export_excel_group,
+            list_excel_sheets,
+            import_excel_sheets,
             export_data_package,
             import_data_package,
             get_file_path_cmd,

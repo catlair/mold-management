@@ -1,9 +1,8 @@
-use crate::storage;
+use crate::db;
 use calamine::{open_workbook_auto, Data, Reader};
 use chrono::Local;
 use rust_xlsxwriter::Workbook;
 use std::collections::HashMap;
-use std::fs;
 use std::path::Path;
 use std::sync::{Mutex, MutexGuard};
 
@@ -416,82 +415,59 @@ fn generate_id(prefix: &str) -> String {
     format!("{}{}{}{:03}", prefix, date_part, time_part, seq)
 }
 
-fn create_empty_workbook_inner(file_path: &str) -> Result<(), String> {
-    if let Some(parent) = Path::new(file_path).parent() {
-        fs::create_dir_all(parent)
-            .map_err(|e| format!("创建数据目录失败「{}」: {}", parent.display(), e))?;
-    }
-    let mut workbook = Workbook::new();
-    for &(sheet_name, cols) in SHEETS {
-        let sheet = workbook
-            .add_worksheet()
-            .set_name(sheet_name)
-            .map_err(|e| e.to_string())?;
-        for (i, &(header, _)) in cols.iter().enumerate() {
-            sheet
-                .write_string(0, i as u16, header)
-                .map_err(|e| e.to_string())?;
-        }
-    }
-    save_workbook_atomically(&mut workbook, Path::new(file_path))
-}
-
-fn save_workbook_atomically(workbook: &mut Workbook, target: &Path) -> Result<(), String> {
-    if let Some(parent) = target.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|e| format!("创建数据目录失败「{}」: {}", parent.display(), e))?;
-    }
-    let temporary = storage::temporary_path(target, "xlsx")?;
-    let result = (|| {
-        workbook
-            .save(&temporary)
-            .map_err(|e| format!("生成临时数据文件失败「{}」: {}", temporary.display(), e))?;
-        validate_workbook_inner(&temporary)?;
-        storage::sync_file(&temporary)?;
-        storage::replace_file(&temporary, target)
-    })();
-    if result.is_err() && temporary.exists() {
-        let _ = fs::remove_file(&temporary);
-    }
-    result.map_err(|e| format!("保存数据文件失败「{}」: {}", target.display(), e))
-}
-
+/// 校验数据文件（现为 SQLite 数据库）：可打开且业务表齐全。
 pub fn validate_workbook(path: &Path) -> Result<(), String> {
     let _guard = lock_excel()?;
-    validate_workbook_inner(path)
+    db::validate_db(&path.to_string_lossy())
 }
 
-fn validate_workbook_inner(path: &Path) -> Result<(), String> {
-    let mut workbook = open_workbook_auto(path)
-        .map_err(|e| format!("验证 Excel 文件失败「{}」: {}", path.display(), e))?;
-    if workbook.sheet_names().is_empty() {
-        return Err(format!("Excel 文件没有工作表「{}」", path.display()));
-    }
-    for &(name, _) in SHEETS {
-        workbook
-            .worksheet_range(name)
-            .map_err(|e| format!("Excel 缺少或无法读取工作表「{}」: {}", name, e))?;
-    }
-    Ok(())
-}
-
+/// 统计各业务表行数。
 pub fn workbook_stats(path: &Path) -> Result<HashMap<String, i64>, String> {
     let _guard = lock_excel()?;
     workbook_stats_inner(path)
 }
 
 fn workbook_stats_inner(path: &Path) -> Result<HashMap<String, i64>, String> {
-    let mut workbook = open_workbook_auto(path)
-        .map_err(|e| format!("读取 Excel 统计失败「{}」: {}", path.display(), e))?;
-    let names = workbook.sheet_names().to_vec();
+    let conn = db::connect(&path.to_string_lossy())?;
     let mut stats = HashMap::new();
-    for name in names {
-        let range = workbook
-            .worksheet_range(&name)
-            .map_err(|e| format!("读取工作表「{}」失败: {}", name, e))?;
-        stats.insert(name, range.rows().count().saturating_sub(1) as i64);
+    for &(sheet_name, _) in SHEETS {
+        let count = db::get_all(&conn, sheet_name)?.len() as i64;
+        stats.insert(sheet_name.to_string(), count);
     }
     Ok(stats)
+}
+
+/// 从旧版 Excel 文件读取单个工作表（一次性迁移到数据库时使用）。
+pub fn read_xlsx_all(
+    xlsx_path: &str,
+    sheet_name: &str,
+) -> Result<Vec<HashMap<String, String>>, String> {
+    if !Path::new(xlsx_path).is_file() {
+        return Ok(vec![]);
+    }
+    let mut workbook = open_workbook_auto(xlsx_path)
+        .map_err(|e| format!("打开旧数据文件失败「{}」: {}", xlsx_path, e))?;
+    let range = workbook
+        .worksheet_range(sheet_name)
+        .map_err(|e| format!("读取工作表「{}」失败: {}", sheet_name, e))?;
+    let keys = get_column_keys(sheet_name);
+    let mut items = Vec::new();
+    for (row_idx, row) in range.rows().enumerate() {
+        if row_idx == 0 {
+            continue;
+        }
+        let mut item = HashMap::new();
+        for (col_idx, cell) in row.iter().enumerate() {
+            if col_idx < keys.len() {
+                item.insert(
+                    keys[col_idx].to_string(),
+                    normalize_value(cell_to_string(cell)),
+                );
+            }
+        }
+        items.push(item);
+    }
+    Ok(items)
 }
 
 /// 清洗 JSON 数组格式的字符串，如 ["30R特"] → 30R特
@@ -636,33 +612,8 @@ fn get_all_inner(
     file_path: &str,
     sheet_name: &str,
 ) -> Result<Vec<HashMap<String, String>>, String> {
-    if !Path::new(file_path).exists() {
-        create_empty_workbook_inner(file_path)?;
-        return Ok(vec![]);
-    }
-    let mut workbook = open_workbook_auto(file_path)
-        .map_err(|e| format!("打开数据文件失败「{}」: {}", file_path, e))?;
-    let range = workbook
-        .worksheet_range(sheet_name)
-        .map_err(|e| format!("读取工作表「{}」失败: {}", sheet_name, e))?;
-    let keys = get_column_keys(sheet_name);
-    let mut items = Vec::new();
-    for (row_idx, row) in range.rows().enumerate() {
-        if row_idx == 0 {
-            continue;
-        }
-        let mut item = HashMap::new();
-        for (col_idx, cell) in row.iter().enumerate() {
-            if col_idx < keys.len() {
-                item.insert(
-                    keys[col_idx].to_string(),
-                    normalize_value(cell_to_string(cell)),
-                );
-            }
-        }
-        items.push(item);
-    }
-    Ok(items)
+    let conn = db::connect(file_path)?;
+    db::get_all(&conn, sheet_name)
 }
 
 pub fn get_by_id(
@@ -671,10 +622,8 @@ pub fn get_by_id(
     id: &str,
 ) -> Result<Option<HashMap<String, String>>, String> {
     let _guard = lock_excel()?;
-    let items = get_all_inner(file_path, sheet_name)?;
-    Ok(items
-        .into_iter()
-        .find(|item| item.get("id").map(|v| v == id).unwrap_or(false)))
+    let conn = db::connect(file_path)?;
+    db::get_by_id(&conn, sheet_name, id)
 }
 
 pub fn add_row(
@@ -691,18 +640,15 @@ fn add_row_inner(
     sheet_name: &str,
     item: &HashMap<String, String>,
 ) -> Result<HashMap<String, String>, String> {
-    if !Path::new(file_path).exists() {
-        create_empty_workbook_inner(file_path)?;
-    }
+    let conn = db::connect(file_path)?;
     let mut result = item.clone();
     if result.get("id").map(|v| v.is_empty()).unwrap_or(true) || !result.contains_key("id") {
         let prefix = get_sheet_prefix(sheet_name);
         result.insert("id".to_string(), generate_id(prefix));
     }
-    let mut all_rows = get_all_inner(file_path, sheet_name)?;
+    let all_rows = db::get_all(&conn, sheet_name)?;
     ensure_unique_record(sheet_name, &result, &all_rows, None)?;
-    all_rows.push(result.clone());
-    write_sheet_data(file_path, sheet_name, &all_rows)?;
+    db::insert_row(&conn, sheet_name, &result)?;
     Ok(result)
 }
 
@@ -722,7 +668,8 @@ fn update_row_inner(
     id: &str,
     data: &HashMap<String, String>,
 ) -> Result<HashMap<String, String>, String> {
-    let mut all_rows = get_all_inner(file_path, sheet_name)?;
+    let conn = db::connect(file_path)?;
+    let all_rows = db::get_all(&conn, sheet_name)?;
     let Some(current) = all_rows.iter().find(|row| field(row, "id") == id) else {
         return Err("记录未找到".to_string());
     };
@@ -736,139 +683,153 @@ fn update_row_inner(
         ensure_unique_record(sheet_name, &candidate, &all_rows, Some(id))?;
     }
 
-    for row in &mut all_rows {
-        if field(row, "id") == id {
-            *row = candidate.clone();
-            break;
-        }
-    }
-
-    write_sheet_data(file_path, sheet_name, &all_rows)?;
+    db::insert_row(&conn, sheet_name, &candidate)?;
     Ok(candidate)
 }
 
 pub fn delete_row(file_path: &str, sheet_name: &str, id: &str) -> Result<bool, String> {
     let _guard = lock_excel()?;
-    delete_row_inner(file_path, sheet_name, id)
+    let conn = db::connect(file_path)?;
+    db::delete_row(&conn, sheet_name, id)
 }
 
-fn delete_row_inner(file_path: &str, sheet_name: &str, id: &str) -> Result<bool, String> {
-    let mut all_rows = get_all_inner(file_path, sheet_name)?;
-    let original_len = all_rows.len();
-    all_rows.retain(|row| row.get("id").map(|v| v != id).unwrap_or(true));
-    if all_rows.len() == original_len {
-        return Ok(false);
-    }
-    write_sheet_data(file_path, sheet_name, &all_rows)?;
-    Ok(true)
-}
+/// 导出分组定义：每组包含的业务表（用于按业务拆分 Excel 导入导出）。
+pub const EXPORT_GROUPS: &[(&str, &[&str])] = &[
+    ("螺丝规格", &["螺丝规格表"]),
+    (
+        "冲头",
+        &[
+            "冲头信息表",
+            "冲头入库记录",
+            "冲头领用记录",
+            "冲头-螺丝规格关联",
+            "冲头库存汇总",
+        ],
+    ),
+    (
+        "牙板",
+        &[
+            "牙板信息表",
+            "牙板入库记录",
+            "牙板领用记录",
+            "牙板-螺丝规格关联",
+            "牙板库存汇总",
+        ],
+    ),
+    (
+        "皮带",
+        &["皮带信息表", "皮带入库记录", "皮带使用记录", "皮带库存汇总"],
+    ),
+    (
+        "主模具",
+        &[
+            "主模具信息表",
+            "主模具入库记录",
+            "主模具使用记录",
+            "主模具-线材关联",
+            "主模具库存汇总",
+        ],
+    ),
+    (
+        "剪刀",
+        &[
+            "剪刀信息表",
+            "剪刀入库记录",
+            "剪刀使用记录",
+            "剪刀-线材关联",
+            "剪刀库存汇总",
+        ],
+    ),
+    (
+        "上冲",
+        &[
+            "上冲信息表",
+            "上冲入库记录",
+            "上冲使用记录",
+            "上冲-线材关联",
+            "上冲库存汇总",
+        ],
+    ),
+];
 
-fn write_sheet_data(
-    file_path: &str,
-    sheet_name: &str,
-    rows: &[HashMap<String, String>],
-) -> Result<(), String> {
-    let mut all_sheets_data: Vec<(String, Vec<HashMap<String, String>>)> = Vec::new();
-    if Path::new(file_path).exists() {
-        // 读取阶段独立作用域：确保 calamine 读取句柄在原子替换前释放，
-        // 否则替换目标文件会因自身读句柄占用而失败（Windows 拒绝访问）。
-        {
-            let mut wb = open_workbook_auto(file_path).map_err(|e| e.to_string())?;
-            for &(sname, _) in SHEETS {
-                if let Ok(range) = wb.worksheet_range(sname) {
-                    let keys = get_column_keys(sname);
-                    let mut sheet_rows = Vec::new();
-                    for (row_idx, row) in range.rows().enumerate() {
-                        if row_idx == 0 {
-                            continue;
-                        }
-                        let mut item = HashMap::new();
-                        for (col_idx, cell) in row.iter().enumerate() {
-                            if col_idx < keys.len() {
-                                item.insert(keys[col_idx].to_string(), cell_to_string(cell));
-                            }
-                        }
-                        sheet_rows.push(item);
-                    }
-                    all_sheets_data.push((sname.to_string(), sheet_rows));
-                } else {
-                    all_sheets_data.push((sname.to_string(), vec![]));
-                }
-            }
-        }
-    } else {
-        for &(sname, _) in SHEETS {
-            all_sheets_data.push((sname.to_string(), vec![]));
-        }
-    }
-    for (name, data) in &mut all_sheets_data {
-        if name == sheet_name {
-            *data = rows.to_vec();
-        }
-    }
+/// 生成单个分组的 Excel 文件内容（该组全部业务表写入一个工作簿）。
+pub fn export_group_xlsx(file_path: &str, group_sheets: &[&str]) -> Result<Vec<u8>, String> {
+    let _guard = lock_excel()?;
+    let conn = db::connect(file_path)?;
     let mut workbook = Workbook::new();
-    for &(sname, cols) in SHEETS {
+    for &sheet_name in group_sheets {
+        let Some((_, cols)) = SHEETS.iter().find(|(name, _)| *name == sheet_name) else {
+            continue;
+        };
         let sheet = workbook
             .add_worksheet()
-            .set_name(sname)
+            .set_name(sheet_name)
             .map_err(|e| e.to_string())?;
         for (i, &(header, _)) in cols.iter().enumerate() {
             sheet
                 .write_string(0, i as u16, header)
                 .map_err(|e| e.to_string())?;
         }
-        if let Some((_, sheet_data)) = all_sheets_data.iter().find(|(n, _)| n == sname) {
-            for (row_idx, row) in sheet_data.iter().enumerate() {
-                for (col_idx, &(_, key)) in cols.iter().enumerate() {
-                    if let Some(value) = row.get(key) {
-                        sheet
-                            .write_string((row_idx + 1) as u32, col_idx as u16, value)
-                            .map_err(|e| e.to_string())?;
-                    }
+        let rows = db::get_all(&conn, sheet_name)?;
+        for (row_idx, row) in rows.iter().enumerate() {
+            for (col_idx, &(_, key)) in cols.iter().enumerate() {
+                if let Some(value) = row.get(key) {
+                    sheet
+                        .write_string((row_idx + 1) as u32, col_idx as u16, value)
+                        .map_err(|e| e.to_string())?;
                 }
             }
         }
     }
-    save_workbook_atomically(&mut workbook, Path::new(file_path))
+    let buffer = workbook
+        .save_to_buffer()
+        .map_err(|e| format!("生成 Excel 失败: {}", e))?;
+    Ok(buffer)
 }
 
+/// 列出 Excel 文件中属于本系统业务表的工作表名（导入时供用户勾选）。
+pub fn list_excel_sheets(xlsx_path: &str) -> Result<Vec<String>, String> {
+    if !Path::new(xlsx_path).is_file() {
+        return Err("所选文件不存在".to_string());
+    }
+    let workbook = open_workbook_auto(xlsx_path)
+        .map_err(|e| format!("打开 Excel 文件失败「{}」: {}", xlsx_path, e))?;
+    let names = workbook.sheet_names().to_vec();
+    let known: Vec<String> = names
+        .into_iter()
+        .filter(|name| SHEETS.iter().any(|(sheet, _)| sheet == name))
+        .collect();
+    if known.is_empty() {
+        return Err("Excel 文件中没有可识别的业务表".to_string());
+    }
+    Ok(known)
+}
+
+/// 从 Excel 文件导入选中的工作表（整表替换，事务内完成）。
+pub fn import_sheets_from_xlsx(
+    file_path: &str,
+    xlsx_path: &str,
+    selected_sheets: &[String],
+) -> Result<HashMap<String, i64>, String> {
+    let _guard = lock_excel()?;
+    let mut conn = db::connect(file_path)?;
+    let mut stats = HashMap::new();
+    let tx = conn
+        .transaction()
+        .map_err(|e| format!("开启事务失败: {}", e))?;
+    for sheet_name in selected_sheets {
+        let rows = read_xlsx_all(xlsx_path, sheet_name)?;
+        db::replace_all_in_tx(&tx, sheet_name, &rows)?;
+        stats.insert(sheet_name.clone(), rows.len() as i64);
+    }
+    tx.commit().map_err(|e| format!("提交导入失败: {}", e))?;
+    Ok(stats)
+}
+
+/// 导出全部业务表为单个 Excel（保留旧入口兼容，推荐改用分组导出）。
 pub fn export_data(file_path: &str) -> Result<Vec<u8>, String> {
-    let _guard = lock_excel()?;
-    export_data_inner(file_path)
-}
-
-fn export_data_inner(file_path: &str) -> Result<Vec<u8>, String> {
-    if !Path::new(file_path).exists() {
-        return Err("数据文件不存在".to_string());
-    }
-    fs::read(file_path).map_err(|e| e.to_string())
-}
-
-pub fn import_data(file_path: &str, data: &[u8]) -> Result<HashMap<String, i64>, String> {
-    let _guard = lock_excel()?;
-    import_data_inner(file_path, data)
-}
-
-fn import_data_inner(file_path: &str, data: &[u8]) -> Result<HashMap<String, i64>, String> {
-    let target = Path::new(file_path);
-    if let Some(parent) = target.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|e| format!("创建数据目录失败「{}」: {}", parent.display(), e))?;
-    }
-    let temporary = storage::temporary_path(target, "xlsx")?;
-    let result = (|| {
-        fs::write(&temporary, data)
-            .map_err(|e| format!("写入导入暂存文件失败「{}」: {}", temporary.display(), e))?;
-        validate_workbook_inner(&temporary)?;
-        let stats = workbook_stats_inner(&temporary)?;
-        storage::sync_file(&temporary)?;
-        storage::replace_file(&temporary, target)?;
-        Ok(stats)
-    })();
-    if result.is_err() && temporary.exists() {
-        let _ = fs::remove_file(&temporary);
-    }
-    result
+    let all_sheets: Vec<&str> = SHEETS.iter().map(|(name, _)| *name).collect();
+    export_group_xlsx(file_path, &all_sheets)
 }
 
 pub fn calculate_stock(
@@ -883,6 +844,7 @@ fn calculate_stock_inner(
     file_path: &str,
     stock_type: &str,
 ) -> Result<Vec<HashMap<String, String>>, String> {
+    let conn = db::connect(file_path)?;
     let (info_sheet, order_sheet, use_sheet, stock_sheet, item_id_key) = match stock_type {
         "punch" => (
             "冲头信息表",
@@ -928,9 +890,9 @@ fn calculate_stock_inner(
         ),
         _ => return Err("未知类型".to_string()),
     };
-    let info_items = get_all_inner(file_path, info_sheet)?;
-    let orders = get_all_inner(file_path, order_sheet)?;
-    let uses = get_all_inner(file_path, use_sheet)?;
+    let info_items = db::get_all(&conn, info_sheet)?;
+    let orders = db::get_all(&conn, order_sheet)?;
+    let uses = db::get_all(&conn, use_sheet)?;
     let stock_data: Vec<HashMap<String, String>> = info_items
         .iter()
         .map(|item| {
@@ -973,19 +935,29 @@ fn calculate_stock_inner(
             row
         })
         .collect();
-    write_sheet_data(file_path, stock_sheet, &stock_data)?;
+    let mut conn = conn;
+    db::replace_all(&mut conn, stock_sheet, &stock_data)?;
     Ok(stock_data)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
 
     fn record(fields: &[(&str, &str)]) -> HashMap<String, String> {
         fields
             .iter()
             .map(|(key, value)| (key.to_string(), value.to_string()))
             .collect()
+    }
+
+    fn excel_import_test_helper(
+        db_path: &str,
+        xlsx_path: &Path,
+    ) -> Result<HashMap<String, i64>, String> {
+        let sheets = list_excel_sheets(xlsx_path.to_str().unwrap())?;
+        import_sheets_from_xlsx(db_path, xlsx_path.to_str().unwrap(), &sheets)
     }
 
     #[test]
@@ -1017,15 +989,19 @@ mod tests {
     }
 
     #[test]
-    fn invalid_import_keeps_existing_workbook() {
+    fn invalid_import_rejected() {
+        // 数据库创建后导入非法 Excel 不应影响数据库结构
         let root =
             std::env::temp_dir().join(format!("mold-excel-import-test-{}", uuid::Uuid::new_v4()));
         fs::create_dir_all(&root).unwrap();
-        let path = root.join("mold-data.xlsx");
-        create_empty_workbook_inner(path.to_str().unwrap()).unwrap();
-        let before = fs::read(&path).unwrap();
-        assert!(import_data(path.to_str().unwrap(), b"not-an-xlsx").is_err());
-        assert_eq!(fs::read(&path).unwrap(), before);
+        let path = root.join("mold-data.db");
+        let conn = db::connect(path.to_str().unwrap()).unwrap();
+        db::init_schema(&conn).unwrap();
+        drop(conn);
+        let invalid = root.join("invalid.xlsx");
+        fs::write(&invalid, b"not-an-xlsx").unwrap();
+        let result = excel_import_test_helper(path.to_str().unwrap(), &invalid);
+        assert!(result.is_err());
         fs::remove_dir_all(root).unwrap();
     }
 
@@ -1074,5 +1050,5 @@ pub fn get_default_file_path() -> String {
             })
             .unwrap_or_else(|| "./data".to_string())
     };
-    format!("{}/mold-data.xlsx", base)
+    format!("{}/mold-data.db", base)
 }

@@ -408,16 +408,32 @@ export const stockCalcApi = isTauri()
     }
 
 // 数据导入导出 API（浏览器预览模式返回 mock）
+// 导出分组：螺丝规格 / 冲头 / 牙板 / 皮带 / 主模具 / 剪刀 / 上冲
+export const EXPORT_GROUPS = [
+  { id: '螺丝规格', label: '螺丝规格' },
+  { id: '冲头', label: '冲头' },
+  { id: '牙板', label: '牙板' },
+  { id: '皮带', label: '皮带' },
+  { id: '主模具', label: '主模具' },
+  { id: '剪刀', label: '剪刀' },
+  { id: '上冲', label: '上冲' }
+] as const
+
 export const dataApi = isTauri()
   ? {
-      exportData: () => invoke<any>('export_data'),
-      importData: (base64: string) => invoke<{ success: boolean; stats: Record<string, number> }>('import_data', { data: base64 }),
+      exportGroup: (groupId: string, destinationPath: string) =>
+        invoke<{ success: boolean; filePath: string; group: string }>('export_excel_group', { groupId, destinationPath }),
+      listExcelSheets: (sourcePath: string) =>
+        invoke<{ sheets: string[] }>('list_excel_sheets', { sourcePath }),
+      importExcelSheets: (sourcePath: string, selectedSheets: string[]) =>
+        invoke<{ success: boolean; stats: Record<string, number> }>('import_excel_sheets', { sourcePath, selectedSheets }),
       exportPackage: (destinationPath: string) => invoke<{ success: boolean; filePath: string }>('export_data_package', { destinationPath }),
       importPackage: (sourcePath: string) => invoke<{ success: boolean; stats: Record<string, number>; attachmentCount: number }>('import_data_package', { sourcePath }),
     }
   : {
-      exportData: async () => ({ filename: 'mold-data.xlsx', data: '' }),
-      importData: async () => ({ success: true, stats: {} }),
+      exportGroup: async (groupId: string, destinationPath: string) => ({ success: true, filePath: destinationPath, group: groupId }),
+      listExcelSheets: async () => ({ sheets: ['螺丝规格表', '冲头信息表', '冲头入库记录'] }),
+      importExcelSheets: async (_sourcePath: string, _selectedSheets: string[]) => ({ success: true, stats: {} }),
       exportPackage: async (destinationPath: string) => ({ success: true, filePath: destinationPath }),
       importPackage: async (_sourcePath: string) => ({ success: true, stats: {}, attachmentCount: 0 }),
     }

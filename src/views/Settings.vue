@@ -20,23 +20,38 @@
           </el-button>
         </div>
         <div class="action-desc">
-          <p>完整数据包包含 Excel、全部附件和版本清单，适合换电脑、完整迁移和离线归档。</p>
+          <p>完整数据包包含数据库、全部附件和版本清单，适合换电脑、完整迁移和离线归档。</p>
         </div>
       </div>
       <div class="action-group secondary-action-group">
-        <div class="action-group-title">仅 Excel（兼容旧流程）</div>
+        <div class="action-group-title">Excel 导出（按业务分组，每组一个文件）</div>
         <div class="action-buttons">
-          <el-button type="primary" @click="handleExport" :loading="exporting">
+          <el-button
+            v-for="group in exportGroups"
+            :key="group.id"
+            :type="group.id === '螺丝规格' ? 'primary' : 'default'"
+            plain
+            :loading="exportingGroup === group.id"
+            @click="handleExportGroup(group.id)"
+          >
             <el-icon><Download /></el-icon>
-            导出 Excel
-          </el-button>
-          <el-button type="warning" @click="handleImport" :loading="importing">
-            <el-icon><Upload /></el-icon>
-            导入 Excel
+            导出{{ group.label }}
           </el-button>
         </div>
         <div class="action-desc">
-          <p>仅 Excel 不包含附件；导入前会创建包含当前 Excel 与附件的联合备份。</p>
+          <p>每组生成一个独立 Excel（如“冲头.xlsx”包含冲头信息、入库、领用、关联与库存汇总），不再把所有表放进一个文件。</p>
+        </div>
+      </div>
+      <div class="action-group secondary-action-group">
+        <div class="action-group-title">Excel 导入（可勾选要导入的工作表）</div>
+        <div class="action-buttons">
+          <el-button type="warning" @click="handleImport" :loading="importing">
+            <el-icon><Upload /></el-icon>
+            选择 Excel 并导入
+          </el-button>
+        </div>
+        <div class="action-desc">
+          <p>导入前先列出 Excel 中的业务表，勾选后整表替换对应数据；导入前自动创建联合备份。</p>
         </div>
       </div>
     </el-card>
@@ -63,7 +78,7 @@
         </div>
       </div>
       <div class="action-desc">
-        <p>选择一个 .xlsx 文件作为数据存储位置</p>
+        <p>选择一个 .db 数据库文件作为数据存储位置</p>
         <p>修改后需要重启应用才能生效</p>
       </div>
     </el-card>
@@ -138,6 +153,19 @@
         暂无备份记录
       </div>
     </el-card>
+
+    <el-dialog v-model="importDialogVisible" title="选择要导入的工作表" width="460px" :close-on-click-modal="false">
+      <div class="import-sheet-tip">该 Excel 中包含以下业务表，勾选后将整表替换对应数据：</div>
+      <el-checkbox-group v-model="selectedSheets" class="import-sheet-group">
+        <el-checkbox v-for="sheet in availableSheets" :key="sheet" :value="sheet">
+          {{ sheet }}
+        </el-checkbox>
+      </el-checkbox-group>
+      <template #footer>
+        <el-button @click="importDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="importing" @click="confirmImport">确定导入</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -145,11 +173,11 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { save, open } from '@tauri-apps/plugin-dialog'
-import { readFile, writeFile } from '@tauri-apps/plugin-fs'
-import { dataApi, settingsApi, backupApi } from '../api'
+import { dataApi, settingsApi, backupApi, EXPORT_GROUPS } from '../api'
 import { isUserCancellation, showDetailedError } from '../utils/errorFeedback'
 
-const exporting = ref(false)
+const exportGroups = EXPORT_GROUPS
+const exportingGroup = ref('')
 const importing = ref(false)
 const packageExporting = ref(false)
 const packageImporting = ref(false)
@@ -158,6 +186,10 @@ const dataPath = ref('')
 const backupCount = ref(10)
 const backupConfig = ref<any>({})
 const backups = ref<any[]>([])
+const importDialogVisible = ref(false)
+const importSourcePath = ref('')
+const availableSheets = ref<string[]>([])
+const selectedSheets = ref<string[]>([])
 
 onMounted(async () => {
   try {
@@ -330,24 +362,21 @@ async function handleImportPackage() {
   }
 }
 
-async function handleExport() {
-  exporting.value = true
+async function handleExportGroup(groupId: string) {
+  exportingGroup.value = groupId
   try {
-    const result = await dataApi.exportData()
-    const bytes = base64ToBytes(result.data)
-
+    const timestamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)
     const filePath = await save({
-      defaultPath: result.filename,
+      defaultPath: `${groupId}-${timestamp}.xlsx`,
       filters: [{ name: 'Excel 文件', extensions: ['xlsx'] }]
     })
     if (!filePath) return
-
-    await writeFile(filePath, bytes)
-    ElMessage.success('导出成功')
+    await dataApi.exportGroup(groupId, filePath)
+    ElMessage.success(`「${groupId}」导出成功`)
   } catch (error) {
-    if (!isUserCancellation(error)) showDetailedError('导出全部数据', error)
+    if (!isUserCancellation(error)) showDetailedError(`导出「${groupId}」`, error)
   } finally {
-    exporting.value = false
+    exportingGroup.value = ''
   }
 }
 
@@ -356,54 +385,53 @@ async function handleImport() {
   try {
     const filePath = await open({
       filters: [{ name: 'Excel 文件', extensions: ['xlsx'] }],
-      multiple: false
+      multiple: false,
+      title: '选择 Excel 文件'
     })
     if (!filePath) return
 
-    await ElMessageBox.confirm(
-      '导入将替换当前所有数据（原数据会自动备份），确定继续？',
-      '确认导入',
-      { type: 'warning', confirmButtonText: '确定导入', cancelButtonText: '取消' }
-    )
-
-    const fileBuffer = await fetchFileAsBase64(filePath as string)
-    const result = await dataApi.importData(fileBuffer)
-
-    const statsText = Object.entries(result.stats)
-      .map(([name, count]) => `${name}: ${count} 条`)
-      .join('\n')
-
-    await ElMessageBox.alert(
-      `导入成功！\n\n${statsText}`,
-      '导入结果',
-      { type: 'success' }
-    )
-
-    window.location.reload()
+    const result = await dataApi.listExcelSheets(filePath as string)
+    availableSheets.value = result.sheets
+    selectedSheets.value = [...result.sheets]
+    importSourcePath.value = filePath as string
+    importDialogVisible.value = true
   } catch (error) {
-    if (!isUserCancellation(error)) showDetailedError('导入并替换全部数据', error)
+    if (!isUserCancellation(error)) showDetailedError('读取 Excel 工作表', error)
   } finally {
     importing.value = false
   }
 }
 
-function base64ToBytes(data: string): Uint8Array {
-  return Uint8Array.from(atob(data), character => character.charCodeAt(0))
-}
-
-async function fetchFileAsBase64(filePath: string): Promise<string> {
-  const bytes = await readFile(filePath)
-  let binary = ''
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i])
+async function confirmImport() {
+  if (selectedSheets.value.length === 0) {
+    ElMessage.warning('请至少勾选一个工作表')
+    return
   }
-  return btoa(binary)
+  importing.value = true
+  importDialogVisible.value = false
+  try {
+    await ElMessageBox.confirm(
+      `将导入 ${selectedSheets.value.length} 个工作表并替换对应数据（导入前自动创建联合备份），确定继续？\n\n${selectedSheets.value.join('、')}`,
+      '确认导入',
+      { type: 'warning', confirmButtonText: '确定导入', cancelButtonText: '取消' }
+    )
+    const result = await dataApi.importExcelSheets(importSourcePath.value, selectedSheets.value)
+    const statsText = Object.entries(result.stats)
+      .map(([name, count]) => `${name}: ${count} 条`)
+      .join('\n')
+    await ElMessageBox.alert(`导入成功！\n\n${statsText}`, '导入结果', { type: 'success' })
+    window.location.reload()
+  } catch (error) {
+    if (!isUserCancellation(error)) showDetailedError('导入 Excel 工作表', error)
+  } finally {
+    importing.value = false
+  }
 }
 
 async function handleSelectPath() {
   try {
     const selected = await open({
-      filters: [{ name: 'Excel 文件', extensions: ['xlsx'] }],
+      filters: [{ name: '数据库文件', extensions: ['db'] }],
       multiple: false,
       title: '选择数据文件'
     })
@@ -625,6 +653,21 @@ async function handleSelectPath() {
   padding: 20px;
   color: var(--text-muted);
   text-align: center;
+}
+
+.import-sheet-tip {
+  color: var(--text-secondary);
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+
+.import-sheet-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 12px;
+  max-height: 320px;
+  overflow: auto;
+  padding: 2px;
 }
 
 @media (min-width: 1100px) {
