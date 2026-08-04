@@ -466,10 +466,13 @@ body {
   background: var(--surface-muted) !important;
 }
 
-/* 列宽拖动：放大表头边界热区，并用主题主色提供明确反馈。 */
+/* 列宽拖动：放大表头边界热区，并用主题主色提供明确反馈。
+   z-index 需高于操作列（表头 z-index: 12），否则横向溢出固定操作列时会盖住
+   倒数第二列右边缘伸出的拖拽热区，导致该处无法拖动列宽。 */
 .vxe-table .vxe-header--column > .vxe-cell--col-resizable {
   right: -5px;
   width: 10px;
+  z-index: 20;
 }
 
 .vxe-table .vxe-header--column > .vxe-cell--col-resizable::before {

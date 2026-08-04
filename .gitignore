@@ -8,5 +8,7 @@ src-tauri/target-*/
 .workbuddy/
 data/backups/
 data/*.xlsx
+data/*.json
+data/*.md
 *.log
 .DS_Store
