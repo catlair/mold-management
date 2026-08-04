@@ -345,10 +345,12 @@ function matchFields(kw: string, fields: any[]): boolean {
 
 // ─── 键盘导航 ────────────────────────────────────────
 /** 计算扁平化索引：将 (groupIndex, itemIndex) 映射为全局序号 */
-function flatIndex(gi: number, ii: number): number {
+function flatIndex(gi: number | string, ii: number | string): number {
+  const g = Number(gi)
+  const i = Number(ii)
   let count = 0
-  for (let i = 0; i < gi; i++) count += groups.value[i]?.items.length || 0
-  return count + ii
+  for (let k = 0; k < g; k++) count += groups.value[k]?.items.length || 0
+  return count + i
 }
 
 /** 总结果数 */
