@@ -33,6 +33,17 @@ export default defineConfig({
           if (id.includes('node_modules/vue') || id.includes('node_modules/vue-router')) {
             return 'vue-vendor'
           }
+          // 打印/PDF 相关库拆为独立 chunk，避免膨胀页面主包
+          if (
+            id.includes('node_modules/jspdf') ||
+            id.includes('node_modules/html2canvas') ||
+            id.includes('node_modules/dompurify') ||
+            id.includes('node_modules/canvg') ||
+            id.includes('node_modules/atob') ||
+            id.includes('node_modules/fflate')
+          ) {
+            return 'print-vendor'
+          }
         },
       },
     },

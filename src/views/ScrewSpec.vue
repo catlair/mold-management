@@ -6,6 +6,14 @@
           <el-icon><Document /></el-icon>
           <span>螺丝规格管理</span>
           <div class="header-right">
+            <el-button @click="openPrint('print')">
+              <el-icon><Printer /></el-icon>
+              打印
+            </el-button>
+            <el-button type="primary" @click="openPrint('pdf')">
+              <el-icon><Download /></el-icon>
+              导出 PDF
+            </el-button>
             <el-button type="primary" @click="handleAdd">
               <el-icon><Plus /></el-icon>
               添加规格
@@ -247,13 +255,31 @@
       :mode="attachmentWorkspaceMode"
       @changed="handleAttachmentChanged"
     />
+
+    <PrintSettingsDialog
+      v-model="printDialogVisible"
+      :mode="printAction"
+      page-key="screwSpec"
+      :columns="screwSpecPrintColumns"
+      @confirm="runPrintAction"
+    />
+    <PrintArea
+      page-key="screwSpec"
+      :current-page-key="printCurrentPageKey"
+      :rows="printRows"
+      :title="printTitle"
+      :print-time="printTime"
+      :settings="printSettings"
+      :enabled-columns="printEnabledColumns"
+      :paginated-pages="printPaginatedPages"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, inject } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { View, Paperclip } from '@element-plus/icons-vue'
+import { View, Paperclip, Printer, Download } from '@element-plus/icons-vue'
 import type { FormInstance } from 'element-plus'
 import { screwSpecApi, screwAttachmentApi, punchApi, dieApi, punchLinkApi, dieLinkApi, stockCalcApi } from '../api'
 import { useAllowDelete } from '../composables/useAllowDelete'
@@ -263,6 +289,11 @@ import FullscreenToggle from '../components/FullscreenToggle.vue'
 import DataTable from '../components/DataTable.vue'
 import RelatedDataDialog from '../components/RelatedDataDialog.vue'
 import ScrewAttachmentWorkspace from '../components/ScrewAttachmentWorkspace.vue'
+import PrintSettingsDialog from '../components/PrintSettingsDialog.vue'
+import PrintArea from '../components/PrintArea.vue'
+import { screwSpecPrintColumns } from '../config/printColumns'
+import { usePrint } from '../composables/usePrint'
+import { usePrintSettings } from '../composables/usePrintSettings'
 import { toShortCode, matchPunchNames } from '../utils/punchName'
 
 const { allowDelete } = useAllowDelete()
@@ -293,6 +324,39 @@ const dieDialogVisible = ref(false)
 const dieDialogItems = ref<any[]>([])
 const dieDialogPrimary = ref('')
 const dieDialogRow = ref<any>({})
+
+// 打印与导出
+const {
+  rows: printRows,
+  title: printTitle,
+  printTime,
+  print,
+  exportPdf,
+  currentPageKey: printCurrentPageKey,
+  paginatedPages: printPaginatedPages,
+  enabledColumns: printEnabledColumns,
+} = usePrint()
+const { settings: printSettings } = usePrintSettings()
+const printDialogVisible = ref(false)
+const printAction = ref<'print' | 'pdf'>('print')
+
+function openPrint(action: 'print' | 'pdf') {
+  if (!tableData.value.length) {
+    ElMessage.info('暂无数据可打印')
+    return
+  }
+  printAction.value = action
+  printDialogVisible.value = true
+}
+
+function runPrintAction() {
+  const options = { title: '螺丝规格明细表' }
+  if (printAction.value === 'print') {
+    print('screwSpec', tableData.value, screwSpecPrintColumns, options)
+  } else {
+    exportPdf('screwSpec', tableData.value, screwSpecPrintColumns, options)
+  }
+}
 
 onMounted(() => {
   loadData()

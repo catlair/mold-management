@@ -6,6 +6,14 @@
           <el-icon><SetUp /></el-icon>
           <span>冲头管理</span>
           <div class="header-right">
+            <el-button @click="openPrint('print')">
+              <el-icon><Printer /></el-icon>
+              打印
+            </el-button>
+            <el-button type="primary" @click="openPrint('pdf')">
+              <el-icon><Download /></el-icon>
+              导出 PDF
+            </el-button>
             <el-button type="primary" @click="handleAdd">
               <el-icon><Plus /></el-icon>
               添加冲头
@@ -177,6 +185,24 @@
       </div>
     </RelatedDataDialog>
 
+    <PrintSettingsDialog
+      v-model="printDialogVisible"
+      :mode="printAction"
+      page-key="punch"
+      :columns="punchPrintColumns"
+      @confirm="runPrintAction"
+    />
+    <PrintArea
+      page-key="punch"
+      :current-page-key="printCurrentPageKey"
+      :rows="printRows"
+      :title="printTitle"
+      :print-time="printTime"
+      :settings="printSettings"
+      :enabled-columns="printEnabledColumns"
+      :paginated-pages="printPaginatedPages"
+    />
+
     <!-- 添加/编辑对话框 -->
     <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑冲头' : '添加冲头'" width="500px">
       <el-form ref="formRef" :model="form" :rules="formRules" label-width="80px">
@@ -318,6 +344,7 @@
 import { ref, computed, onMounted, inject } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance } from 'element-plus'
+import { SetUp, Plus, Printer, Download } from '@element-plus/icons-vue'
 import { punchApi, punchOrderApi, punchUseApi, punchLinkApi, screwSpecApi, stockCalcApi, punchSpecApi } from '../api'
 import { useAllowDelete } from '../composables/useAllowDelete'
 import { useHighlight } from '../composables/useHighlight'
@@ -325,6 +352,11 @@ import { settleNamedRequests, showBatchErrors, showDetailedError } from '../util
 import DataTable from '../components/DataTable.vue'
 import RelatedDataDialog from '../components/RelatedDataDialog.vue'
 import FullscreenToggle from '../components/FullscreenToggle.vue'
+import PrintSettingsDialog from '../components/PrintSettingsDialog.vue'
+import PrintArea from '../components/PrintArea.vue'
+import { punchPrintColumns } from '../config/printColumns'
+import { usePrint } from '../composables/usePrint'
+import { usePrintSettings } from '../composables/usePrintSettings'
 import { toFullName } from '../utils/punchName'
 import {
   duplicateErrorMessage,
@@ -336,6 +368,39 @@ import {
 const { allowDelete } = useAllowDelete()
 // 全屏状态由 App 全局提供（isFullscreen 仅用于页面容器样式）
 const { isFullscreen } = inject<any>('fullscreen')!
+
+// 打印与导出
+const {
+  rows: printRows,
+  title: printTitle,
+  printTime,
+  print,
+  exportPdf,
+  currentPageKey: printCurrentPageKey,
+  paginatedPages: printPaginatedPages,
+  enabledColumns: printEnabledColumns,
+} = usePrint()
+const { settings: printSettings } = usePrintSettings()
+const printDialogVisible = ref(false)
+const printAction = ref<'print' | 'pdf'>('print')
+
+function openPrint(action: 'print' | 'pdf') {
+  if (!punchList.value.length) {
+    ElMessage.info('暂无数据可打印')
+    return
+  }
+  printAction.value = action
+  printDialogVisible.value = true
+}
+
+function runPrintAction() {
+  const options = { title: '冲头信息明细表' }
+  if (printAction.value === 'print') {
+    print('punch', punchList.value, punchPrintColumns, options)
+  } else {
+    exportPdf('punch', punchList.value, punchPrintColumns, options)
+  }
+}
 
 function getCurrentDateTime() {
   const d = new Date()

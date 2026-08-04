@@ -6,6 +6,14 @@
           <el-icon><Grid /></el-icon>
           <span>牙板管理</span>
           <div class="header-right">
+            <el-button @click="openPrint('print')">
+              <el-icon><Printer /></el-icon>
+              打印
+            </el-button>
+            <el-button type="primary" @click="openPrint('pdf')">
+              <el-icon><Download /></el-icon>
+              导出 PDF
+            </el-button>
             <el-button type="primary" @click="handleAdd">
               <el-icon><Plus /></el-icon>
               添加牙板
@@ -310,6 +318,24 @@
         该牙板暂无关联螺丝规格
       </div>
     </RelatedDataDialog>
+
+    <PrintSettingsDialog
+      v-model="printDialogVisible"
+      :mode="printAction"
+      page-key="die"
+      :columns="diePrintColumns"
+      @confirm="runPrintAction"
+    />
+    <PrintArea
+      page-key="die"
+      :current-page-key="printCurrentPageKey"
+      :rows="printRows"
+      :title="printTitle"
+      :print-time="printTime"
+      :settings="printSettings"
+      :enabled-columns="printEnabledColumns"
+      :paginated-pages="printPaginatedPages"
+    />
   </div>
 </template>
 
@@ -317,6 +343,7 @@
 import { ref, computed, onMounted, inject } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance } from 'element-plus'
+import { Grid, Plus, Printer, Download } from '@element-plus/icons-vue'
 import { dieApi, dieOrderApi, dieUseApi, dieLinkApi, screwSpecApi, stockCalcApi, dieMachineTypeApi } from '../api'
 import { useAllowDelete } from '../composables/useAllowDelete'
 import { useHighlight } from '../composables/useHighlight'
@@ -324,6 +351,11 @@ import { settleNamedRequests, showBatchErrors, showDetailedError } from '../util
 import DataTable from '../components/DataTable.vue'
 import RelatedDataDialog from '../components/RelatedDataDialog.vue'
 import FullscreenToggle from '../components/FullscreenToggle.vue'
+import PrintSettingsDialog from '../components/PrintSettingsDialog.vue'
+import PrintArea from '../components/PrintArea.vue'
+import { diePrintColumns } from '../config/printColumns'
+import { usePrint } from '../composables/usePrint'
+import { usePrintSettings } from '../composables/usePrintSettings'
 import {
   dieUniqueKey,
   duplicateErrorMessage,
@@ -334,6 +366,39 @@ import {
 const { allowDelete } = useAllowDelete()
 // 全屏状态由 App 全局提供（isFullscreen 仅用于页面容器样式）
 const { isFullscreen } = inject<any>('fullscreen')!
+
+// 打印与导出
+const {
+  rows: printRows,
+  title: printTitle,
+  printTime,
+  print,
+  exportPdf,
+  currentPageKey: printCurrentPageKey,
+  paginatedPages: printPaginatedPages,
+  enabledColumns: printEnabledColumns,
+} = usePrint()
+const { settings: printSettings } = usePrintSettings()
+const printDialogVisible = ref(false)
+const printAction = ref<'print' | 'pdf'>('print')
+
+function openPrint(action: 'print' | 'pdf') {
+  if (!dieList.value.length) {
+    ElMessage.info('暂无数据可打印')
+    return
+  }
+  printAction.value = action
+  printDialogVisible.value = true
+}
+
+function runPrintAction() {
+  const options = { title: '牙板信息明细表' }
+  if (printAction.value === 'print') {
+    print('die', dieList.value, diePrintColumns, options)
+  } else {
+    exportPdf('die', dieList.value, diePrintColumns, options)
+  }
+}
 
 function getCurrentDateTime() {
   const d = new Date()
