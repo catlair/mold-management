@@ -418,8 +418,9 @@ async function confirmImport() {
   importing.value = true
   importDialogVisible.value = false
   try {
+    const names = selectedSheets.value.map(selection => selection.table).join('、')
     await ElMessageBox.confirm(
-      `将导入 ${selectedSheets.value.length} 个工作表并替换对应数据（导入前自动创建联合备份），确定继续？\n\n${selectedSheets.value.join('、')}`,
+      `将导入 ${selectedSheets.value.length} 个工作表：${names}\n（导入前自动创建联合备份），确定继续？`,
       '确认导入',
       { type: 'warning', confirmButtonText: '确定导入', cancelButtonText: '取消' }
     )
