@@ -256,6 +256,7 @@ async function saveDisplayName() {
     Object.assign(currentAttachment.value, updated)
     const listItem = attachments.value.find(item => item.id === updated.id)
     if (listItem) Object.assign(listItem, updated)
+    ElMessage.success('附件名称已更新')
   } catch (error) {
     showDetailedError('重命名螺丝规格附件', error)
   } finally { saving.value = false }

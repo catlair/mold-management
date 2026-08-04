@@ -25,14 +25,14 @@
 
         <DataTable table-id="screw-spec.info" :data="tableData" :loading="loading">
         <ConfigurableTable field="name" title="螺丝名称" width="160" sortable />
-        <ConfigurableTable field="headType" title="头型" width="120" sortable :filters="headTypeFilters" :filter-method="filterHandler" />
+        <ConfigurableTable field="headType" title="头型" width="120" sortable :filters="headTypeFilters" :filter-method="exactFilter" />
         <ConfigurableTable field="punch" title="冲头" width="120" sortable>
           <template #default="{ row }">
             <el-link v-if="row.punch" type="primary" :underline="false" @click="showPunchDialog(row)">{{ row.punch }}</el-link>
             <span v-else>-</span>
           </template>
         </ConfigurableTable>
-        <ConfigurableTable field="threadType" title="牙型" width="120" sortable :filters="threadTypeFilters" :filter-method="filterHandler" />
+        <ConfigurableTable field="threadType" title="牙型" width="120" sortable :filters="threadTypeFilters" :filter-method="exactFilter" />
         <ConfigurableTable field="die" title="牙板" width="120" sortable>
           <template #default="{ row }">
             <el-link v-if="row.die" type="success" :underline="false" @click="showDieDialog(row)">{{ row.die }}</el-link>
@@ -45,7 +45,7 @@
         <ConfigurableTable field="threadDiameter" title="牙径" width="100" sortable />
         <ConfigurableTable field="shankLength" title="光钉长度" width="120" sortable />
         <ConfigurableTable field="wireMaterial" title="线材" width="100" sortable />
-        <ConfigurableTable field="plating" title="电镀" width="120" sortable :filters="platingFilters" :filter-method="filterHandler" />
+        <ConfigurableTable field="plating" title="电镀" width="120" sortable :filters="platingFilters" :filter-method="exactFilter" />
         <ConfigurableTable field="customer" title="客户名" width="120" sortable />
         <ConfigurableTable field="externalId" title="外部ID" width="120" sortable />
         <ConfigurableTable field="remark" title="备注" min-width="140" />
@@ -300,6 +300,7 @@ import { usePrint } from '../composables/usePrint'
 import { usePrintSettings } from '../composables/usePrintSettings'
 import { toShortCode, matchPunchNames } from '../utils/punchName'
 import { parseSpecText } from '../utils/specNormalize'
+import { exactFilter, buildFilters } from '../utils/tableFilters'
 
 const { allowDelete } = useAllowDelete()
 // 全屏状态由 App 全局提供（isFullscreen 仅用于页面容器样式）
@@ -395,10 +396,9 @@ const dieOptions = computed(() => {
   })
 })
 
-const headTypeFilters = computed(() => [...new Set(tableData.value.map(i => i.headType).filter(Boolean))].map(t => ({ label: t, value: t })))
-const threadTypeFilters = computed(() => [...new Set(tableData.value.map(i => i.threadType).filter(Boolean))].map(t => ({ label: t, value: t })))
-const platingFilters = computed(() => [...new Set(tableData.value.map(i => i.plating).filter(Boolean))].map(t => ({ label: t, value: t })))
-function filterHandler({ value, row, column }: any) { return row[column.property] === value }
+const headTypeFilters = computed(() => buildFilters(tableData.value, 'headType'))
+const threadTypeFilters = computed(() => buildFilters(tableData.value, 'threadType'))
+const platingFilters = computed(() => buildFilters(tableData.value, 'plating'))
 
 const form = ref<any>({
   id: '', customer: '', externalId: '', name: '', headType: '',
@@ -516,6 +516,7 @@ async function setPunchPrimary(item: any) {
     await screwSpecApi.update(punchDialogRow.value.id, { punch: shortName })
     punchDialogVisible.value = false
     loadData()
+    ElMessage.success('外显冲头已设置')
   } catch (error) {
     showDetailedError('设置螺丝规格外显冲头', error)
   }
@@ -543,6 +544,7 @@ async function setDiePrimary(item: any) {
     await screwSpecApi.update(dieDialogRow.value.id, { die: item.name })
     dieDialogVisible.value = false
     loadData()
+    ElMessage.success('外显牙板已设置')
   } catch (error) {
     showDetailedError('设置螺丝规格外显牙板', error)
   }
@@ -706,6 +708,7 @@ async function handleSubmit() {
       await syncLinks(specId, 'dieId', dieNames, dieLinkApi, dieList.value, true)
       dialogVisible.value = false
       loadData()
+      ElMessage.success(isEdit.value ? '规格已更新' : '规格已添加')
     } catch (error) {
       showDetailedError(isEdit.value ? '更新螺丝规格及关联' : '添加螺丝规格及关联', error)
     }
