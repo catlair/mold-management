@@ -400,7 +400,7 @@ async function handleImport() {
 
     const result = await dataApi.listExcelSheets(filePath as string)
     availableSheets.value = result
-    selectedSheets.value = result.filter(sheet => !sheet.systemCalculated).map(({ name, table }) => ({ name, table }))
+    selectedSheets.value = []
     importSourcePath.value = filePath as string
     importDialogVisible.value = true
   } catch (error) {
