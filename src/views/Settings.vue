@@ -30,7 +30,7 @@
             v-for="group in exportGroups"
             :key="group.id"
             size="small"
-            :type="group.id === '螺丝规格' ? 'primary' : 'default'"
+            type="primary"
             plain
             class="export-group-button"
             :loading="exportingGroup === group.id"
