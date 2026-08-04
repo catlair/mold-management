@@ -579,24 +579,36 @@ fn export_excel_group(
 #[tauri::command]
 fn list_excel_sheets(source_path: String) -> Result<Value, String> {
     let sheets = excel::list_excel_sheets(&source_path)?;
-    Ok(json!({ "sheets": sheets }))
+    serde_json::to_value(sheets).map_err(|e| format!("序列化工作表信息失败: {}", e))
 }
 
 #[tauri::command]
 fn import_excel_sheets(
     state: State<AppState>,
     source_path: String,
-    selected_sheets: Vec<String>,
+    selections: Vec<Value>,
 ) -> Result<Value, String> {
-    if selected_sheets.is_empty() {
+    if selections.is_empty() {
         return Err("请至少选择一个要导入的工作表".to_string());
+    }
+    let mut pairs = Vec::new();
+    for selection in selections {
+        let name = selection
+            .get("name")
+            .and_then(Value::as_str)
+            .ok_or_else(|| "导入选择缺少工作表名".to_string())?;
+        let table = selection
+            .get("table")
+            .and_then(Value::as_str)
+            .ok_or_else(|| "导入选择缺少目标表名".to_string())?;
+        pairs.push((name.to_string(), table.to_string()));
     }
     let path = state.file_path.lock().map_err(|e| e.to_string())?;
     let config = state.config.lock().map_err(|e| e.to_string())?;
     let backup_dir = get_backup_dir_for_file(&path, &config);
     let count = config.backup_count;
     do_backup(&path, &backup_dir, "Excel 导入前备份")?;
-    let stats = excel::import_sheets_from_xlsx(&path, &source_path, &selected_sheets)?;
+    let stats = excel::import_sheets_from_xlsx(&path, &source_path, &pairs)?;
     cleanup_old_backups(&backup_dir, count)?;
     Ok(json!({ "success": true, "stats": stats }))
 }
@@ -657,8 +669,13 @@ fn import_data(state: State<AppState>, data: String) -> Result<Value, String> {
     let temporary = storage::temporary_path(Path::new(&*path), "xlsx")?;
     fs::write(&temporary, &bytes).map_err(|e| format!("写入导入暂存文件失败: {}", e))?;
     let sheets = excel::list_excel_sheets(&temporary.to_string_lossy())?;
+    let pairs: Vec<(String, String)> = sheets
+        .into_iter()
+        .filter(|info| !info.system_calculated)
+        .map(|info| (info.name, info.table))
+        .collect();
     do_backup(&path, &backup_dir, "Excel 导入前备份")?;
-    let stats = excel::import_sheets_from_xlsx(&path, &temporary.to_string_lossy(), &sheets)?;
+    let stats = excel::import_sheets_from_xlsx(&path, &temporary.to_string_lossy(), &pairs)?;
     let _ = fs::remove_file(&temporary);
     cleanup_old_backups(&backup_dir, count)?;
     Ok(json!({ "success": true, "stats": stats }))

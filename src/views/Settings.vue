@@ -156,11 +156,17 @@
       </div>
     </el-card>
 
-    <el-dialog v-model="importDialogVisible" title="选择要导入的工作表" width="460px" :close-on-click-modal="false">
-      <div class="import-sheet-tip">该 Excel 中包含以下业务表，勾选后将整表替换对应数据：</div>
+    <el-dialog v-model="importDialogVisible" title="选择要导入的工作表" width="520px" :close-on-click-modal="false">
+      <div class="import-sheet-tip">该 Excel 中包含以下业务表，勾选后将整表替换对应数据（库存汇总为系统计算表，默认不导入）：</div>
       <el-checkbox-group v-model="selectedSheets" class="import-sheet-group">
-        <el-checkbox v-for="sheet in availableSheets" :key="sheet" :value="sheet">
-          {{ sheet }}
+        <el-checkbox v-for="sheet in availableSheets" :key="sheet.name" :value="sheet" class="import-sheet-item">
+          <span class="import-sheet-name">
+            {{ sheet.matchedByHeader ? `${sheet.name}（识别为${sheet.table}）` : sheet.table }}
+          </span>
+          <span class="import-sheet-meta">
+            {{ sheet.rowCount }} 行
+            <el-tag v-if="sheet.systemCalculated" size="small" type="info" class="import-sheet-tag">系统计算表</el-tag>
+          </span>
         </el-checkbox>
       </el-checkbox-group>
       <template #footer>
@@ -175,7 +181,7 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { save, open } from '@tauri-apps/plugin-dialog'
-import { dataApi, settingsApi, backupApi, EXPORT_GROUPS } from '../api'
+import { dataApi, settingsApi, backupApi, EXPORT_GROUPS, type ExcelSheetInfo, type ExcelSheetSelection } from '../api'
 import { isUserCancellation, showDetailedError } from '../utils/errorFeedback'
 
 const exportGroups = EXPORT_GROUPS
@@ -190,8 +196,8 @@ const backupConfig = ref<any>({})
 const backups = ref<any[]>([])
 const importDialogVisible = ref(false)
 const importSourcePath = ref('')
-const availableSheets = ref<string[]>([])
-const selectedSheets = ref<string[]>([])
+const availableSheets = ref<ExcelSheetInfo[]>([])
+const selectedSheets = ref<ExcelSheetSelection[]>([])
 
 onMounted(async () => {
   try {
@@ -393,8 +399,8 @@ async function handleImport() {
     if (!filePath) return
 
     const result = await dataApi.listExcelSheets(filePath as string)
-    availableSheets.value = result.sheets
-    selectedSheets.value = [...result.sheets]
+    availableSheets.value = result
+    selectedSheets.value = result.filter(sheet => !sheet.systemCalculated).map(({ name, table }) => ({ name, table }))
     importSourcePath.value = filePath as string
     importDialogVisible.value = true
   } catch (error) {
@@ -665,11 +671,30 @@ async function handleSelectPath() {
 
 .import-sheet-group {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px 12px;
+  grid-template-columns: 1fr;
+  gap: 4px 12px;
   max-height: 320px;
   overflow: auto;
   padding: 2px;
+}
+
+.import-sheet-item {
+  height: 34px;
+  margin-right: 0;
+}
+
+.import-sheet-name {
+  color: var(--text-primary);
+}
+
+.import-sheet-meta {
+  margin-left: 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.import-sheet-tag {
+  margin-left: 6px;
 }
 
 .export-group-button {

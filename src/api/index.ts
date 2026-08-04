@@ -419,21 +419,38 @@ export const EXPORT_GROUPS = [
   { id: '上冲', label: '上冲' }
 ] as const
 
+export interface ExcelSheetInfo {
+  name: string
+  table: string
+  matchedByHeader: boolean
+  rowCount: number
+  systemCalculated: boolean
+}
+
+export interface ExcelSheetSelection {
+  name: string
+  table: string
+}
+
 export const dataApi = isTauri()
   ? {
       exportGroup: (groupId: string, destinationPath: string) =>
         invoke<{ success: boolean; filePath: string; group: string }>('export_excel_group', { groupId, destinationPath }),
       listExcelSheets: (sourcePath: string) =>
-        invoke<{ sheets: string[] }>('list_excel_sheets', { sourcePath }),
-      importExcelSheets: (sourcePath: string, selectedSheets: string[]) =>
-        invoke<{ success: boolean; stats: Record<string, number> }>('import_excel_sheets', { sourcePath, selectedSheets }),
+        invoke<ExcelSheetInfo[]>('list_excel_sheets', { sourcePath }),
+      importExcelSheets: (sourcePath: string, selections: ExcelSheetSelection[]) =>
+        invoke<{ success: boolean; stats: Record<string, number> }>('import_excel_sheets', { sourcePath, selections }),
       exportPackage: (destinationPath: string) => invoke<{ success: boolean; filePath: string }>('export_data_package', { destinationPath }),
       importPackage: (sourcePath: string) => invoke<{ success: boolean; stats: Record<string, number>; attachmentCount: number }>('import_data_package', { sourcePath }),
     }
   : {
       exportGroup: async (groupId: string, destinationPath: string) => ({ success: true, filePath: destinationPath, group: groupId }),
-      listExcelSheets: async () => ({ sheets: ['螺丝规格表', '冲头信息表', '冲头入库记录'] }),
-      importExcelSheets: async (_sourcePath: string, _selectedSheets: string[]) => ({ success: true, stats: {} }),
+      listExcelSheets: async () => ([
+        { name: '螺丝规格表', table: '螺丝规格表', matchedByHeader: false, rowCount: 40, systemCalculated: false },
+        { name: '冲头信息表', table: '冲头信息表', matchedByHeader: false, rowCount: 21, systemCalculated: false },
+        { name: '冲头库存汇总', table: '冲头库存汇总', matchedByHeader: false, rowCount: 21, systemCalculated: true }
+      ] as ExcelSheetInfo[]),
+      importExcelSheets: async (_sourcePath: string, _selections: ExcelSheetSelection[]) => ({ success: true, stats: {} }),
       exportPackage: async (destinationPath: string) => ({ success: true, filePath: destinationPath }),
       importPackage: async (_sourcePath: string) => ({ success: true, stats: {}, attachmentCount: 0 }),
     }

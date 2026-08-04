@@ -2,6 +2,7 @@ use crate::db;
 use calamine::{open_workbook_auto, Data, Reader};
 use chrono::Local;
 use rust_xlsxwriter::Workbook;
+use serde::Serialize;
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::{Mutex, MutexGuard};
@@ -437,7 +438,7 @@ fn workbook_stats_inner(path: &Path) -> Result<HashMap<String, i64>, String> {
     Ok(stats)
 }
 
-/// 从旧版 Excel 文件读取单个工作表（一次性迁移到数据库时使用）。
+/// 从旧版 Excel 文件读取单个工作表（一次性迁移到数据库时使用，按系统列位置读取）。
 pub fn read_xlsx_all(
     xlsx_path: &str,
     sheet_name: &str,
@@ -468,6 +469,199 @@ pub fn read_xlsx_all(
         items.push(item);
     }
     Ok(items)
+}
+
+/// Excel 导入识别结果：每个可识别工作表对应哪个业务表，以及行数与来源方式。
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExcelSheetInfo {
+    /// Excel 中的原始工作表名
+    pub name: String,
+    /// 识别到的系统业务表名
+    pub table: String,
+    /// 是否通过表头特征识别（表名不匹配时）
+    pub matched_by_header: bool,
+    /// 数据行数（不含表头）
+    pub row_count: i64,
+    /// 是否为系统自动计算的库存汇总表（导入时忽略）
+    pub system_calculated: bool,
+}
+
+fn trimmed_sheet_name(name: &str) -> String {
+    name.trim().trim_matches('\u{3000}').trim().to_string()
+}
+
+/// 按表头特征匹配业务表：返回 (SHEETS 索引, 匹配列数)，歧义时返回 None。
+fn match_table_by_header(header: &[String]) -> Option<(usize, usize)> {
+    let mut best: Option<(usize, usize)> = None;
+    for (idx, &(_, columns)) in SHEETS.iter().enumerate() {
+        let matched = columns
+            .iter()
+            .filter(|(header_name, _)| {
+                header
+                    .iter()
+                    .any(|cell| trimmed_sheet_name(cell) == *header_name)
+            })
+            .count();
+        let threshold = (columns.len() / 2).max(2);
+        if matched >= threshold {
+            let is_better = match best {
+                Some((_, current)) => matched > current,
+                None => true,
+            };
+            if is_better {
+                best = Some((idx, matched));
+            }
+        }
+    }
+    let (best_idx, best_count) = best?;
+    // 唯一性：不存在第二个表达到相同匹配数
+    let mut tied = 0;
+    for (idx, &(_, columns)) in SHEETS.iter().enumerate() {
+        let matched = columns
+            .iter()
+            .filter(|(header_name, _)| {
+                header
+                    .iter()
+                    .any(|cell| trimmed_sheet_name(cell) == *header_name)
+            })
+            .count();
+        if idx != best_idx && matched == best_count {
+            tied += 1;
+        }
+    }
+    if tied > 0 {
+        return None;
+    }
+    Some((best_idx, best_count))
+}
+
+/// 列出 Excel 文件中可识别的业务表（名称匹配优先，否则按表头特征识别）。
+pub fn list_excel_sheets(xlsx_path: &str) -> Result<Vec<ExcelSheetInfo>, String> {
+    if !Path::new(xlsx_path).is_file() {
+        return Err("所选文件不存在".to_string());
+    }
+    let mut workbook = open_workbook_auto(xlsx_path)
+        .map_err(|e| format!("打开 Excel 文件失败「{}」: {}", xlsx_path, e))?;
+    let names = workbook.sheet_names().to_vec();
+    let mut result = Vec::new();
+    for name in names {
+        let range = match workbook.worksheet_range(&name) {
+            Ok(range) => range,
+            Err(_) => continue,
+        };
+        let header: Vec<String> = range
+            .rows()
+            .next()
+            .map(|row| {
+                row.iter()
+                    .map(|cell| trimmed_sheet_name(&cell_to_string(cell)))
+                    .collect()
+            })
+            .unwrap_or_default();
+        let data_rows = range.rows().count().saturating_sub(1) as i64;
+
+        // 1) 名称精确匹配（容错首尾空格）
+        let table = SHEETS
+            .iter()
+            .find(|(sheet, _)| trimmed_sheet_name(&name) == **sheet)
+            .map(|(sheet, _)| sheet.to_string());
+
+        let (table, matched_by_header) = match table {
+            Some(table) => (table, false),
+            None => match match_table_by_header(&header) {
+                Some((idx, _)) => (SHEETS[idx].0.to_string(), true),
+                None => continue, // 名称与表头都无法识别，忽略
+            },
+        };
+
+        result.push(ExcelSheetInfo {
+            name,
+            table: table.clone(),
+            matched_by_header,
+            row_count: data_rows,
+            system_calculated: table.ends_with("库存汇总"),
+        });
+    }
+    if result.is_empty() {
+        return Err("Excel 文件中没有可识别的业务表".to_string());
+    }
+    Ok(result)
+}
+
+/// 按表头映射读取指定工作表的数据（列顺序无关，缺列安全，多余列忽略）。
+fn read_xlsx_sheet_mapped(
+    xlsx_path: &str,
+    excel_sheet: &str,
+    table_name: &str,
+) -> Result<Vec<HashMap<String, String>>, String> {
+    let mut workbook = open_workbook_auto(xlsx_path)
+        .map_err(|e| format!("打开 Excel 文件失败「{}」: {}", xlsx_path, e))?;
+    let range = workbook
+        .worksheet_range(excel_sheet)
+        .map_err(|e| format!("读取工作表「{}」失败: {}", excel_sheet, e))?;
+    let columns = SHEETS
+        .iter()
+        .find(|(name, _)| *name == table_name)
+        .map(|(_, columns)| columns)
+        .ok_or_else(|| format!("未知业务表「{}」", table_name))?;
+    let mut col_index: HashMap<String, usize> = HashMap::new();
+    if let Some(header_row) = range.rows().next() {
+        for (col_idx, cell) in header_row.iter().enumerate() {
+            let header = trimmed_sheet_name(&cell_to_string(cell));
+            if let Some(&(_, key)) = columns
+                .iter()
+                .find(|(header_name, _)| header == *header_name)
+            {
+                col_index.insert(key.to_string(), col_idx);
+            }
+        }
+    }
+    if col_index.is_empty() {
+        return Err(format!(
+            "工作表「{}」的表头与「{}」定义不匹配，无法导入",
+            excel_sheet, table_name
+        ));
+    }
+    let mut items = Vec::new();
+    for (row_idx, row) in range.rows().enumerate() {
+        if row_idx == 0 {
+            continue;
+        }
+        let mut item = HashMap::new();
+        for (key, col_idx) in &col_index {
+            if let Some(cell) = row.get(*col_idx) {
+                item.insert(key.clone(), normalize_value(cell_to_string(cell)));
+            }
+        }
+        items.push(item);
+    }
+    Ok(items)
+}
+
+/// 从 Excel 文件导入选中的工作表（按表头映射，事务内整表替换）。
+/// selections 为 (Excel 工作表名, 目标业务表名)；库存汇总表一律忽略。
+pub fn import_sheets_from_xlsx(
+    file_path: &str,
+    xlsx_path: &str,
+    selections: &[(String, String)],
+) -> Result<HashMap<String, i64>, String> {
+    let _guard = lock_excel()?;
+    let mut conn = db::connect(file_path)?;
+    let mut stats = HashMap::new();
+    let tx = conn
+        .transaction()
+        .map_err(|e| format!("开启事务失败: {}", e))?;
+    for (excel_sheet, table) in selections {
+        if table.ends_with("库存汇总") {
+            continue; // 系统计算表，忽略导入
+        }
+        let rows = read_xlsx_sheet_mapped(xlsx_path, excel_sheet, table)?;
+        db::replace_all_in_tx(&tx, table, &rows)?;
+        stats.insert(table.clone(), rows.len() as i64);
+    }
+    tx.commit().map_err(|e| format!("提交导入失败: {}", e))?;
+    Ok(stats)
 }
 
 /// 清洗 JSON 数组格式的字符串，如 ["30R特"] → 30R特
@@ -787,45 +981,6 @@ pub fn export_group_xlsx(file_path: &str, group_sheets: &[&str]) -> Result<Vec<u
     Ok(buffer)
 }
 
-/// 列出 Excel 文件中属于本系统业务表的工作表名（导入时供用户勾选）。
-pub fn list_excel_sheets(xlsx_path: &str) -> Result<Vec<String>, String> {
-    if !Path::new(xlsx_path).is_file() {
-        return Err("所选文件不存在".to_string());
-    }
-    let workbook = open_workbook_auto(xlsx_path)
-        .map_err(|e| format!("打开 Excel 文件失败「{}」: {}", xlsx_path, e))?;
-    let names = workbook.sheet_names().to_vec();
-    let known: Vec<String> = names
-        .into_iter()
-        .filter(|name| SHEETS.iter().any(|(sheet, _)| sheet == name))
-        .collect();
-    if known.is_empty() {
-        return Err("Excel 文件中没有可识别的业务表".to_string());
-    }
-    Ok(known)
-}
-
-/// 从 Excel 文件导入选中的工作表（整表替换，事务内完成）。
-pub fn import_sheets_from_xlsx(
-    file_path: &str,
-    xlsx_path: &str,
-    selected_sheets: &[String],
-) -> Result<HashMap<String, i64>, String> {
-    let _guard = lock_excel()?;
-    let mut conn = db::connect(file_path)?;
-    let mut stats = HashMap::new();
-    let tx = conn
-        .transaction()
-        .map_err(|e| format!("开启事务失败: {}", e))?;
-    for sheet_name in selected_sheets {
-        let rows = read_xlsx_all(xlsx_path, sheet_name)?;
-        db::replace_all_in_tx(&tx, sheet_name, &rows)?;
-        stats.insert(sheet_name.clone(), rows.len() as i64);
-    }
-    tx.commit().map_err(|e| format!("提交导入失败: {}", e))?;
-    Ok(stats)
-}
-
 /// 导出全部业务表为单个 Excel（保留旧入口兼容，推荐改用分组导出）。
 pub fn export_data(file_path: &str) -> Result<Vec<u8>, String> {
     let all_sheets: Vec<&str> = SHEETS.iter().map(|(name, _)| *name).collect();
@@ -957,7 +1112,12 @@ mod tests {
         xlsx_path: &Path,
     ) -> Result<HashMap<String, i64>, String> {
         let sheets = list_excel_sheets(xlsx_path.to_str().unwrap())?;
-        import_sheets_from_xlsx(db_path, xlsx_path.to_str().unwrap(), &sheets)
+        let pairs: Vec<(String, String)> = sheets
+            .into_iter()
+            .filter(|info| !info.system_calculated)
+            .map(|info| (info.name, info.table))
+            .collect();
+        import_sheets_from_xlsx(db_path, xlsx_path.to_str().unwrap(), &pairs)
     }
 
     #[test]
