@@ -222,15 +222,18 @@ pub fn migrate_from_xlsx(conn: &Connection, xlsx_path: &str) -> Result<(), Strin
     if !Path::new(xlsx_path).is_file() {
         return Ok(());
     }
-    let existing: i64 = conn
-        .query_row(
-            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name NOT IN ('meta', 'sqlite_sequence')",
-            [],
-            |row| row.get(0),
-        )
-        .map_err(|e| format!("检查数据库状态失败: {}", e))?;
-    if existing > 1 {
-        return Ok(()); // 已有业务表，不重复迁移
+    // 以“是否有数据行”判断迁移条件：init_schema 会预先建表，不能用表数量判断。
+    for &(sheet_name, _) in excel::SHEETS {
+        let count: i64 = conn
+            .query_row(
+                &format!("SELECT COUNT(*) FROM {}", sheet_table(sheet_name)),
+                [],
+                |row| row.get(0),
+            )
+            .map_err(|e| format!("检查「{}」数据失败: {}", sheet_name, e))?;
+        if count > 0 {
+            return Ok(()); // 库中已有数据，不重复迁移
+        }
     }
     for &(sheet_name, _) in excel::SHEETS {
         let items = excel::read_xlsx_all(xlsx_path, sheet_name)?;
