@@ -37,6 +37,15 @@
           <span class="option-hint">{{ draft.portrait ? '210 × 297mm' : '297 × 210mm' }}</span>
         </div>
 
+        <div v-if="groupable" class="option-row">
+          <span class="option-label">分组方式</span>
+          <el-radio-group v-model="draft.groupMode">
+            <el-radio value="none">普通分页</el-radio>
+            <el-radio value="customer">按客户分组</el-radio>
+          </el-radio-group>
+          <span class="option-hint">按客户分组：同客户尽量同页，组头显示客户名与条数</span>
+        </div>
+
         <div class="option-row">
           <span class="option-label">字体</span>
           <el-select v-model="draft.fontFamily" size="small" style="width: 132px">
@@ -114,6 +123,7 @@ import {
   FONT_FAMILY_OPTIONS,
   FONT_SIZE_OPTIONS,
   PRINT_STYLE_OPTIONS,
+  type PrintGroupMode,
 } from '../composables/usePrintSettings'
 
 const props = defineProps<{
@@ -121,6 +131,8 @@ const props = defineProps<{
   mode: 'print' | 'pdf'
   pageKey: string
   columns: PrintColumn[]
+  /** 页面是否支持按客户分组（显示分组方式选项） */
+  groupable?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -128,7 +140,7 @@ const emit = defineEmits<{
   confirm: []
 }>()
 
-const { settings, getEnabledFields, setEnabledFields, applyPrintSettings, resetPrintSettings } = usePrintSettings()
+const { getPageSettings, setEnabledFields, applyPrintSettings, resetPrintSettings } = usePrintSettings()
 const STRIPE_COLOR_OPTIONS = ['#eef6ff', '#eef9f0', '#f3f4f6', '#fff7e6', '#f6efff']
 
 interface DraftSettings {
@@ -139,17 +151,19 @@ interface DraftSettings {
   styleId: string
   striped: boolean
   stripeColor: string
+  groupMode: PrintGroupMode
 }
 
 function buildDraft(): DraftSettings {
   return {
-    enabledFields: [...getEnabledFields(props.pageKey)],
-    portrait: settings.portrait,
-    fontFamily: settings.fontFamily,
-    fontSize: settings.fontSize,
-    styleId: settings.styleId,
-    striped: settings.striped,
-    stripeColor: settings.stripeColor,
+    enabledFields: [...getPageSettings(props.pageKey).enabledFields],
+    portrait: getPageSettings(props.pageKey).portrait,
+    fontFamily: getPageSettings(props.pageKey).fontFamily,
+    fontSize: getPageSettings(props.pageKey).fontSize,
+    styleId: getPageSettings(props.pageKey).styleId,
+    striped: getPageSettings(props.pageKey).striped,
+    stripeColor: getPageSettings(props.pageKey).stripeColor,
+    groupMode: getPageSettings(props.pageKey).groupMode,
   }
 }
 
@@ -172,19 +186,20 @@ function clearAll() {
 }
 
 function resetAll() {
-  resetPrintSettings()
+  resetPrintSettings(props.pageKey)
   resetDraft()
 }
 
 function confirmSettings() {
   setEnabledFields(props.pageKey, [...draft.enabledFields])
-  applyPrintSettings({
+  applyPrintSettings(props.pageKey, {
     portrait: draft.portrait,
     fontFamily: draft.fontFamily,
     fontSize: draft.fontSize,
     styleId: draft.styleId,
     striped: draft.striped,
     stripeColor: draft.stripeColor,
+    groupMode: draft.groupMode,
   })
   emit('update:modelValue', false)
   emit('confirm')

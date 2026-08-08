@@ -74,6 +74,38 @@
             </div>
           </div>
 
+          <section class="option-card tolerance-keyboard-config">
+            <div class="option-card-heading">
+              <div>
+                <h3>公差虚拟键盘</h3>
+                <p>配置螺丝规格公差字段的数字、符号与常用词快捷输入。</p>
+              </div>
+              <el-switch
+                v-model="keyboardDraft.enabled"
+                inline-prompt
+                active-text="开"
+                inactive-text="关"
+                @change="saveKeyboardSettings"
+              />
+            </div>
+            <el-input-tag
+              v-model="keyboardDraft.quickKeys"
+              :max="30"
+              clearable
+              placeholder="输入字符后按 Enter，例如 ±、介厚"
+              @change="saveKeyboardSettings"
+            />
+            <div class="keyboard-preview">
+              <span>预览</span>
+              <el-tag v-for="key in keyboardDraft.quickKeys" :key="key" effect="plain">{{ key }}</el-tag>
+            </div>
+            <p class="keyboard-scope">适用于头/垫片大小、头高、长度、牙径、光钉长度；数字键 0–9、00 固定显示。</p>
+            <div class="option-actions">
+              <el-button type="primary" @click="saveKeyboardSettings">保存</el-button>
+              <el-button @click="resetKeyboardSettings">恢复默认</el-button>
+            </div>
+          </section>
+
           <div v-loading="loadingSettings" class="option-grid">
             <section v-for="definition in systemDefinitions" :key="definition.id" class="option-card">
               <div class="option-card-heading">
@@ -265,9 +297,36 @@ import {
   type PortableConfigurationImportPlan,
 } from '../config/portableConfigurationRegistry'
 import { useTablePreferences, type ColumnPreference } from '../composables/useTablePreferences'
+import { useToleranceKeyboard } from '../composables/useToleranceKeyboard'
 import { isUserCancellation, showDetailedError } from '../utils/errorFeedback'
 
 const router = useRouter()
+const {
+  settings: toleranceKeyboardSettings,
+  updateToleranceKeyboardSettings,
+  resetToleranceKeyboardSettings,
+} = useToleranceKeyboard()
+const keyboardDraft = ref({
+  enabled: toleranceKeyboardSettings.enabled,
+  quickKeys: [...toleranceKeyboardSettings.quickKeys],
+})
+
+function saveKeyboardSettings() {
+  updateToleranceKeyboardSettings({
+    enabled: keyboardDraft.value.enabled,
+    quickKeys: keyboardDraft.value.quickKeys,
+  })
+  ElMessage.success('公差虚拟键盘配置已保存')
+}
+
+function resetKeyboardSettings() {
+  resetToleranceKeyboardSettings()
+  keyboardDraft.value = {
+    enabled: toleranceKeyboardSettings.enabled,
+    quickKeys: [...toleranceKeyboardSettings.quickKeys],
+  }
+  ElMessage.success('公差虚拟键盘已恢复默认')
+}
 const registry = getPortableConfigurationRegistry()
 const systemDefinitions = registry.filter(definition => ['boolean', 'number', 'theme'].includes(definition.editor))
 const optionDefinitions = registry.filter(definition => definition.editor === 'option-list') as PortableConfigurationDefinition<string[]>[]
@@ -701,6 +760,12 @@ function openPage() {
 .page-summary p {
   margin: 5px 0 0;
 }
+
+.tolerance-keyboard-config { margin-bottom: 14px; }
+.tolerance-keyboard-config :deep(.el-input-tag) { width: 100%; }
+.keyboard-preview { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface-muted); }
+.keyboard-preview > span { margin-right: 3px; color: var(--text-muted); font-size: 12px; }
+.keyboard-scope { margin: 0; color: var(--text-secondary); font-size: 12px; line-height: 1.65; }
 
 .option-grid {
   display: grid;

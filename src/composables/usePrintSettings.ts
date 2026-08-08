@@ -1,20 +1,28 @@
 /**
- * 打印设置：应用级全局配置，跨页面沿用。
+ * 打印设置：按业务页面独立保存。
  * - 持久化到 localStorage（key: mold-management.print-preferences.v1）
- * - 勾选列按页面（pageKey）分别保存，互不影响
- * - 弹窗编辑本地草稿，确认后 applyPrintSettings 提交并持久化
+ * - 螺丝规格、冲头、牙板等页面的列、方向、字体、字号、风格和隔行色互不覆盖
+ * - 兼容旧版的全局版式设置和按页面列设置，首次读取时自动迁移
  */
 import { reactive } from 'vue'
 import { PRINT_COLUMN_SETS, screwSpecPrintColumnFields } from '../config/printColumns'
 
-export interface PrintSettings {
-  enabledFieldsByPage: Record<string, string[]>
+export type PrintGroupMode = 'none' | 'customer'
+
+export interface PrintPageSettings {
+  enabledFields: string[]
   portrait: boolean
   fontFamily: string
   fontSize: number
   styleId: string
   striped: boolean
   stripeColor: string
+  /** 分组方式：none=普通分页；customer=按客户分组（同客户尽量同页） */
+  groupMode: PrintGroupMode
+}
+
+export interface PrintSettings {
+  byPage: Record<string, PrintPageSettings>
 }
 
 export const FONT_FAMILY_OPTIONS = ['微软雅黑', '宋体', '黑体', '仿宋', '楷体'] as const
@@ -38,19 +46,29 @@ export const DEFAULT_ENABLED_FIELDS: Record<string, string[]> = Object.fromEntri
   Object.entries(PRINT_COLUMN_SETS).map(([key, columns]) => [key, columns.map(column => column.field)]),
 )
 
-export const DEFAULT_PRINT_SETTINGS: PrintSettings = {
-  enabledFieldsByPage: Object.fromEntries(
-    Object.entries(DEFAULT_ENABLED_FIELDS).map(([key, fields]) => [key, [...fields]]),
-  ),
+export const DEFAULT_PAGE_PRINT_SETTINGS: PrintPageSettings = {
+  enabledFields: [],
   portrait: true,
   fontFamily: '微软雅黑',
   fontSize: 9,
   styleId: 'blue',
   striped: false,
   stripeColor: '#eef6ff',
+  groupMode: 'none',
+}
+
+/** 默认启用按客户分组的页面（打印设置里可随时切回普通分页） */
+const DEFAULT_GROUP_MODE: Record<string, PrintGroupMode> = {
+  screwSpec: 'customer',
 }
 
 const STORAGE_KEY = 'mold-management.print-preferences.v1'
+
+type LegacyStorage = Partial<PrintPageSettings> & {
+  enabledFieldsByPage?: unknown
+  byPage?: unknown
+  enabledFields?: unknown
+}
 
 function isValidFontFamily(value: unknown): value is string {
   return typeof value === 'string' && (FONT_FAMILY_OPTIONS as readonly string[]).includes(value)
@@ -68,63 +86,93 @@ function isValidColor(value: unknown): value is string {
   return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value)
 }
 
-function isRegisteredPageKey(key: string): key is keyof typeof DEFAULT_ENABLED_FIELDS {
-  return Object.prototype.hasOwnProperty.call(DEFAULT_ENABLED_FIELDS, key)
-}
-
-function normalizeEnabledFields(value: unknown): Record<string, string[]> {
-  const result: Record<string, string[]> = {}
-  const source = value && typeof value === 'object' ? value as Record<string, unknown> : {}
-  for (const pageKey of Object.keys(DEFAULT_ENABLED_FIELDS)) {
-    const fields = source[pageKey]
-    const validFields = Array.isArray(fields)
-      ? fields.filter((field): field is string => typeof field === 'string' && DEFAULT_ENABLED_FIELDS[pageKey].includes(field))
-      : [...DEFAULT_ENABLED_FIELDS[pageKey]]
-    result[pageKey] = validFields.length ? validFields : [...DEFAULT_ENABLED_FIELDS[pageKey]]
+function clonePageDefaults(pageKey: string, enabledFields?: string[]): PrintPageSettings {
+  const defaults = DEFAULT_ENABLED_FIELDS[pageKey] ?? []
+  const validFields = enabledFields?.filter(field => defaults.includes(field))
+  return {
+    ...DEFAULT_PAGE_PRINT_SETTINGS,
+    enabledFields: validFields?.length ? [...validFields] : [...defaults],
+    groupMode: DEFAULT_GROUP_MODE[pageKey] ?? 'none',
   }
-  return result
 }
 
 function cloneDefaultSettings(): PrintSettings {
   return {
-    ...DEFAULT_PRINT_SETTINGS,
-    enabledFieldsByPage: Object.fromEntries(
-      Object.entries(DEFAULT_ENABLED_FIELDS).map(([key, fields]) => [key, [...fields]]),
+    byPage: Object.fromEntries(
+      Object.keys(DEFAULT_ENABLED_FIELDS).map(pageKey => [pageKey, clonePageDefaults(pageKey)]),
     ),
   }
 }
 
+function normalizePageSettings(pageKey: string, value: unknown, fallback?: Partial<PrintPageSettings>): PrintPageSettings {
+  const source = value && typeof value === 'object' ? value as Partial<PrintPageSettings> : {}
+  const fallbackFields = fallback?.enabledFields
+  const fields = Array.isArray(source.enabledFields) ? source.enabledFields : fallbackFields
+  const result = clonePageDefaults(pageKey, Array.isArray(fields) ? fields : undefined)
+  result.portrait = typeof source.portrait === 'boolean' ? source.portrait : fallback?.portrait ?? result.portrait
+  result.fontFamily = isValidFontFamily(source.fontFamily) ? source.fontFamily : fallback?.fontFamily ?? result.fontFamily
+  result.fontSize = isValidFontSize(source.fontSize) ? source.fontSize : fallback?.fontSize ?? result.fontSize
+  result.styleId = isValidStyleId(source.styleId) ? source.styleId : fallback?.styleId ?? result.styleId
+  result.striped = typeof source.striped === 'boolean' ? source.striped : fallback?.striped ?? result.striped
+  result.stripeColor = isValidColor(source.stripeColor) ? source.stripeColor : fallback?.stripeColor ?? result.stripeColor
+  result.groupMode = source.groupMode === 'none' || source.groupMode === 'customer'
+    ? source.groupMode
+    : fallback?.groupMode ?? result.groupMode
+  return result
+}
+
+function normalizeEnabledFieldsByPage(value: unknown): Record<string, string[]> {
+  const source = value && typeof value === 'object' ? value as Record<string, unknown> : {}
+  return Object.fromEntries(
+    Object.keys(DEFAULT_ENABLED_FIELDS).map(pageKey => {
+      const fields = source[pageKey]
+      return [pageKey, clonePageDefaults(pageKey, Array.isArray(fields) ? fields.filter((field): field is string => typeof field === 'string') : undefined).enabledFields]
+    }),
+  )
+}
+
 function loadSettings(): PrintSettings {
-  if (typeof window === 'undefined') return cloneDefaultSettings()
+  const defaults = cloneDefaultSettings()
+  if (typeof window === 'undefined') return defaults
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY)
-    if (!raw) return cloneDefaultSettings()
-    const parsed = JSON.parse(raw) as Partial<PrintSettings> & { enabledFields?: unknown }
-    let enabledFieldsByPage: Record<string, string[]>
-    if (parsed.enabledFieldsByPage !== undefined) {
-      enabledFieldsByPage = normalizeEnabledFields(parsed.enabledFieldsByPage)
-    } else if (Array.isArray(parsed.enabledFields)) {
-      // 旧版：单个字段数组（螺丝规格），迁移到 screwSpec，其他页面默认全选
-      const legacy = parsed.enabledFields.filter((field): field is string =>
-        typeof field === 'string' && screwSpecPrintColumnFields.includes(field))
-      enabledFieldsByPage = normalizeEnabledFields({
-        ...DEFAULT_ENABLED_FIELDS,
-        screwSpec: legacy.length ? legacy : [...DEFAULT_ENABLED_FIELDS.screwSpec],
-      })
-    } else {
-      enabledFieldsByPage = cloneDefaultSettings().enabledFieldsByPage
+    if (!raw) return defaults
+    const parsed = JSON.parse(raw) as LegacyStorage
+
+    // 新版结构：每个页面拥有完整的设置对象。
+    if (parsed.byPage && typeof parsed.byPage === 'object') {
+      const source = parsed.byPage as Record<string, unknown>
+      for (const pageKey of Object.keys(DEFAULT_ENABLED_FIELDS)) {
+        defaults.byPage[pageKey] = normalizePageSettings(pageKey, source[pageKey])
+      }
+      return defaults
     }
-    return {
-      enabledFieldsByPage,
-      portrait: parsed.portrait !== false,
-      fontFamily: isValidFontFamily(parsed.fontFamily) ? parsed.fontFamily : DEFAULT_PRINT_SETTINGS.fontFamily,
-      fontSize: isValidFontSize(parsed.fontSize) ? parsed.fontSize : DEFAULT_PRINT_SETTINGS.fontSize,
-      styleId: isValidStyleId(parsed.styleId) ? parsed.styleId : DEFAULT_PRINT_SETTINGS.styleId,
-      striped: parsed.striped === true,
-      stripeColor: isValidColor(parsed.stripeColor) ? parsed.stripeColor : DEFAULT_PRINT_SETTINGS.stripeColor,
+
+    // 兼容当前旧版：列已按页面保存，但版式仍是全局设置。
+    const enabledFieldsByPage = parsed.enabledFieldsByPage
+      ? normalizeEnabledFieldsByPage(parsed.enabledFieldsByPage)
+      : (() => {
+          const legacyFields = Array.isArray(parsed.enabledFields)
+            ? parsed.enabledFields.filter((field): field is string => typeof field === 'string' && screwSpecPrintColumnFields.includes(field))
+            : undefined
+          return Object.fromEntries(
+            Object.keys(DEFAULT_ENABLED_FIELDS).map(pageKey => [pageKey, pageKey === 'screwSpec' && legacyFields?.length ? legacyFields : DEFAULT_ENABLED_FIELDS[pageKey]]),
+          )
+        })()
+    const legacyLayout: Partial<PrintPageSettings> = {
+      portrait: parsed.portrait,
+      fontFamily: parsed.fontFamily,
+      fontSize: parsed.fontSize,
+      styleId: parsed.styleId,
+      striped: parsed.striped,
+      stripeColor: parsed.stripeColor,
     }
+    for (const pageKey of Object.keys(DEFAULT_ENABLED_FIELDS)) {
+      defaults.byPage[pageKey] = normalizePageSettings(pageKey, { enabledFields: enabledFieldsByPage[pageKey] }, legacyLayout)
+    }
+    return defaults
   } catch {
-    return structuredClone(DEFAULT_PRINT_SETTINGS)
+    return cloneDefaultSettings()
   }
 }
 
@@ -135,34 +183,32 @@ function persist() {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(settings))
 }
 
-function getEnabledFields(pageKey: string): string[] {
-  if (!isRegisteredPageKey(pageKey)) return []
-  return settings.enabledFieldsByPage[pageKey] ?? [...DEFAULT_ENABLED_FIELDS[pageKey]]
+function getPageSettings(pageKey: string): PrintPageSettings {
+  if (!settings.byPage[pageKey]) {
+    settings.byPage[pageKey] = clonePageDefaults(pageKey)
+  }
+  return settings.byPage[pageKey]
 }
 
 function setEnabledFields(pageKey: string, fields: string[]) {
-  if (!isRegisteredPageKey(pageKey)) return
-  const validFields = fields.filter(field => DEFAULT_ENABLED_FIELDS[pageKey].includes(field))
-  settings.enabledFieldsByPage = {
-    ...settings.enabledFieldsByPage,
-    [pageKey]: validFields.length ? validFields : [...DEFAULT_ENABLED_FIELDS[pageKey]],
-  }
+  const pageSettings = getPageSettings(pageKey)
+  const validFields = fields.filter(field => (DEFAULT_ENABLED_FIELDS[pageKey] ?? []).includes(field))
+  pageSettings.enabledFields = validFields.length ? [...validFields] : [...(DEFAULT_ENABLED_FIELDS[pageKey] ?? [])]
   persist()
 }
 
-function applyPrintSettings(patch: Partial<PrintSettings>) {
-  if (patch.enabledFieldsByPage !== undefined) {
-    patch.enabledFieldsByPage = normalizeEnabledFields(patch.enabledFieldsByPage)
-  }
-  Object.assign(settings, patch)
+function applyPrintSettings(pageKey: string, patch: Partial<PrintPageSettings>) {
+  const pageSettings = getPageSettings(pageKey)
+  Object.assign(pageSettings, patch)
   persist()
 }
 
-function resetPrintSettings() {
-  Object.assign(settings, cloneDefaultSettings())
+function resetPrintSettings(pageKey: string) {
+  const pageSettings = getPageSettings(pageKey)
+  Object.assign(pageSettings, clonePageDefaults(pageKey))
   persist()
 }
 
 export function usePrintSettings() {
-  return { settings, getEnabledFields, setEnabledFields, applyPrintSettings, resetPrintSettings }
+  return { settings, getPageSettings, setEnabledFields, applyPrintSettings, resetPrintSettings }
 }

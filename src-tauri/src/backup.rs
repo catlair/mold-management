@@ -36,7 +36,18 @@ pub fn create_backup_zip(
     reason: &str,
     created_at: &str,
 ) -> Result<Vec<u8>, String> {
-    let workbook_path = Path::new(data_file_path);
+    let snapshot = crate::db::create_snapshot(data_file_path)?;
+    let result = create_backup_zip_from_snapshot(data_file_path, reason, created_at, &snapshot);
+    let _ = fs::remove_file(&snapshot);
+    result
+}
+
+fn create_backup_zip_from_snapshot(
+    data_file_path: &str,
+    reason: &str,
+    created_at: &str,
+    workbook_path: &Path,
+) -> Result<Vec<u8>, String> {
     excel::validate_workbook(workbook_path)?;
     let workbook_bytes = fs::metadata(workbook_path)
         .map_err(|e| format!("读取数据文件大小失败「{}」: {}", workbook_path.display(), e))?
@@ -439,10 +450,19 @@ fn apply_attachment_map(staging: &Path) -> Result<(), String> {
         fs::read_to_string(&map_path).map_err(|e| format!("读取附件映射清单失败: {}", e))?;
     let map: HashMap<String, String> =
         serde_json::from_str(&content).map_err(|e| format!("解析附件映射清单失败: {}", e))?;
-    let attachments_dir = staging.join("attachments");
+    let mut targets = HashSet::new();
     for (zip_name, relative_path) in &map {
-        let source = staging.join(zip_name);
-        let destination = attachments_dir.join(relative_path);
+        let safe_zip_name = crate::data_package::safe_relative_path(zip_name)?;
+        let safe_relative_path = crate::data_package::safe_relative_path(relative_path)?;
+        if safe_relative_path.components().count() < 2 {
+            return Err(format!("备份附件映射目标无效「{}」", relative_path));
+        }
+        let source = staging.join(safe_zip_name);
+        let destination = staging.join("attachments").join(safe_relative_path);
+        let normalized_target = destination.to_string_lossy().to_ascii_lowercase();
+        if !targets.insert(normalized_target) {
+            return Err(format!("备份附件映射目标重复「{}」", relative_path));
+        }
         if !source.is_file() {
             return Err(format!("备份附件缺失「{}」", zip_name));
         }

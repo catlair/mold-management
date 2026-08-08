@@ -45,16 +45,20 @@
               <el-icon><Top /></el-icon>
               <template #title>上冲管理</template>
             </el-menu-item>
-            <el-menu-item index="/inventory">
-              <el-icon><DataAnalysis /></el-icon>
-              <template #title>库存汇总</template>
-            </el-menu-item>
           </el-menu-item-group>
           <el-menu-item-group>
             <template #title><span v-show="!isCollapse" class="menu-group-title">系统功能</span></template>
             <el-menu-item index="/configuration-management">
               <el-icon><Operation /></el-icon>
               <template #title>配置管理</template>
+            </el-menu-item>
+            <el-menu-item index="/operation-log">
+              <el-icon><List /></el-icon>
+              <template #title>操作日志</template>
+            </el-menu-item>
+            <el-menu-item index="/agent">
+              <el-icon><MagicStick /></el-icon>
+              <template #title>AI 助手</template>
             </el-menu-item>
             <el-menu-item index="/settings">
               <el-icon><Setting /></el-icon>
@@ -80,7 +84,9 @@
     <el-main class="app-main">
       <router-view v-slot="{ Component }">
         <transition name="fade-slide" mode="out-in">
-          <component :is="Component" />
+          <keep-alive include="Agent">
+            <component :is="Component" />
+          </keep-alive>
         </transition>
       </router-view>
     </el-main>

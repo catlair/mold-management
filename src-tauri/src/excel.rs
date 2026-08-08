@@ -1,4 +1,5 @@
 use crate::db;
+use crate::log;
 use calamine::{open_workbook_auto, Data, Reader};
 use chrono::Local;
 use rust_xlsxwriter::Workbook;
@@ -661,6 +662,20 @@ pub fn import_sheets_from_xlsx(
         stats.insert(table.clone(), rows.len() as i64);
     }
     tx.commit().map_err(|e| format!("提交导入失败: {}", e))?;
+    if !stats.is_empty() {
+        let detail = stats
+            .iter()
+            .map(|(table, count)| format!("{} {} 条", table, count))
+            .collect::<Vec<_>>()
+            .join("；");
+        let _ = log::log_operation(
+            &conn,
+            "导入",
+            "import",
+            "",
+            &format!("导入 Excel：{}", detail),
+        );
+    }
     Ok(stats)
 }
 
@@ -820,6 +835,14 @@ pub fn get_by_id(
     db::get_by_id(&conn, sheet_name, id)
 }
 
+/// 记录展示名：优先 name 字段，否则用 id。
+fn record_display_name(row: &HashMap<String, String>) -> String {
+    row.get("name")
+        .filter(|v| !v.trim().is_empty())
+        .cloned()
+        .unwrap_or_else(|| row.get("id").cloned().unwrap_or_default())
+}
+
 pub fn add_row(
     file_path: &str,
     sheet_name: &str,
@@ -843,6 +866,14 @@ fn add_row_inner(
     let all_rows = db::get_all(&conn, sheet_name)?;
     ensure_unique_record(sheet_name, &result, &all_rows, None)?;
     db::insert_row(&conn, sheet_name, &result)?;
+    let record_id = result.get("id").cloned().unwrap_or_default();
+    let _ = log::log_operation(
+        &conn,
+        sheet_name,
+        "add",
+        &record_id,
+        &format!("新增 {}：{}", sheet_name, record_display_name(&result)),
+    );
     Ok(result)
 }
 
@@ -877,14 +908,57 @@ fn update_row_inner(
         ensure_unique_record(sheet_name, &candidate, &all_rows, Some(id))?;
     }
 
-    db::insert_row(&conn, sheet_name, &candidate)?;
+    // 使用真正的 UPDATE 语义（依赖 id 唯一索引定位行），避免 INSERT OR REPLACE
+    // 在表缺少唯一索引时退化为追加重复行。
+    db::update_row(&conn, sheet_name, id, &candidate)?;
+    let mut changes: Vec<String> = Vec::new();
+    for (key, value) in data {
+        if key == "id" {
+            continue;
+        }
+        let old = current.get(key).cloned().unwrap_or_default();
+        if old != *value {
+            changes.push(format!(
+                "{}: {}→{}",
+                key,
+                if old.is_empty() { "空" } else { &old },
+                if value.is_empty() { "空" } else { value }
+            ));
+        }
+    }
+    let summary = if changes.is_empty() {
+        format!("修改 {}：{}", sheet_name, record_display_name(&candidate))
+    } else {
+        format!(
+            "修改 {}：{}（{}）",
+            sheet_name,
+            record_display_name(&candidate),
+            changes.join("；")
+        )
+    };
+    let _ = log::log_operation(&conn, sheet_name, "update", id, &summary);
     Ok(candidate)
 }
 
 pub fn delete_row(file_path: &str, sheet_name: &str, id: &str) -> Result<bool, String> {
     let _guard = lock_excel()?;
     let conn = db::connect(file_path)?;
-    db::delete_row(&conn, sheet_name, id)
+    let existing = db::get_by_id(&conn, sheet_name, id)?;
+    let deleted = db::delete_row(&conn, sheet_name, id)?;
+    if deleted {
+        let name = existing
+            .as_ref()
+            .map(record_display_name)
+            .unwrap_or_else(|| id.to_string());
+        let _ = log::log_operation(
+            &conn,
+            sheet_name,
+            "delete",
+            id,
+            &format!("删除 {}：{}", sheet_name, name),
+        );
+    }
+    Ok(deleted)
 }
 
 /// 导出分组定义：每组包含的业务表（用于按业务拆分 Excel 导入导出）。
@@ -1211,4 +1285,157 @@ pub fn get_default_file_path() -> String {
             .unwrap_or_else(|| "./data".to_string())
     };
     format!("{}/mold-data.db", base)
+}
+
+// ========== Excel 与数据库差异对比（AI 助手「上传 Excel 找差异」） ==========
+
+/// 对比 Excel 文件与当前数据库：按业务唯一键（冲头/牙板）或 id 匹配，
+/// 返回每张可识别业务表的 新增 / 修改 / 缺失 / 无变化 明细。
+pub fn compare_xlsx_with_db(xlsx_path: &str, db_path: &str) -> Result<serde_json::Value, String> {
+    use serde_json::{json, Value};
+    use std::collections::{HashMap as StdMap, HashSet};
+
+    let sheets = list_excel_sheets(xlsx_path)?;
+    let mut result = Vec::new();
+    for info in &sheets {
+        if info.system_calculated {
+            continue;
+        }
+        let table = info.table.clone();
+        let xlsx_rows = read_xlsx_all(xlsx_path, &info.name)?;
+        let db_rows = get_all(db_path, &table)?;
+
+        // 匹配键：优先业务唯一键（冲头/牙板），否则 id；都没有则跳过该表。
+        let has_business_key = business_unique_key(&table, &StdMap::new()).is_some();
+        let has_excel_id = xlsx_rows
+            .iter()
+            .any(|row| row.get("id").map(|v| !v.trim().is_empty()).unwrap_or(false));
+        let match_key = if has_business_key {
+            "business"
+        } else if has_excel_id {
+            "id"
+        } else {
+            "none"
+        };
+        if match_key == "none" {
+            result.push(json!({
+                "table": table,
+                "matchKey": "none",
+                "xlsxCount": xlsx_rows.len(),
+                "dbCount": db_rows.len(),
+                "addedCount": 0, "modifiedCount": 0, "removedCount": 0, "unchanged": 0,
+                "skipReason": "该表没有可用的唯一匹配键（Excel 中无 id 列，且非冲头/牙板）"
+            }));
+            continue;
+        }
+        let key_of = |row: &StdMap<String, String>| -> Option<String> {
+            business_unique_key(&table, row)
+                .or_else(|| {
+                    row.get("id")
+                        .cloned()
+                        .filter(|v| !v.trim().is_empty())
+                        .map(|id| format!("id:{}", id))
+                })
+                .map(normalize_value)
+        };
+
+        let mut db_by_key: StdMap<String, &StdMap<String, String>> = StdMap::new();
+        for row in &db_rows {
+            if let Some(key) = key_of(row) {
+                db_by_key.insert(key, row);
+            }
+        }
+
+        let mut seen: HashSet<String> = HashSet::new();
+        let mut added: Vec<Value> = Vec::new();
+        let mut modified: Vec<Value> = Vec::new();
+        let mut unchanged = 0usize;
+        for row in &xlsx_rows {
+            let Some(key) = key_of(row) else { continue };
+            seen.insert(key.clone());
+            match db_by_key.get(&key) {
+                None => {
+                    if added.len() < 200 {
+                        added.push(serde_json::to_value(row).unwrap_or(json!({})));
+                    }
+                }
+                Some(db_row) => {
+                    let changes = diff_record_fields(db_row, row);
+                    if changes.is_empty() {
+                        unchanged += 1;
+                    } else if modified.len() < 200 {
+                        modified.push(json!({
+                            "key": key,
+                            "xlsx": serde_json::to_value(row).unwrap_or(json!({})),
+                            "changes": changes,
+                        }));
+                    }
+                }
+            }
+        }
+        let removed: Vec<String> = db_by_key
+            .keys()
+            .filter(|key| !seen.contains(*key))
+            .take(100)
+            .cloned()
+            .collect();
+        let added_total = xlsx_rows
+            .iter()
+            .filter_map(key_of)
+            .filter(|key| !db_by_key.contains_key(key))
+            .count();
+        result.push(json!({
+            "table": table,
+            "matchKey": match_key,
+            "xlsxCount": xlsx_rows.len(),
+            "dbCount": db_rows.len(),
+            "addedCount": added_total,
+            "modifiedCount": modified.len(),
+            "removedCount": removed.len(),
+            "unchanged": unchanged,
+            "added": added,
+            "modified": modified,
+            "removed": removed,
+        }));
+    }
+    Ok(json!(result))
+}
+
+/// 对比两行记录的字段差异（跳过 id），返回 {字段: [数据库值, Excel 值]}（全部字段，值截断防爆）。
+fn diff_record_fields(
+    db_row: &std::collections::HashMap<String, String>,
+    xlsx_row: &std::collections::HashMap<String, String>,
+) -> serde_json::Map<String, serde_json::Value> {
+    use serde_json::{json, Map};
+    let mut changes = Map::new();
+    let mut keys: Vec<&String> = db_row
+        .keys()
+        .chain(xlsx_row.keys())
+        .collect::<std::collections::HashSet<_>>()
+        .into_iter()
+        .collect();
+    keys.sort();
+    for key in keys {
+        if key == "id" {
+            continue;
+        }
+        let left = db_row.get(key).map(|v| v.trim()).unwrap_or("");
+        let right = xlsx_row.get(key).map(|v| v.trim()).unwrap_or("");
+        if left != right && !(left.is_empty() && right.is_empty()) {
+            let left = truncate_value(left);
+            let right = truncate_value(right);
+            changes.insert(key.clone(), json!([left, right]));
+        }
+    }
+    changes
+}
+
+/// 长值截断到 80 字符，避免差异 JSON 过大。
+fn truncate_value(value: &str) -> String {
+    let trimmed = value.trim();
+    if trimmed.chars().count() > 80 {
+        format!("{}…", trimmed.chars().take(80).collect::<String>())
+    } else {
+        trimmed.to_string()
+    }
 }

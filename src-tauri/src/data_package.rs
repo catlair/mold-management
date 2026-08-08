@@ -30,7 +30,150 @@ struct PackageManifest {
 }
 
 pub fn export_package(data_file_path: &str) -> Result<Vec<u8>, String> {
-    let workbook_path = Path::new(data_file_path);
+    let snapshot = crate::db::create_snapshot(data_file_path)?;
+    let result = export_package_from_snapshot(data_file_path, &snapshot);
+    let _ = fs::remove_file(&snapshot);
+    result
+}
+
+/// 导出只包含数据库的一致性快照，供 WebDAV 按组件同步。
+pub fn export_document_snapshot(data_file_path: &str) -> Result<Vec<u8>, String> {
+    let snapshot = crate::db::create_snapshot(data_file_path)?;
+    let result = (|| {
+        excel::validate_workbook(&snapshot)?;
+        fs::read(&snapshot)
+            .map_err(|e| format!("读取数据库快照失败「{}」: {}", snapshot.display(), e))
+    })();
+    let _ = fs::remove_file(&snapshot);
+    result
+}
+
+/// 将附件目录独立打包，数据库未变化时可直接复用远端附件对象。
+pub fn export_attachments_package(data_file_path: &str) -> Result<Vec<u8>, String> {
+    let attachment_root = attachments::root_path(data_file_path)?;
+    if attachment_root.exists() {
+        attachments::validate_root(&attachment_root)?;
+    }
+    let mut files = Vec::new();
+    if attachment_root.exists() {
+        collect_files(&attachment_root, &mut files)?;
+        files.sort();
+    }
+    if files.len() + 1 > MAX_PACKAGE_ENTRIES {
+        return Err(format!("附件组件条目过多: {}", files.len() + 1));
+    }
+    let cursor = std::io::Cursor::new(Vec::new());
+    let mut archive = ZipWriter::new(cursor);
+    let options = SimpleFileOptions::default()
+        .compression_method(zip::CompressionMethod::Deflated)
+        .unix_permissions(0o600);
+    let has_index = files
+        .iter()
+        .any(|path| path == &attachment_root.join("index.json"));
+    if !has_index {
+        archive
+            .start_file("attachments/index.json", options)
+            .map_err(|e| format!("创建附件组件索引失败: {}", e))?;
+        archive
+            .write_all(b"[]")
+            .map_err(|e| format!("写入空附件索引失败: {}", e))?;
+    }
+    for path in files {
+        let relative = path
+            .strip_prefix(&attachment_root)
+            .map_err(|e| format!("计算附件相对路径失败: {}", e))?;
+        let archive_name = format!(
+            "{}{}",
+            ATTACHMENT_PREFIX,
+            relative.to_string_lossy().replace('\\', "/")
+        );
+        archive
+            .start_file(&archive_name, options)
+            .map_err(|e| format!("创建附件组件条目失败「{}」: {}", path.display(), e))?;
+        let mut source =
+            File::open(&path).map_err(|e| format!("打开附件失败「{}」: {}", path.display(), e))?;
+        std::io::copy(&mut source, &mut archive)
+            .map_err(|e| format!("写入附件组件条目失败「{}」: {}", path.display(), e))?;
+    }
+    archive
+        .finish()
+        .map(|cursor| cursor.into_inner())
+        .map_err(|e| format!("完成附件组件失败: {}", e))
+}
+
+/// 将数据库组件和附件组件重新组装为标准完整数据包后导入。
+pub fn import_split_package(
+    data_file_path: &str,
+    document: &[u8],
+    attachments_package: &[u8],
+) -> Result<serde_json::Value, String> {
+    if document.len() as u64 > MAX_ENTRY_BYTES {
+        return Err("WebDAV 文档组件超过 100MB 限制".to_string());
+    }
+    if attachments_package.len() as u64 > MAX_PACKAGE_BYTES {
+        return Err("WebDAV 附件组件超过 1GB 限制".to_string());
+    }
+    let cursor = std::io::Cursor::new(Vec::new());
+    let mut archive = ZipWriter::new(cursor);
+    let options = SimpleFileOptions::default()
+        .compression_method(zip::CompressionMethod::Deflated)
+        .unix_permissions(0o600);
+    let manifest = PackageManifest {
+        format: "mold-management-data-package".to_string(),
+        version: PACKAGE_VERSION,
+        created_at: Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+        workbook: WORKBOOK_NAME.to_string(),
+        attachments: "attachments".to_string(),
+    };
+    archive
+        .start_file(MANIFEST_NAME, options)
+        .map_err(|e| format!("创建拆分数据包清单失败: {}", e))?;
+    archive
+        .write_all(
+            &serde_json::to_vec_pretty(&manifest).map_err(|e| format!("序列化清单失败: {}", e))?,
+        )
+        .map_err(|e| format!("写入拆分数据包清单失败: {}", e))?;
+    archive
+        .start_file(WORKBOOK_NAME, options)
+        .map_err(|e| format!("创建文档组件条目失败: {}", e))?;
+    archive
+        .write_all(document)
+        .map_err(|e| format!("写入文档组件失败: {}", e))?;
+
+    let mut source_archive = ZipArchive::new(std::io::Cursor::new(attachments_package))
+        .map_err(|e| format!("打开附件组件失败: {}", e))?;
+    let mut seen = HashSet::new();
+    for index in 0..source_archive.len() {
+        let mut entry = source_archive
+            .by_index(index)
+            .map_err(|e| format!("读取附件组件失败: {}", e))?;
+        let relative = safe_relative_path(entry.name())?;
+        if !relative.starts_with("attachments") {
+            return Err(format!("附件组件包含未知条目「{}」", entry.name()));
+        }
+        if !seen.insert(relative.to_string_lossy().to_ascii_lowercase()) {
+            return Err(format!("附件组件包含重复条目「{}」", entry.name()));
+        }
+        if entry.size() > MAX_ENTRY_BYTES {
+            return Err(format!("附件组件条目过大「{}」", entry.name()));
+        }
+        archive
+            .start_file(relative.to_string_lossy().replace('\\', "/"), options)
+            .map_err(|e| format!("创建附件导入条目失败: {}", e))?;
+        std::io::copy(&mut entry, &mut archive)
+            .map_err(|e| format!("写入附件导入条目失败: {}", e))?;
+    }
+    let bytes = archive
+        .finish()
+        .map(|cursor| cursor.into_inner())
+        .map_err(|e| format!("完成拆分数据包失败: {}", e))?;
+    import_package(data_file_path, &bytes)
+}
+
+fn export_package_from_snapshot(
+    data_file_path: &str,
+    workbook_path: &Path,
+) -> Result<Vec<u8>, String> {
     excel::validate_workbook(workbook_path)?;
     let workbook_bytes = fs::metadata(workbook_path)
         .map_err(|e| format!("读取数据文件大小失败「{}」: {}", workbook_path.display(), e))?

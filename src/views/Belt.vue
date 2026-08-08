@@ -6,10 +6,12 @@
           <el-icon><Connection /></el-icon>
           <span>皮带管理</span>
           <div class="header-right">
+              <el-button @click="askAgent">问 AI</el-button>
             <el-button type="primary" @click="handleAdd">
               <el-icon><Plus /></el-icon>
               添加皮带
             </el-button>
+            <el-input v-model="tableSearch" placeholder="筛选当前表格..." prefix-icon="Search" clearable size="default" class="header-search-input" />
             <FullscreenToggle />
           </div>
         </div>
@@ -17,7 +19,7 @@
 
       <el-tabs v-model="activeTab">
         <el-tab-pane label="皮带信息" name="info">
-           <DataTable table-id="belt.info" :data="beltList" :loading="loading">
+           <DataTable v-model:search="tableSearch" :hide-search="true" table-id="belt.info" :data="beltList" :loading="loading">
             <ConfigurableTable field="name" title="名称" width="160" sortable />
             <ConfigurableTable field="machine" title="适用机器" width="120" sortable :filters="machineFilters" :filter-method="exactFilter" />
             <ConfigurableTable field="safetyStock" title="安全库存" width="100" sortable />
@@ -30,7 +32,7 @@
               </template>
             </ConfigurableTable>
             <ConfigurableTable field="remark" title="备注" min-width="120" />
-            <ConfigurableTable title="操作" width="150" class-name="operation-column" header-class-name="operation-column">
+            <ConfigurableTable title="操作" :width="allowDelete ? 160 : 90" class-name="operation-column" header-class-name="operation-column">
               <template #default="{ row }">
                 <el-button size="small" @click="handleEdit(row)">编辑</el-button>
                 <el-button size="small" type="danger" v-if="allowDelete" @click="handleDelete(row)">删除</el-button>
@@ -193,6 +195,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, inject } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useRouter } from 'vue-router'
 import type { FormInstance } from 'element-plus'
 import { beltApi, beltOrderApi, beltUseApi, stockCalcApi } from '../api'
 import { useAllowDelete } from '../composables/useAllowDelete'
@@ -213,6 +216,12 @@ function getCurrentDateTime() {
 
 const activeTab = ref('info')
 const beltList = ref<any[]>([])
+const tableSearch = ref('')
+
+const router = useRouter()
+const askAgent = () => {
+  router.push({ path: '/agent', query: { from: '皮带管理', table: '皮带信息表', filter: tableSearch.value, tab: activeTab.value } })
+}
 useHighlight(beltList)
 const orderList = ref<any[]>([])
 const useList = ref<any[]>([])
@@ -411,9 +420,10 @@ async function handleUseSubmit() {
 .page-container.is-fullscreen .el-table__body-wrapper { overflow: auto !important; }
 .page-container.is-fullscreen .el-table .el-table__fixed { height: calc(100% - 14px) !important; }
 
-.header-right {
+.header-right { align-items: center;
   display: flex;
   gap: 8px;
   margin-left: auto;
 }
+.header-search-input { width: 240px; }
 </style>

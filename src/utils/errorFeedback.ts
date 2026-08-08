@@ -61,6 +61,9 @@ export function getErrorSuggestion(reason: string): string {
   if (/zip|corrupt|invalid.*xlsx|损坏|格式/.test(normalized)) {
     return '数据文件可能损坏或不是有效的 XLSX 文件；请先从备份恢复后再重试。'
   }
+  if (/webdav|http 401|http 403|应用密码|远端/.test(normalized)) {
+    return '请在“配置”中检查 WebDAV 地址、账户和应用密码；涉及远端冲突时先下载确认。'
+  }
   if (/unknown command|command .* not found|未找到命令/.test(normalized)) {
     return '前后端版本不一致；请完全退出并重新启动桌面应用。'
   }

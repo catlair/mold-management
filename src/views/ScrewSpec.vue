@@ -6,44 +6,54 @@
           <el-icon><Document /></el-icon>
           <span>螺丝规格管理</span>
           <div class="header-right">
-            <el-button @click="openPrint('print')">
+              <el-button @click="askAgent">问 AI</el-button>
+            <el-button @click="openPrint">
               <el-icon><Printer /></el-icon>
               打印
-            </el-button>
-            <el-button type="primary" @click="openPrint('pdf')">
-              <el-icon><Download /></el-icon>
-              导出 PDF
             </el-button>
             <el-button type="primary" @click="handleAdd">
               <el-icon><Plus /></el-icon>
               添加规格
             </el-button>
+            <el-input v-model="tableSearch" placeholder="筛选当前表格..." prefix-icon="Search" clearable size="default" class="header-search-input" />
             <FullscreenToggle />
           </div>
         </div>
       </template>
 
-        <DataTable table-id="screw-spec.info" :data="tableData" :loading="loading">
+        <DataTable v-model:search="tableSearch" :hide-search="true" table-id="screw-spec.info" :data="tableData" :loading="loading">
         <ConfigurableTable field="name" title="螺丝名称" width="160" sortable />
         <ConfigurableTable field="headType" title="头型" width="120" sortable :filters="headTypeFilters" :filter-method="exactFilter" />
         <ConfigurableTable field="punch" title="冲头" width="120" sortable>
           <template #default="{ row }">
-            <el-link v-if="row.punch" type="primary" :underline="false" @click="showPunchDialog(row)">{{ row.punch }}</el-link>
+            <span v-if="row.punch === NONE_OPTION">无</span>
+            <el-link v-else-if="row.punch" type="primary" :underline="false" @click="showPunchDialog(row)">{{ row.punch }}</el-link>
             <span v-else>-</span>
           </template>
         </ConfigurableTable>
         <ConfigurableTable field="threadType" title="牙型" width="120" sortable :filters="threadTypeFilters" :filter-method="exactFilter" />
         <ConfigurableTable field="die" title="牙板" width="120" sortable>
           <template #default="{ row }">
-            <el-link v-if="row.die" type="success" :underline="false" @click="showDieDialog(row)">{{ row.die }}</el-link>
+            <span v-if="row.die === NONE_OPTION">无</span>
+            <el-link v-else-if="row.die" type="success" :underline="false" @click="showDieDialog(row)">{{ row.die }}</el-link>
             <span v-else>-</span>
           </template>
         </ConfigurableTable>
-        <ConfigurableTable field="headSize" title="头/垫片大小" width="140" sortable />
-        <ConfigurableTable field="headHeight" title="头高" width="100" sortable />
-        <ConfigurableTable field="length" title="长度" width="100" sortable />
-        <ConfigurableTable field="threadDiameter" title="牙径" width="100" sortable />
-        <ConfigurableTable field="shankLength" title="光钉长度" width="120" sortable />
+        <ConfigurableTable field="headSize" title="头/垫片大小" width="140" sortable>
+          <template #default="{ row }"><ToleranceDisplay :value="row.headSize" /></template>
+        </ConfigurableTable>
+        <ConfigurableTable field="headHeight" title="头高" width="100" sortable>
+          <template #default="{ row }"><ToleranceDisplay :value="row.headHeight" /></template>
+        </ConfigurableTable>
+        <ConfigurableTable field="length" title="长度" width="100" sortable>
+          <template #default="{ row }"><ToleranceDisplay :value="row.length" /></template>
+        </ConfigurableTable>
+        <ConfigurableTable field="threadDiameter" title="牙径" width="100" sortable>
+          <template #default="{ row }"><ToleranceDisplay :value="row.threadDiameter" /></template>
+        </ConfigurableTable>
+        <ConfigurableTable field="shankLength" title="光钉长度" width="120" sortable>
+          <template #default="{ row }"><ToleranceDisplay :value="row.shankLength" /></template>
+        </ConfigurableTable>
         <ConfigurableTable field="wireMaterial" title="线材" width="100" sortable />
         <ConfigurableTable field="plating" title="电镀" width="120" sortable :filters="platingFilters" :filter-method="exactFilter" />
         <ConfigurableTable field="customer" title="客户名" width="120" sortable />
@@ -71,7 +81,7 @@
 
 
     <!-- 添加/编辑对话框 -->
-    <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑螺丝规格' : '添加螺丝规格'" width="800px">
+    <el-dialog v-model="dialogVisible" class="screw-spec-dialog" :title="isEdit ? '编辑螺丝规格' : '添加螺丝规格'" width="800px">
       <el-form ref="formRef" :model="form" :rules="formRules" label-width="100px">
         <el-row :gutter="20">
           <el-col :span="12">
@@ -81,12 +91,18 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="螺丝头型">
-              <SpecInput v-model="form.headType" placeholder="如 平头" />
+              <el-select v-model="form.headType" filterable allow-create clearable default-first-option placeholder="选择历史头型或输入新头型" style="width: 100%">
+                <el-option v-for="option in headTypeOptions" :key="option.value" :label="option.label" :value="option.value">
+                  <span>{{ option.label }}</span>
+                  <span class="reuse-count">{{ option.count }} 次</span>
+                </el-option>
+              </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="冲头" prop="punch">
-              <el-select v-model="form.punch" placeholder="请选择冲头" filterable allow-create multiple collapse-tags style="width: 100%">
+              <el-select v-model="form.punch" placeholder="请选择冲头" filterable allow-create multiple collapse-tags style="width: 100%" @change="handleNoneSelection('punch', $event)">
+                <el-option label="无" :value="NONE_OPTION" />
                 <el-option v-for="item in punchOptions" :key="item.name" :label="item.name" :value="item.name">
                   <span>{{ item.name }}</span>
                   <span style="float: right; color: #8492a6; font-size: 12px">{{ item.specs }}</span>
@@ -97,12 +113,18 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="牙型">
-              <SpecInput v-model="form.threadType" placeholder="如 自攻" />
+              <el-select v-model="form.threadType" filterable allow-create clearable default-first-option placeholder="选择历史牙型或输入新牙型" style="width: 100%">
+                <el-option v-for="option in threadTypeOptions" :key="option.value" :label="option.label" :value="option.value">
+                  <span>{{ option.label }}</span>
+                  <span class="reuse-count">{{ option.count }} 次</span>
+                </el-option>
+              </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="牙板" prop="die">
-              <el-select v-model="form.die" placeholder="请选择牙板" filterable allow-create multiple collapse-tags style="width: 100%">
+              <el-select v-model="form.die" placeholder="请选择牙板" filterable allow-create multiple collapse-tags style="width: 100%" @change="handleNoneSelection('die', $event)">
+                <el-option label="无" :value="NONE_OPTION" />
                 <el-option v-for="item in dieOptions" :key="item.id" :label="item.label" :value="item.value">
                   <span>{{ item.shortName }}</span>
                   <span v-if="item.specs" style="float: right; color: #8492a6; font-size: 12px">{{ item.specs }}</span>
@@ -113,42 +135,55 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="头/垫片大小">
-              <SpecInput v-model="form.headSize" placeholder="如 9.1~9.3、5.3±0.1" />
+              <SpecInput v-model="form.headSize" virtual-keyboard placeholder="如 9.1~9.3、5.3±0.1" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="头高">
-              <SpecInput v-model="form.headHeight" placeholder="如 2.3~2.4、2.3±0.1" />
+              <SpecInput v-model="form.headHeight" virtual-keyboard placeholder="如 2.3~2.4、2.3±0.1" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="长度">
-              <SpecInput v-model="form.length" placeholder="如 8±0.5、8-0.5、7.7~8.1" />
+              <SpecInput v-model="form.length" virtual-keyboard placeholder="如 8±0.5、8-0.5、7.7~8.1" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="牙径">
-              <SpecInput v-model="form.threadDiameter" placeholder="如 2.5~2.6、4.22-0.18" />
+              <SpecInput v-model="form.threadDiameter" virtual-keyboard placeholder="如 2.5~2.6、4.22-0.18" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="光钉长度">
-              <SpecInput v-model="form.shankLength" placeholder="如 11、11±0.1" />
+              <SpecInput v-model="form.shankLength" virtual-keyboard placeholder="如 11、11±0.1" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="线材">
-              <SpecInput v-model="form.wireMaterial" placeholder="如 1018" />
+              <el-select v-model="form.wireMaterial" filterable allow-create clearable default-first-option placeholder="选择历史线材或输入新线材" style="width: 100%">
+                <el-option v-for="option in wireMaterialOptions" :key="option.value" :label="option.label" :value="option.value">
+                  <span>{{ option.label }}</span>
+                  <span class="reuse-count">{{ option.count }} 次</span>
+                </el-option>
+              </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="电镀">
-              <SpecInput v-model="form.plating" placeholder="如 彩锌" />
+              <el-select v-model="form.plating" filterable allow-create clearable default-first-option placeholder="选择常用电镀或输入新值" style="width: 100%">
+                <el-option v-for="option in platingOptions" :key="option.value" :label="option.label" :value="option.value">
+                  <span>{{ option.label }}</span>
+                  <span v-if="option.count" class="reuse-count">{{ option.count }} 次</span>
+                  <span v-else class="reuse-count">常用</span>
+                </el-option>
+              </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="客户名">
-              <SpecInput v-model="form.customer" placeholder="如 客户A" />
+              <el-select v-model="form.customer" filterable allow-create clearable default-first-option placeholder="选择历史客户或输入新客户" style="width: 100%">
+                <el-option v-for="customer in customerOptions" :key="customer" :label="customer" :value="customer" />
+              </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -193,7 +228,7 @@
     >
       <ConfigurableVxeTable table-id="screw-spec.punch-dialog" :data="punchDialogItems" border round stripe size="small">
         <ConfigurableTable title="冲头名称" width="120">
-          <template #default="{ row: r }">{{ toShortCode(r.name) || r.name }}</template>
+          <template #default="{ row: r }">{{ r.name }}</template>
         </ConfigurableTable>
         <ConfigurableTable field="spec" title="规格" width="100" />
         <ConfigurableTable field="material" title="材质" width="80" />
@@ -243,7 +278,7 @@
         </ConfigurableTable>
         <ConfigurableTable title="外显" width="60" align="center">
           <template #default="{ row: item }">
-            <el-link :type="item.name === dieDialogPrimary ? 'info' : 'warning'" :underline="false" @click="setDiePrimary(item)">
+            <el-link :type="dieDisplayValue(item) === dieDialogPrimary ? 'info' : 'warning'" :underline="false" @click="setDiePrimary(item)">
               <el-icon><View /></el-icon>
             </el-link>
           </template>
@@ -261,9 +296,10 @@
 
     <PrintSettingsDialog
       v-model="printDialogVisible"
-      :mode="printAction"
+mode="print"
       page-key="screwSpec"
       :columns="screwSpecPrintColumns"
+      :groupable="true"
       @confirm="runPrintAction"
     />
     <PrintArea
@@ -272,7 +308,7 @@
       :rows="printRows"
       :title="printTitle"
       :print-time="printTime"
-      :settings="printSettings"
+      :settings="printPageSettings"
       :enabled-columns="printEnabledColumns"
       :paginated-pages="printPaginatedPages"
     />
@@ -282,7 +318,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, inject } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { View, Paperclip, Printer, Download } from '@element-plus/icons-vue'
+import { useRouter } from 'vue-router'
+import { View, Paperclip, Printer } from '@element-plus/icons-vue'
 import type { FormInstance } from 'element-plus'
 import { screwSpecApi, screwAttachmentApi, punchApi, dieApi, punchLinkApi, dieLinkApi, stockCalcApi } from '../api'
 import { useAllowDelete } from '../composables/useAllowDelete'
@@ -291,6 +328,7 @@ import { settleNamedRequests, showBatchErrors, showDetailedError } from '../util
 import FullscreenToggle from '../components/FullscreenToggle.vue'
 import DataTable from '../components/DataTable.vue'
 import SpecInput from '../components/SpecInput.vue'
+import ToleranceDisplay from '../components/ToleranceDisplay.vue'
 import RelatedDataDialog from '../components/RelatedDataDialog.vue'
 import ScrewAttachmentWorkspace from '../components/ScrewAttachmentWorkspace.vue'
 import PrintSettingsDialog from '../components/PrintSettingsDialog.vue'
@@ -298,7 +336,7 @@ import PrintArea from '../components/PrintArea.vue'
 import { screwSpecPrintColumns } from '../config/printColumns'
 import { usePrint } from '../composables/usePrint'
 import { usePrintSettings } from '../composables/usePrintSettings'
-import { toShortCode, matchPunchNames } from '../utils/punchName'
+import { toFullName, matchPunchNames } from '../utils/punchName'
 import { parseSpecText } from '../utils/specNormalize'
 import { exactFilter, buildFilters } from '../utils/tableFilters'
 
@@ -307,6 +345,12 @@ const { allowDelete } = useAllowDelete()
 const { isFullscreen } = inject<any>('fullscreen')!
 
 const tableData = ref<any[]>([])
+const tableSearch = ref('')
+
+const router = useRouter()
+const askAgent = () => {
+  router.push({ path: '/agent', query: { from: '螺丝规格管理', table: '螺丝规格表', filter: tableSearch.value } })
+}
 useHighlight(tableData)
 const punchList = ref<any[]>([])
 const dieList = ref<any[]>([])
@@ -337,31 +381,28 @@ const {
   title: printTitle,
   printTime,
   print,
-  exportPdf,
   currentPageKey: printCurrentPageKey,
   paginatedPages: printPaginatedPages,
   enabledColumns: printEnabledColumns,
 } = usePrint()
-const { settings: printSettings } = usePrintSettings()
+const { settings: printSettings, getPageSettings } = usePrintSettings()
+const printPageSettings = printSettings.byPage.screwSpec
 const printDialogVisible = ref(false)
-const printAction = ref<'print' | 'pdf'>('print')
 
-function openPrint(action: 'print' | 'pdf') {
+function openPrint() {
   if (!tableData.value.length) {
     ElMessage.info('暂无数据可打印')
     return
   }
-  printAction.value = action
   printDialogVisible.value = true
 }
 
 function runPrintAction() {
-  const options = { title: '螺丝规格明细表' }
-  if (printAction.value === 'print') {
-    print('screwSpec', tableData.value, screwSpecPrintColumns, options)
-  } else {
-    exportPdf('screwSpec', tableData.value, screwSpecPrintColumns, options)
-  }
+  const groupMode = getPageSettings('screwSpec').groupMode
+  print('screwSpec', tableData.value, screwSpecPrintColumns, {
+    title: '螺丝规格明细表',
+    ...(groupMode === 'customer' ? { groupBy: (row: any) => row.customer } : {}),
+  })
 }
 
 onMounted(() => {
@@ -370,22 +411,34 @@ onMounted(() => {
 
 const formRef = ref<FormInstance>()
 const formRules = { name: [{ required: true, message: '请输入螺丝名称', trigger: 'blur' }] }
+const NONE_OPTION = '无'
 
-// 冲头选项（按名称去重，显示简写+全写）
+/** 「无」与具体冲头/牙板互斥：最后选中无则只保留无，选择具体项则自动移除无。 */
+function handleNoneSelection(field: 'punch' | 'die', value: unknown) {
+  const values = Array.isArray(value) ? value.map(String) : []
+  const lastSelected = values[values.length - 1]
+  form.value[field] = lastSelected === NONE_OPTION
+    ? [NONE_OPTION]
+    : values.filter(item => item !== NONE_OPTION)
+}
+
+// 冲头选项：螺丝规格中始终使用信息表的完整名称
 const punchOptions = computed(() => {
   const names = [...new Set(punchList.value.map(item => item.name).filter(Boolean))]
-  return names.map(name => {
-    const short = toShortCode(name)
-    const display = short || name
-    const fullName = short ? name : ''
-    return {
-      name: display, // 简写作为值
-      fullName,       // 全写（如果有）
-      label: fullName ? `${display} (${fullName})` : display,
-      specs: punchList.value.filter(p => p.name === name).map(p => `${p.spec}${p.material ? '(' + p.material + ')' : ''}`).join('、')
-    }
-  })
+  return names.map(name => ({
+    name,
+    fullName: name,
+    label: name,
+    specs: punchList.value.filter(p => p.name === name).map(p => `${p.spec}${p.material ? '(' + p.material + ')' : ''}`).join('、')
+  }))
 })
+
+function normalizePunchName(name: unknown, infoList: any[]): string {
+  if (name == null || String(name).trim() === '') return ''
+  const text = String(name).trim()
+  const matched = infoList.find((item: any) => item?.name && matchPunchNames(text, item.name))
+  return matched?.name || toFullName(text) || text
+}
 
 // 牙板选项（按名称+机型+线径组合区分）
 const dieOptions = computed(() => {
@@ -396,8 +449,34 @@ const dieOptions = computed(() => {
   })
 })
 
+interface ReuseOption { value: string; label: string; count: number }
+
+/** 从现有记录生成复用选项：去首尾空格、按使用次数降序，再按名称排序。 */
+function buildReuseOptions(field: string, presets: string[] = []): ReuseOption[] {
+  const counts = new Map<string, number>()
+  for (const row of tableData.value) {
+    const value = String(row?.[field] ?? '').trim()
+    if (value) counts.set(value, (counts.get(value) || 0) + 1)
+  }
+  for (const preset of presets) {
+    const value = preset.trim()
+    if (value && !counts.has(value)) counts.set(value, 0)
+  }
+  return [...counts.entries()]
+    .map(([value, count]) => ({ value, label: value, count }))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, 'zh-CN'))
+}
+
+const COMMON_PLATING_OPTIONS = ['无', '白锌', '彩锌', '蓝白锌', '黑锌', '镀镍', '镀铜', '发黑', '达克罗']
+const headTypeOptions = computed(() => buildReuseOptions('headType'))
+const threadTypeOptions = computed(() => buildReuseOptions('threadType'))
+const wireMaterialOptions = computed(() => buildReuseOptions('wireMaterial'))
+const platingOptions = computed(() => buildReuseOptions('plating', COMMON_PLATING_OPTIONS))
+
 const headTypeFilters = computed(() => buildFilters(tableData.value, 'headType'))
 const threadTypeFilters = computed(() => buildFilters(tableData.value, 'threadType'))
+// 历史客户名（去重，供选择）
+const customerOptions = computed(() => [...new Set(tableData.value.map(item => item.customer).filter((value): value is string => !!value && value.trim() !== ''))])
 const platingFilters = computed(() => buildFilters(tableData.value, 'plating'))
 
 const form = ref<any>({
@@ -406,7 +485,7 @@ const form = ref<any>({
   length: '', threadDiameter: '', shankLength: '', wireMaterial: '', plating: '', remark: ''
 })
 
-// 解析关联表：保留具体的记录 ID，同时解析出名字用于显示（全写转简写）
+// 解析关联表：保留具体的记录 ID，同时解析出完整名称用于显示
 function resolveLinks(linkIdField: string, links: any[], infoList: any[]): Record<string, { ids: string[], names: string[] }> {
   const map: Record<string, { ids: string[], names: string[] }> = {}
   for (const link of links) {
@@ -418,14 +497,27 @@ function resolveLinks(linkIdField: string, links: any[], infoList: any[]): Recor
       map[specId].ids.push(itemId)
       const info = infoList.find((i: any) => i.id === itemId)
       const rawName = info ? info.name : itemId
-      const shortName = toShortCode(rawName) || rawName
-      map[specId].names.push(shortName)
+      map[specId].names.push(rawName)
     }
   }
   return map
 }
 
-// 根据名字在信息表中查找 ID（多条同名的都返回）
+function dieDisplayValue(item: any): string {
+  return [item?.name, item?.machineType, item?.wireDiameter].filter(Boolean).join(' ')
+}
+
+function resolvePrimaryDie(primaryValue: unknown, linkedIds: string[], infoList: any[]): { name: string; display: string } {
+  const primary = String(primaryValue ?? '').trim()
+  if (!primary) return { name: '', display: '' }
+  const linkedSet = new Set(linkedIds)
+  const candidates = infoList.filter((item: any) => linkedSet.has(item.id))
+  const matched = candidates.find((item: any) => dieDisplayValue(item) === primary || item.name === primary)
+  return matched
+    ? { name: String(matched.name || ''), display: dieDisplayValue(matched) }
+    : { name: primary, display: primary }
+}
+
 function findIdsByNames(names: string[], infoList: any[], isDie = false): string[] {
   const ids: string[] = []
   const seen = new Set<string>()
@@ -433,7 +525,7 @@ function findIdsByNames(names: string[], infoList: any[], isDie = false): string
     for (const item of infoList) {
       if (isDie) {
         // 牙板按 名称+机型+线径 组合匹配
-        const display = [item.name, item.machineType, item.wireDiameter].filter(Boolean).join(' ')
+        const display = dieDisplayValue(item)
         if ((display === n || item.name === n) && !seen.has(item.id)) {
           ids.push(item.id)
           seen.add(item.id)
@@ -475,14 +567,23 @@ async function loadData() {
     const availableCounts = counts || {}
 
     if (screws) {
-      tableData.value = screws.map((screw: any) => ({
-        ...screw,
-        _punchIds: punchMap[screw.id]?.ids || [],
-        _punchNames: punchMap[screw.id]?.names || [],
-        _dieIds: dieMap[screw.id]?.ids || [],
-        _dieNames: dieMap[screw.id]?.names || [],
-        _attachmentCount: availableCounts[screw.id] || 0,
-      }))
+      tableData.value = screws.map((screw: any) => {
+        const dieIds = dieMap[screw.id]?.ids || []
+        const primaryDie = resolvePrimaryDie(screw.die, dieIds, availableDies)
+        return {
+          ...screw,
+          punch: normalizePunchName(screw.punch, availablePunches),
+          // 页面统一显示「牙板名称 + 机型 + 线径」，兼容历史仅存纯名称的主显值。
+          die: primaryDie.display,
+          _punchIds: punchMap[screw.id]?.ids || [],
+          _punchNames: punchMap[screw.id]?.names || [],
+          _dieIds: dieIds,
+          _dieNames: dieMap[screw.id]?.names || [],
+          // 打印专用：仅保留当前主显牙板的纯名称，不含机型/线径。
+          _diePrimaryName: primaryDie.name,
+          _attachmentCount: availableCounts[screw.id] || 0,
+        }
+      })
     }
     if (counts) attachmentCounts.value = counts
     if (punches) punchList.value = punches
@@ -495,8 +596,9 @@ async function loadData() {
 
 // ====== 冲头关联弹窗 ======
 function showPunchDialog(row: any) {
+  if (!row?.punch || row.punch === NONE_OPTION) return
   punchDialogRow.value = row
-  punchDialogPrimary.value = row.punch || ''
+  punchDialogPrimary.value = normalizePunchName(row.punch, punchList.value)
   const ids = row._punchIds || []
   const items = ids.map((id: string) => punchList.value.find(p => p.id === id)).filter(Boolean).map((p: any) => ({ ...p }))
   stockCalcApi.calculate('punch').then((sd: any[]) => {
@@ -512,8 +614,7 @@ function showPunchDialog(row: any) {
 async function setPunchPrimary(item: any) {
   if (matchPunchNames(item.name, punchDialogPrimary.value)) return
   try {
-    const shortName = toShortCode(item.name) || item.name
-    await screwSpecApi.update(punchDialogRow.value.id, { punch: shortName })
+    await screwSpecApi.update(punchDialogRow.value.id, { punch: item.name })
     punchDialogVisible.value = false
     loadData()
     ElMessage.success('外显冲头已设置')
@@ -524,6 +625,7 @@ async function setPunchPrimary(item: any) {
 
 // ====== 牙板关联弹窗 ======
 function showDieDialog(row: any) {
+  if (!row?.die || row.die === NONE_OPTION) return
   dieDialogRow.value = row
   dieDialogPrimary.value = row.die || ''
   const ids = row._dieIds || []
@@ -539,9 +641,10 @@ function showDieDialog(row: any) {
 }
 
 async function setDiePrimary(item: any) {
-  if (item.name === dieDialogPrimary.value) return
+  const display = dieDisplayValue(item)
+  if (display === dieDialogPrimary.value) return
   try {
-    await screwSpecApi.update(dieDialogRow.value.id, { die: item.name })
+    await screwSpecApi.update(dieDialogRow.value.id, { die: display })
     dieDialogVisible.value = false
     loadData()
     ElMessage.success('外显牙板已设置')
@@ -585,10 +688,12 @@ function handleAdd() {
 
 function handleEdit(row: any) {
   isEdit.value = true
+  const punchNames = [...(row._punchNames || [])]
+  const dieNames = [...(row._dieNames || [])]
   form.value = {
     ...row,
-    punch: [...(row._punchNames || [])],
-    die: [...(row._dieNames || [])]
+    punch: row.punch === NONE_OPTION ? [NONE_OPTION] : punchNames,
+    die: row.die === NONE_OPTION ? [NONE_OPTION] : dieNames,
   }
   dialogVisible.value = true
 }
@@ -608,15 +713,29 @@ async function handleDelete(row: any) {
   }
 }
 
-// 同步关联表：先删旧的，再建新的
-async function syncLinks(screwSpecId: string, nameField: string, names: string[], linkApi: any, infoList: any[], isDie = false) {
+// 差异同步关联表：只删除已取消的关联、只新增缺少的关联。
+// 原实现每次都「全删再全建」，即使冲头没变也会产生冲头删除/新增日志。
+async function syncLinks(screwSpecId: string, itemIdField: string, names: string[], linkApi: any, infoList: any[], isDie = false) {
   const allLinks = await linkApi.getAll()
-  for (const l of allLinks.filter((l: any) => l.screwSpecId === screwSpecId)) {
-    await linkApi.remove(l.id)
+  const existingLinks = allLinks.filter((link: any) => link.screwSpecId === screwSpecId)
+  const targetIds = [...new Set(findIdsByNames(names, infoList, isDie))]
+  const targetSet = new Set(targetIds)
+  const retainedIds = new Set<string>()
+
+  for (const link of existingLinks) {
+    const itemId = String(link[itemIdField] || '')
+    // 删除已取消关联；历史重复关联只保留第一条。
+    if (!targetSet.has(itemId) || retainedIds.has(itemId)) {
+      await linkApi.remove(link.id)
+    } else {
+      retainedIds.add(itemId)
+    }
   }
-  const ids = findIdsByNames(names, infoList, isDie)
-  for (const id of ids) {
-    await linkApi.add({ [nameField]: id, screwSpecId })
+
+  for (const itemId of targetIds) {
+    if (!retainedIds.has(itemId)) {
+      await linkApi.add({ [itemIdField]: itemId, screwSpecId })
+    }
   }
 }
 
@@ -629,6 +748,16 @@ function specFieldKey(value: unknown): string {
 }
 
 function duplicateReason(a: Record<string, any>, b: Record<string, any>): string {
+  // 客户不一致 → 视为独立规格，不算重复
+  const customerA = specFieldKey(a.customer)
+  const customerB = specFieldKey(b.customer)
+  if (customerA !== customerB) return ''
+
+  // 外部 ID 都非空且不同 → 不同产品（如 V 1 / N 1 / D 932），不算重复
+  const extA = specFieldKey(a.externalId)
+  const extB = specFieldKey(b.externalId)
+  if (extA && extB && extA !== extB) return ''
+
   const nameA = specFieldKey(a.name)
   const nameB = specFieldKey(b.name)
   const headA = specFieldKey(a.headType)
@@ -636,14 +765,11 @@ function duplicateReason(a: Record<string, any>, b: Record<string, any>): string
   const threadA = specFieldKey(a.threadType)
   const threadB = specFieldKey(b.threadType)
   if ((nameA || headA || threadA) && nameA === nameB && headA === headB && threadA === threadB) {
-    return `名称、头型、牙型相同：${b.name || '-'} / ${b.headType || '-'} / ${b.threadType || '-'}`
+    return `名称、头型、牙型相同：${b.name || '-'} / ${b.headType || '-'} / ${b.threadType || '-'}（客户：${b.customer || '-'}${extA && extB ? `，外部ID：${b.externalId}` : ''}）`
   }
 
-  const extA = specFieldKey(a.externalId)
-  const extB = specFieldKey(b.externalId)
-  const customerA = specFieldKey(a.customer)
-  const customerB = specFieldKey(b.customer)
-  if (extA && extB && customerA && customerB && extA === extB && customerA === customerB) {
+  // 外部ID + 客户 相同（externalId 至少一方非空时）
+  if (extA && extB && customerA && customerB && extA === extB) {
     return `外部ID、客户相同：${b.externalId} / ${b.customer}`
   }
 
@@ -687,13 +813,24 @@ async function handleSubmit() {
         }
       }
 
-      const punchNames = Array.isArray(form.value.punch) ? form.value.punch : []
-      const dieNames = Array.isArray(form.value.die) ? form.value.die : []
-      // 主表只存外显的第一个名字
+      const selectedPunchNames: string[] = Array.isArray(form.value.punch) ? form.value.punch : []
+      const selectedDieNames: string[] = Array.isArray(form.value.die) ? form.value.die : []
+      const punchIsNone = selectedPunchNames.includes(NONE_OPTION)
+      const dieIsNone = selectedDieNames.includes(NONE_OPTION)
+      // 关联表不为「无」创建关联；主表仍把「无」作为实际业务值保存。
+      const punchNames = selectedPunchNames
+        .filter((name: string) => name !== NONE_OPTION)
+        .map((name: string) => toFullName(name) || name)
+      const dieNames = selectedDieNames.filter((name: string) => name !== NONE_OPTION)
+      // 主表只提交真实业务字段；排除以 _ 开头的前端内部辅助字段，
+      // 避免 _punchNames/_dieNames/_punchIds 等被后端日志误判为字段变更。
+      const businessFields = Object.fromEntries(
+        Object.entries(form.value).filter(([key]) => !key.startsWith('_')),
+      )
       const payload = {
-        ...form.value,
-        punch: punchNames[0] || '',
-        die: dieNames[0] || ''
+        ...businessFields,
+        punch: punchIsNone ? NONE_OPTION : (punchNames[0] || ''),
+        die: dieIsNone ? NONE_OPTION : (dieNames[0] || '')
       }
       let specId: string
       if (isEdit.value) {
@@ -722,10 +859,14 @@ async function handleSubmit() {
 .page-container.is-fullscreen .el-card__header { display: none; }
 .page-container.is-fullscreen .el-card__body { flex: 1; overflow: hidden; padding: 12px; }
 
-/* 编辑对话框：所有字段统一高度（输入框 + 22px 信息行），无论有误预览/警告/普通输入都整齐 */
-.form-item-spacer { height: 22px; }
+/* 编辑对话框：保留规范提示所需高度，同时收紧表单项之间的空隙 */
+.screw-spec-dialog :deep(.el-form-item) { margin-bottom: 8px; }
+.screw-spec-dialog :deep(.el-form-item__label) { line-height: 32px; }
+.form-item-spacer { height: 8px; }
 
-.header-right { display: flex; gap: 8px; margin-left: auto; }
+.reuse-count { float: right; margin-left: 16px; color: var(--text-muted); font-size: 12px; }
+.header-right { display: flex; gap: 8px; margin-left: auto; align-items: center; }
+.header-search-input { width: 240px; }
 .attachment-count-button { min-width: 46px; font-weight: 600; }
 .form-attachment-panel { width: 100%; min-height: 72px; padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px dashed var(--border-strong); border-radius: 12px; background: var(--surface-muted); }
 .form-attachment-panel > div { min-width: 0; display: flex; align-items: center; gap: 11px; }

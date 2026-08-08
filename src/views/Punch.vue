@@ -6,18 +6,16 @@
           <el-icon><SetUp /></el-icon>
           <span>冲头管理</span>
           <div class="header-right">
-            <el-button @click="openPrint('print')">
+              <el-button @click="askAgent">问 AI</el-button>
+            <el-button @click="openPrint">
               <el-icon><Printer /></el-icon>
               打印
-            </el-button>
-            <el-button type="primary" @click="openPrint('pdf')">
-              <el-icon><Download /></el-icon>
-              导出 PDF
             </el-button>
             <el-button type="primary" @click="handleAdd">
               <el-icon><Plus /></el-icon>
               添加冲头
             </el-button>
+            <el-input v-model="tableSearch" placeholder="筛选当前表格..." prefix-icon="Search" clearable size="default" class="header-search-input" />
             <FullscreenToggle />
           </div>
         </div>
@@ -25,7 +23,7 @@
 
       <el-tabs v-model="activeTab">
         <el-tab-pane label="冲头信息" name="info">
-           <DataTable table-id="punch.info" :data="punchList" :loading="loading">
+           <DataTable v-model:search="tableSearch" :hide-search="true" table-id="punch.info" :data="punchList" :loading="loading">
             <ConfigurableTable field="name" title="名称" width="160" sortable>
               <template #default="{ row }">
                 <el-link type="primary" :underline="false" @click="showLinkedScrews(row)">{{ row.name }}</el-link>
@@ -43,7 +41,7 @@
               </template>
             </ConfigurableTable>
             <ConfigurableTable field="remark" title="备注" min-width="120" />
-            <ConfigurableTable title="操作" width="150" class-name="operation-column" header-class-name="operation-column">
+            <ConfigurableTable title="操作" :width="allowDelete ? 160 : 90" class-name="operation-column" header-class-name="operation-column">
               <template #default="{ row }">
                 <el-button size="small" @click="handleEdit(row)">编辑</el-button>
                 <el-button size="small" type="danger" v-if="allowDelete" @click="handleDelete(row)">删除</el-button>
@@ -187,7 +185,7 @@
 
     <PrintSettingsDialog
       v-model="printDialogVisible"
-      :mode="printAction"
+mode="print"
       page-key="punch"
       :columns="punchPrintColumns"
       @confirm="runPrintAction"
@@ -198,7 +196,7 @@
       :rows="printRows"
       :title="printTitle"
       :print-time="printTime"
-      :settings="printSettings"
+      :settings="printPageSettings"
       :enabled-columns="printEnabledColumns"
       :paginated-pages="printPaginatedPages"
     />
@@ -343,8 +341,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, inject } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useRouter } from 'vue-router'
 import type { FormInstance } from 'element-plus'
-import { SetUp, Plus, Printer, Download } from '@element-plus/icons-vue'
+import { SetUp, Plus, Printer } from '@element-plus/icons-vue'
 import { punchApi, punchOrderApi, punchUseApi, punchLinkApi, screwSpecApi, stockCalcApi, punchSpecApi } from '../api'
 import { useAllowDelete } from '../composables/useAllowDelete'
 import { useHighlight } from '../composables/useHighlight'
@@ -376,31 +375,24 @@ const {
   title: printTitle,
   printTime,
   print,
-  exportPdf,
   currentPageKey: printCurrentPageKey,
   paginatedPages: printPaginatedPages,
   enabledColumns: printEnabledColumns,
 } = usePrint()
 const { settings: printSettings } = usePrintSettings()
+const printPageSettings = printSettings.byPage.punch
 const printDialogVisible = ref(false)
-const printAction = ref<'print' | 'pdf'>('print')
 
-function openPrint(action: 'print' | 'pdf') {
+function openPrint() {
   if (!punchList.value.length) {
     ElMessage.info('暂无数据可打印')
     return
   }
-  printAction.value = action
   printDialogVisible.value = true
 }
 
 function runPrintAction() {
-  const options = { title: '冲头信息明细表' }
-  if (printAction.value === 'print') {
-    print('punch', punchList.value, punchPrintColumns, options)
-  } else {
-    exportPdf('punch', punchList.value, punchPrintColumns, options)
-  }
+  print('punch', punchList.value, punchPrintColumns, { title: '冲头信息明细表' })
 }
 
 function getCurrentDateTime() {
@@ -410,6 +402,12 @@ function getCurrentDateTime() {
 
 const activeTab = ref('info')
 const punchList = ref<any[]>([])
+const tableSearch = ref('')
+
+const router = useRouter()
+const askAgent = () => {
+  router.push({ path: '/agent', query: { from: '冲头管理', table: '冲头信息表', filter: tableSearch.value, tab: activeTab.value } })
+}
 useHighlight(punchList)
 const orderList = ref<any[]>([])
 const useList = ref<any[]>([])
@@ -724,7 +722,7 @@ async function handleDeleteLink(row: any) {
 .page-container.is-fullscreen .el-table__body-wrapper { overflow: auto !important; }
 .page-container.is-fullscreen .el-table .el-table__fixed { height: calc(100% - 14px) !important; }
 
-.header-right {
+.header-right { align-items: center;
   display: flex;
   gap: 8px;
   margin-left: auto;
@@ -740,4 +738,5 @@ async function handleDeleteLink(row: any) {
   gap: 4px;
   overflow-wrap: anywhere;
 }
+.header-search-input { width: 240px; }
 </style>

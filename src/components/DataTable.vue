@@ -1,6 +1,6 @@
 <template>
   <div class="dt-container">
-    <div class="dt-toolbar">
+    <div v-if="!hideSearch" class="dt-toolbar">
       <el-input
         v-model="searchKeyword"
         placeholder="筛选当前表格..."
@@ -65,6 +65,7 @@ const props = withDefaults(defineProps<{
   tableId?: string
   data: any[]
   loading?: boolean
+  hideSearch?: boolean
 }>(), {
   tableId: '',
 })
@@ -81,7 +82,7 @@ const customConfig = createVxeCustomConfig()
 const { setColumnPreference } = useTablePreferences()
 
 // ─── 本地搜索 ────────────────────────────────────────
-const searchKeyword = ref('')
+const searchKeyword = defineModel<string>('search', { default: '' })
 
 /** 归一化：小写 + 乘号统一 */
 function normalizeStr(s: string): string {

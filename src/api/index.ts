@@ -104,6 +104,8 @@ function createMockApi(sheetName: string) {
       ensureMockUnique(data)
       const created = { ...data, id: `mock_new_${Date.now()}_${rows.length}` }
       rows.push(created)
+      const name = created.name || created.id
+      writeMockLog('add', sheetName, created.id, `新增 ${sheetName}：${name}`)
       return { ...created }
     },
     update: async (id: string, data: any) => {
@@ -115,12 +117,21 @@ function createMockApi(sheetName: string) {
         ensureMockUnique(updated, id)
       }
       rows[currentIndex] = updated
+      const changes = Object.entries(data)
+        .filter(([key, value]) => key !== 'id' && String(current[key] ?? '') !== String(value ?? ''))
+        .map(([key, value]) => `${key}: ${String(current[key] ?? '') || '空'}→${String(value ?? '') || '空'}`)
+      const name = updated.name || id
+      writeMockLog('update', sheetName, id, changes.length
+        ? `修改 ${sheetName}：${name}（${changes.join('；')}）`
+        : `修改 ${sheetName}：${name}`)
       return { ...updated }
     },
     remove: async (id: string) => {
-      const index = rows.findIndex(row => row.id === id)
-      if (index < 0) return false
-      rows.splice(index, 1)
+      const currentIndex = rows.findIndex(row => row.id === id)
+      if (currentIndex < 0) return false
+      const removed = rows[currentIndex]
+      rows.splice(currentIndex, 1)
+      writeMockLog('delete', sheetName, id, `删除 ${sheetName}：${removed.name || id}`)
       return true
     },
   }
@@ -455,6 +466,67 @@ export const dataApi = isTauri()
       importPackage: async (_sourcePath: string) => ({ success: true, stats: {}, attachmentCount: 0 }),
     }
 
+export interface WebDavConfigView {
+  url: string
+  remotePath: string
+  usernameMasked: string
+  credentialsConfigured: boolean
+  credentialStore: string
+  usingDevelopmentConfig: boolean
+  autoUploadOnStart: boolean
+  autoUploadOnExit: boolean
+  lastEtag: string | null
+  lastUploadedAt: string | null
+  lastDownloadedAt: string | null
+}
+
+export interface WebDavRemoteStatus {
+  connected: boolean
+  exists: boolean
+  remotePath: string
+  etag: string | null
+  lastModified: string | null
+  size: number | null
+}
+
+export interface WebDavConfigInput {
+  url: string
+  remotePath: string
+  username?: string
+  password?: string
+  autoUploadOnStart: boolean
+  autoUploadOnExit: boolean
+}
+
+export const webdavApi = isTauri()
+  ? {
+      getConfig: () => invoke<WebDavConfigView>('get_webdav_config'),
+      setConfig: (input: WebDavConfigInput) => invoke<{ success: boolean }>('set_webdav_config', { ...input }),
+      testConnection: () => invoke<WebDavRemoteStatus>('test_webdav_connection'),
+      getStatus: () => invoke<WebDavRemoteStatus>('get_webdav_status'),
+      upload: (forceOverwrite = false) => invoke<{ success: boolean; etag: string | null; uploadedAt: string; size: number; sha256: string }>('upload_webdav_now', { forceOverwrite }),
+      download: () => invoke<{ success: boolean; etag: string | null; sha256: string; checksumVerified: boolean }>('download_webdav_now'),
+    }
+  : {
+      getConfig: async (): Promise<WebDavConfigView> => ({
+        url: 'https://dav.example.com/dav/', remotePath: 'mold-management.moldpkg',
+        usernameMasked: 'd***@example.com', credentialsConfigured: true, credentialStore: '浏览器预览模式',
+        usingDevelopmentConfig: true, autoUploadOnStart: false, autoUploadOnExit: false,
+        lastEtag: null, lastUploadedAt: null, lastDownloadedAt: null,
+      }),
+      setConfig: async () => ({ success: true }),
+      testConnection: async (): Promise<WebDavRemoteStatus> => ({
+        connected: true, exists: false, remotePath: 'mold-management.moldpkg', etag: null,
+        lastModified: null, size: null,
+      }),
+      getStatus: async (): Promise<WebDavRemoteStatus> => ({
+        connected: true, exists: false, remotePath: 'mold-management.moldpkg', etag: null,
+        lastModified: null, size: null,
+      }),
+      upload: async () => ({ success: true, etag: 'mock-etag', uploadedAt: new Date().toISOString(), size: 0, sha256: '' }),
+      download: async () => ({ success: true, etag: 'mock-etag', sha256: '', checksumVerified: true }),
+    }
+
 // 配置 API（浏览器预览模式返回 mock）
 export const settingsApi = isTauri()
   ? {
@@ -514,4 +586,197 @@ export const punchSpecApi = isTauri()
   : {
       get: async () => ['12*15', '14*15', '18*18'],
       set: async (specs: string[]) => ({ success: true, specs }),
+    }
+
+export type AgentProtocol = 'openai' | 'anthropic' | 'gemini'
+
+export interface AgentProfileView {
+  id: string
+  name: string
+  kind: 'builtin' | 'custom'
+  provider: string
+  format: string
+  endpoint: string
+  model: string
+  apiKeyConfigured: boolean
+  /** 该配置是否需要 API Key（false = 免费服务如 opencode Zen） */
+  apiKeyRequired?: boolean
+}
+
+export interface AgentBuiltinView {
+  value: string
+  label: string
+  model: string
+  protocol: string
+  /** 是否需要 API Key（false = 免费服务，无需填写 Key） */
+  needsApiKey?: boolean
+}
+
+export interface ZenModelView {
+  id: string
+  label: string
+  protocol: string
+  free: boolean
+}
+
+export interface AgentConfigView {
+  profiles: AgentProfileView[]
+  active: string
+  credentialStore: string
+  builtins: AgentBuiltinView[]
+  ccEndpoint?: string
+  ccModels?: ZenModelView[]
+  zenFreeModels?: ZenModelView[]
+  zenModels?: ZenModelView[]
+}
+
+export interface AgentProfileInput {
+  id: string
+  name: string
+  kind: 'builtin' | 'custom'
+  provider: string
+  format: string
+  endpoint: string
+  model: string
+  apiKey?: string
+}
+
+export interface AgentChange {
+  operation: 'add' | 'update' | 'delete' | 'set_setting' | 'import'
+  table: string
+  id?: string
+  fields: Record<string, unknown>
+  before?: Record<string, unknown> | null
+  after?: Record<string, unknown> | null
+  requireConfirm?: boolean
+}
+
+export interface AgentChatResult {
+  answer: string
+  changes: AgentChange[] | null
+  reasoning?: string | null
+}
+
+export interface AgentExcelCompareTable {
+  table: string
+  matchKey: 'business' | 'id' | 'none'
+  xlsxCount: number
+  dbCount: number
+  addedCount: number
+  modifiedCount: number
+  removedCount: number
+  unchanged: number
+  skipReason?: string
+  added?: Record<string, string>[]
+  modified?: { key: string; changes: Record<string, [string, string]> }[]
+  removed?: string[]
+}
+
+export type AgentExcelCompareResult = AgentExcelCompareTable[]
+
+export const agentApi = isTauri()
+  ? {
+      getConfig: () => invoke<AgentConfigView>('get_agent_config'),
+      setConfig: (input: { profiles: AgentProfileInput[]; active: string }) =>
+        invoke<{ success: boolean }>('set_agent_config', { ...input }),
+      chat: (question: string, history: { role: string; content: string }[], pageContext = '') =>
+        invoke<AgentChatResult>('agent_chat', { question, history, pageContext }),
+      applyChange: (change: AgentChange) =>
+        invoke<{ success: boolean; operation: string; table: string; result: unknown }>('apply_agent_change', { change }),
+      applyChanges: (changes: AgentChange[]) =>
+        invoke<{ success: boolean; applied: { success: boolean; operation: string; table: string; result: unknown }[]; failed: { change: AgentChange; error: string }[] }>('apply_agent_changes', { changes }),
+      compareExcel: (xlsxPath: string) =>
+        invoke<AgentExcelCompareResult>('compare_excel', { xlsxPath }),
+      analyzeExcel: (xlsxPath: string, history: { role: string; content: string }[], pageContext = '') =>
+        invoke<AgentChatResult>('agent_analyze_excel', { xlsxPath, history, pageContext }),
+    }
+  : {
+      getConfig: async (): Promise<AgentConfigView> => ({
+        profiles: [],
+        active: '',
+        credentialStore: '浏览器预览模式',
+        builtins: [
+          { value: 'deepseek', label: 'DeepSeek', model: 'deepseek-v4-flash', protocol: 'openai', needsApiKey: true },
+          { value: 'openai', label: 'OpenAI', model: 'gpt-4.1-mini', protocol: 'openai', needsApiKey: true },
+          { value: 'glm', label: '智谱 GLM', model: 'glm-4-flash-250414', protocol: 'openai', needsApiKey: true },
+          { value: 'anthropic', label: 'Claude Code', model: 'claude-sonnet-4-6', protocol: 'anthropic', needsApiKey: true },
+          { value: 'opencode-zen-free', label: 'OpenCode Zen（免费）', model: 'deepseek-v4-flash-free', protocol: 'openai', needsApiKey: false },
+          { value: 'opencode-zen', label: 'OpenCode Zen（需 Key）', model: 'deepseek-v4-flash', protocol: 'openai', needsApiKey: true },
+          { value: 'qwen', label: '通义千问', model: 'qwen-plus', protocol: 'openai', needsApiKey: true },
+          { value: 'gemini', label: 'Gemini', model: 'gemini-3.6-flash', protocol: 'gemini', needsApiKey: true },
+        ],
+        ccModels: [
+          { id: 'deepseek-v4-flash-free', label: 'DeepSeek V4 Flash Free', protocol: 'openai', free: true },
+          { id: 'deepseek-v4-flash', label: 'DeepSeek V4 Flash', protocol: 'openai', free: false },
+        ],
+        zenFreeModels: [
+          { id: 'big-pickle', label: 'Big Pickle', protocol: 'openai', free: true },
+          { id: 'deepseek-v4-flash-free', label: 'DeepSeek V4 Flash Free', protocol: 'openai', free: true },
+        ],
+        zenModels: [
+          { id: 'gpt-5.6-sol', label: 'GPT 5.6 Sol', protocol: 'responses', free: false },
+          { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6', protocol: 'anthropic', free: false },
+          { id: 'deepseek-v4-flash', label: 'DeepSeek V4 Flash', protocol: 'openai', free: false },
+          { id: 'deepseek-v4-flash-free', label: 'DeepSeek V4 Flash Free', protocol: 'openai', free: true },
+        ],
+      }),
+      setConfig: async () => ({ success: true }),
+      chat: async (question: string): Promise<AgentChatResult> => ({
+        answer: `浏览器预览模式已收到：${question}。桌面应用中会读取当前业务数据并调用已配置的第三方 API。`,
+        changes: null,
+      }),
+      applyChange: async () => ({ success: true, operation: 'update', table: '', result: {} }),
+      applyChanges: async () => ({ success: true, applied: [], failed: [] }),
+      compareExcel: async () => [],
+      analyzeExcel: async (): Promise<AgentChatResult> => ({ answer: '浏览器预览模式不支持文件分析', changes: null }),
+    }
+
+// ========== 操作日志 ==========
+export interface OperationLogEntry {
+  id: number
+  ts: number
+  tableName: string
+  operation: 'add' | 'update' | 'delete' | 'import'
+  recordId: string
+  summary: string
+}
+
+// 浏览器预览模式：mock 日志持久化到 localStorage
+const MOCK_LOG_STORAGE_KEY = 'mold-management-mock-operation-logs'
+
+function readMockLogs(): OperationLogEntry[] {
+  try {
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(MOCK_LOG_STORAGE_KEY) : null
+    return raw ? JSON.parse(raw) as OperationLogEntry[] : []
+  } catch {
+    return []
+  }
+}
+
+function writeMockLog(operation: OperationLogEntry['operation'], tableName: string, recordId: string, summary: string) {
+  try {
+    const logs = readMockLogs()
+    logs.unshift({ id: Date.now(), ts: Math.floor(Date.now() / 1000), tableName, operation, recordId, summary })
+    if (logs.length > 500) logs.length = 500
+    localStorage.setItem(MOCK_LOG_STORAGE_KEY, JSON.stringify(logs))
+  } catch {
+    // mock 环境写失败不影响业务
+  }
+}
+
+export const operationLogApi = isTauri()
+  ? {
+      get: (limit = 500, offset = 0) =>
+        invoke<{ total: number; items: OperationLogEntry[] }>('get_operation_logs', { limit, offset }),
+      clear: () => invoke<boolean>('clear_operation_logs'),
+    }
+  : {
+      get: async (limit = 500, _offset = 0) => {
+        const items = readMockLogs().slice(0, limit)
+        return { total: items.length, items }
+      },
+      clear: async () => {
+        localStorage.removeItem(MOCK_LOG_STORAGE_KEY)
+        return true
+      },
     }

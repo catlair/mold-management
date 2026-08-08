@@ -43,9 +43,9 @@ const router = createRouter({
       component: () => import('../views/UpperPunch.vue')
     },
     {
-      path: '/inventory',
-      name: 'Inventory',
-      component: () => import('../views/Inventory.vue')
+      path: '/agent',
+      name: 'Agent',
+      component: () => import('../views/Agent.vue')
     },
     {
       path: '/configuration-management',
@@ -60,6 +60,11 @@ const router = createRouter({
       path: '/settings',
       name: 'Settings',
       component: () => import('../views/Settings.vue')
+    },
+    {
+      path: '/operation-log',
+      name: 'OperationLog',
+      component: () => import('../views/OperationLog.vue')
     }
   ]
 })

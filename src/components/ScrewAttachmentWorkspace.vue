@@ -4,7 +4,7 @@
       <div
         v-if="visible"
         class="attachment-workspace-overlay"
-        :style="{ left: `${sidebarWidth}px` }"
+        :style="{ left: isFullscreen ? '0px' : `${sidebarWidth}px` }"
         role="dialog"
         aria-modal="true"
         :aria-label="mode === 'edit' ? '附件编辑与标注' : '附件预览'"
@@ -135,6 +135,8 @@ const emit = defineEmits<{
 
 // 应用侧栏宽度：覆盖层从侧栏右侧开始铺满主内容区
 const sidebarWidth = inject<Ref<number>>('appSidebarWidth', ref(180))
+const fullscreenState = inject<{ isFullscreen: Ref<boolean> }>('fullscreen', { isFullscreen: ref(false) })
+const isFullscreen = fullscreenState.isFullscreen
 
 const visible = computed({ get: () => props.modelValue, set: value => emit('update:modelValue', value) })
 const attachments = ref<ScrewAttachment[]>([])
@@ -399,7 +401,7 @@ watch(() => [props.modelValue, props.screwSpecId] as const, ([opened, id]) => {
   background: var(--card-bg);
   border-left: 1px solid var(--border);
   box-shadow: -10px 0 32px rgba(15, 23, 42, 0.16);
-  transition: border-color 180ms ease, background-color 180ms ease;
+  transition: left 180ms ease, border-color 180ms ease, background-color 180ms ease;
 }
 .workspace-header { display: flex; align-items: center; gap: 12px; padding: 12px 18px; flex-shrink: 0; border-bottom: 1px solid var(--border); }
 .workspace-title-mark { width: 40px; height: 40px; display: grid; place-items: center; flex-shrink: 0; border-radius: 12px; color: white; background: var(--primary); box-shadow: 0 8px 18px color-mix(in srgb, var(--primary) 26%, transparent); }

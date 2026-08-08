@@ -85,6 +85,106 @@
       </div>
     </el-card>
 
+    <el-card class="settings-card webdav-card">
+      <template #header>
+        <div class="card-header">
+          <el-icon><Connection /></el-icon>
+          <span>WebDAV 数据同步</span>
+          <el-tag v-if="webdavConfig.credentialsConfigured" size="small" type="success" class="header-status-tag">
+            {{ webdavConfig.usingDevelopmentConfig ? '开发配置' : '已加密保存' }}
+          </el-tag>
+        </div>
+      </template>
+      <el-alert
+        title="本地数据库始终是运行时主数据；WebDAV 仅同步完整数据包快照。"
+        type="info"
+        :closable="false"
+        show-icon
+        class="webdav-alert"
+      />
+      <el-form label-width="118px" class="webdav-form">
+        <el-form-item label="服务器地址">
+          <el-input v-model="webdavForm.url" placeholder="https://example.com/dav/" clearable />
+        </el-form-item>
+        <el-form-item label="远端文件">
+          <el-input v-model="webdavForm.remotePath" placeholder="mold-management.moldpkg" clearable />
+        </el-form-item>
+        <el-form-item label="已保存账户">
+          <div class="credential-status-row">
+            <el-tag :type="webdavConfig.credentialsConfigured ? 'success' : 'info'">
+              {{ webdavConfig.usernameMasked || '尚未配置' }}
+            </el-tag>
+            <span class="form-tip">填写下面两项会替换已保存凭据，留空则保持不变</span>
+          </div>
+        </el-form-item>
+        <el-form-item label="新账户">
+          <el-input v-model="webdavForm.username" autocomplete="off" placeholder="留空保持现有账户" clearable />
+        </el-form-item>
+        <el-form-item label="新应用密码">
+          <el-input
+            v-model="webdavForm.password"
+            type="password"
+            autocomplete="new-password"
+            placeholder="留空保持现有密码"
+            show-password
+            clearable
+          />
+        </el-form-item>
+        <el-form-item label="自动同步">
+          <div class="sync-policy-row">
+            <el-checkbox v-model="webdavForm.autoUploadOnStart">启动后上传</el-checkbox>
+            <el-checkbox v-model="webdavForm.autoUploadOnExit">退出时上传</el-checkbox>
+          </div>
+        </el-form-item>
+      </el-form>
+      <div class="action-buttons webdav-actions">
+        <el-button type="primary" :loading="webdavSaving" :disabled="webdavWriteBusy && !webdavSaving" @click="handleSaveWebdav">
+          <el-icon><Check /></el-icon>
+          保存配置
+        </el-button>
+        <el-button :loading="webdavTesting" @click="handleTestWebdav">
+          <el-icon><Link /></el-icon>
+          测试连接
+        </el-button>
+        <el-button
+          type="success"
+          plain
+          :loading="webdavUploading"
+          :disabled="webdavWriteBusy && !webdavUploading"
+          @click="handleWebdavUpload(false)"
+        >
+          <el-icon><Upload /></el-icon>
+          上传当前数据
+        </el-button>
+        <el-button
+          type="warning"
+          plain
+          :loading="webdavDownloading"
+          :disabled="webdavWriteBusy && !webdavDownloading"
+          @click="handleWebdavDownload"
+        >
+          <el-icon><Download /></el-icon>
+          下载并恢复
+        </el-button>
+      </div>
+      <div v-if="webdavStatus" class="webdav-status" aria-live="polite">
+        <el-descriptions :column="2" border size="small">
+          <el-descriptions-item label="远端状态">
+            <el-tag :type="webdavStatus.exists ? 'success' : 'info'">
+              {{ webdavStatus.exists ? '已有同步快照' : '尚无远端快照' }}
+            </el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="文件大小">{{ formatBytes(webdavStatus.size) }}</el-descriptions-item>
+          <el-descriptions-item label="最后修改">{{ webdavStatus.lastModified || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="ETag"><span class="etag-text">{{ webdavStatus.etag || '—' }}</span></el-descriptions-item>
+        </el-descriptions>
+      </div>
+      <div class="action-desc">
+        <p>账户与应用密码由 Rust 后端保存到当前系统安全凭据库（Windows 凭据管理器 / macOS 钥匙串 / Linux Secret Service）；页面不会读取或显示已保存的密码。Linux 无 Secret Service 时不会降级为明文保存。</p>
+        <p>上传遇到远端变化时会停止并提示确认，下载恢复前自动创建本地联合备份。</p>
+      </div>
+    </el-card>
+
     <el-card class="settings-card">
       <template #header>
         <div class="card-header">
@@ -178,10 +278,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { save, open } from '@tauri-apps/plugin-dialog'
-import { dataApi, settingsApi, backupApi, EXPORT_GROUPS, type ExcelSheetInfo, type ExcelSheetSelection } from '../api'
+import {
+  dataApi,
+  settingsApi,
+  backupApi,
+  webdavApi,
+  EXPORT_GROUPS,
+  type ExcelSheetInfo,
+  type ExcelSheetSelection,
+  type WebDavConfigView,
+  type WebDavRemoteStatus,
+} from '../api'
 import { isUserCancellation, showDetailedError } from '../utils/errorFeedback'
 
 const exportGroups = EXPORT_GROUPS
@@ -198,6 +308,35 @@ const importDialogVisible = ref(false)
 const importSourcePath = ref('')
 const availableSheets = ref<ExcelSheetInfo[]>([])
 const selectedSheets = ref<ExcelSheetSelection[]>([])
+const webdavSaving = ref(false)
+const webdavTesting = ref(false)
+const webdavUploading = ref(false)
+const webdavDownloading = ref(false)
+const webdavWriteBusy = computed(
+  () => webdavSaving.value || webdavUploading.value || webdavDownloading.value
+)
+const webdavStatus = ref<WebDavRemoteStatus | null>(null)
+const webdavConfig = ref<WebDavConfigView>({
+  url: '',
+  remotePath: 'mold-management.moldpkg',
+  usernameMasked: '',
+  credentialsConfigured: false,
+  credentialStore: '',
+  usingDevelopmentConfig: false,
+  autoUploadOnStart: false,
+  autoUploadOnExit: false,
+  lastEtag: null,
+  lastUploadedAt: null,
+  lastDownloadedAt: null,
+})
+const webdavForm = ref({
+  url: '',
+  remotePath: 'mold-management.moldpkg',
+  username: '',
+  password: '',
+  autoUploadOnStart: false,
+  autoUploadOnExit: false,
+})
 
 onMounted(async () => {
   try {
@@ -208,7 +347,138 @@ onMounted(async () => {
   }
   await loadBackupConfig()
   await loadBackups()
+  await loadWebdavConfig()
 })
+
+async function loadWebdavConfig() {
+  try {
+    const config = await webdavApi.getConfig()
+    webdavConfig.value = config
+    webdavForm.value = {
+      url: config.url,
+      remotePath: config.remotePath || 'mold-management.moldpkg',
+      username: '',
+      password: '',
+      autoUploadOnStart: config.autoUploadOnStart,
+      autoUploadOnExit: config.autoUploadOnExit,
+    }
+  } catch (error) {
+    showDetailedError('加载 WebDAV 配置', error)
+  }
+}
+
+async function handleSaveWebdav() {
+  const username = webdavForm.value.username.trim()
+  const password = webdavForm.value.password
+  if ((username && !password) || (!username && password)) {
+    ElMessage.warning('更新凭据时必须同时填写账户和应用密码')
+    return
+  }
+  webdavSaving.value = true
+  try {
+    await webdavApi.setConfig({
+      url: webdavForm.value.url.trim(),
+      remotePath: webdavForm.value.remotePath.trim(),
+      username: username || undefined,
+      password: password || undefined,
+      autoUploadOnStart: webdavForm.value.autoUploadOnStart,
+      autoUploadOnExit: webdavForm.value.autoUploadOnExit,
+    })
+    webdavForm.value.username = ''
+    webdavForm.value.password = ''
+    await loadWebdavConfig()
+    ElMessage.success('WebDAV 配置已加密保存')
+  } catch (error) {
+    showDetailedError('保存 WebDAV 配置', error)
+  } finally {
+    webdavSaving.value = false
+  }
+}
+
+async function handleTestWebdav() {
+  webdavTesting.value = true
+  try {
+    webdavStatus.value = await webdavApi.testConnection()
+    ElMessage.success(webdavStatus.value.exists ? '连接成功，远端已有同步快照' : '连接成功，远端尚无同步快照')
+  } catch (error) {
+    showDetailedError('测试 WebDAV 连接', error, '请检查 HTTPS 地址、账户与应用密码，并确认 WebDAV 服务可用。')
+  } finally {
+    webdavTesting.value = false
+  }
+}
+
+async function handleWebdavUpload(forceOverwrite: boolean) {
+  webdavUploading.value = true
+  try {
+    const result = await webdavApi.upload(forceOverwrite)
+    ElMessage.success(`上传成功，数据包 ${formatBytes(result.size)}`)
+    await loadWebdavConfig()
+    webdavStatus.value = await webdavApi.getStatus()
+  } catch (error) {
+    const reason = String(error || '')
+    if (!forceOverwrite && reason.includes('WEBDAV_CONFLICT|')) {
+      try {
+        await ElMessageBox.confirm(
+          `${reason.split('|').slice(1).join('|')}\n\n强制覆盖会替换远端快照，确定继续？`,
+          '远端数据冲突',
+          { type: 'warning', confirmButtonText: '强制覆盖远端', cancelButtonText: '取消' }
+        )
+        webdavUploading.value = false
+        await handleWebdavUpload(true)
+        return
+      } catch {
+        return
+      }
+    }
+    if (!forceOverwrite && reason.includes('WEBDAV_LEGACY_MANIFEST|')) {
+      try {
+        await ElMessageBox.confirm(
+          `${reason.split('|').slice(1).join('|')}\n\n上传将用新版格式替换该远端快照，确定继续？`,
+          '远端快照为旧版本格式',
+          { type: 'warning', confirmButtonText: '强制覆盖远端', cancelButtonText: '取消' }
+        )
+        webdavUploading.value = false
+        await handleWebdavUpload(true)
+        return
+      } catch {
+        return
+      }
+    }
+    showDetailedError('上传 WebDAV 数据快照', error, '请先测试连接；若远端已变化，建议先下载确认再上传。')
+  } finally {
+    webdavUploading.value = false
+  }
+}
+
+async function handleWebdavDownload() {
+  try {
+    await ElMessageBox.confirm(
+      '下载远端完整数据包将替换当前数据库和全部附件。系统会先创建本地联合备份，确定继续？',
+      '确认从 WebDAV 恢复',
+      { type: 'warning', confirmButtonText: '下载并恢复', cancelButtonText: '取消' }
+    )
+  } catch {
+    return
+  }
+  webdavDownloading.value = true
+  try {
+    await webdavApi.download()
+    ElMessage.success('下载恢复成功，SHA-256 校验通过')
+    window.location.reload()
+  } catch (error) {
+    showDetailedError('下载并恢复 WebDAV 数据', error, '请确认远端快照完整；本地数据不会在下载或校验失败时被替换。')
+  } finally {
+    webdavDownloading.value = false
+  }
+}
+
+function formatBytes(size: number | null | undefined) {
+  if (size == null) return '—'
+  if (size < 1024) return `${size} B`
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
+  if (size < 1024 * 1024 * 1024) return `${(size / 1024 / 1024).toFixed(1)} MB`
+  return `${(size / 1024 / 1024 / 1024).toFixed(2)} GB`
+}
 
 async function loadBackupConfig() {
   try {
@@ -599,6 +869,52 @@ async function handleSelectPath() {
 
 .backup-config {
   margin-bottom: 0;
+}
+
+.header-status-tag {
+  margin-left: auto;
+}
+
+.webdav-alert {
+  margin-bottom: 14px;
+}
+
+.webdav-form {
+  max-width: 760px;
+}
+
+.webdav-form :deep(.el-input) {
+  max-width: 560px;
+}
+
+.credential-status-row,
+.sync-policy-row {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.webdav-actions {
+  margin-top: 4px;
+  margin-bottom: 12px;
+}
+
+.webdav-status {
+  margin-bottom: 12px;
+}
+
+.etag-text {
+  display: inline-block;
+  max-width: 320px;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-family: "Cascadia Mono", "Segoe UI Mono", monospace;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+  white-space: nowrap;
 }
 
 .form-tip {

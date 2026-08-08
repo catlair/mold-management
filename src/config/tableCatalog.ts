@@ -49,13 +49,6 @@ const entityColumn = (label: string) => column(label, label, {
   canFilter: false,
 })
 
-const stockColumns = (nameLabel: string): TableColumnDefinition[] => [
-  column('name', nameLabel, { defaultSortable: true }),
-  column('currentStock', '当前库存', { defaultSortable: true }),
-  column('safetyStock', '安全库存', { defaultSortable: true }),
-  column('status', '库存状态', { defaultSortable: true }),
-]
-
 const orderColumns = (entityLabel: string, withStatus = true): TableColumnDefinition[] => [
   entityColumn(entityLabel),
   column('quantity', '入库数量', { defaultSortable: true }),
@@ -252,19 +245,6 @@ export const pageTableCatalog: PageTableDefinition[] = [
       { id: 'upper-punch.order', label: '入库记录', columns: orderColumns('上冲') },
       { id: 'upper-punch.use', label: '使用记录', columns: useColumns('上冲', '使用人', '使用数量', '使用时间') },
       { id: 'upper-punch.link', label: '线材关联', columns: wireLinkColumns('上冲') },
-    ],
-  },
-  {
-    id: 'inventory',
-    label: '库存汇总',
-    route: '/inventory',
-    tables: [
-      { id: 'inventory.punch', label: '冲头库存', columns: stockColumns('冲头名称') },
-      { id: 'inventory.die', label: '牙板库存', columns: stockColumns('牙板名称') },
-      { id: 'inventory.belt', label: '皮带库存', columns: stockColumns('皮带名称') },
-      { id: 'inventory.main-mold', label: '主模具库存', columns: stockColumns('主模具名称') },
-      { id: 'inventory.scissor', label: '剪刀库存', columns: stockColumns('剪刀名称') },
-      { id: 'inventory.upper-punch', label: '上冲库存', columns: stockColumns('上冲名称') },
     ],
   },
   {
